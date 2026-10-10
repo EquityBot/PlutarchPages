@@ -222,6 +222,33 @@ fn images_are_removed_or_have_their_pixels_cleared() {
     assert_eq!(s.decoded().unwrap(), [0, 0, 255, 255], "pixels 1–2 (x 100–120) cleared");
     let Object::Stream(orig) = &*doc.get(ObjRef::new(7, 0)) else { panic!() };
     assert_eq!(orig.decoded().unwrap(), [255; 4], "the shared original is untouched");
+    // The originals are no longer referenced from the page: both /Im1 and /Im2 are gone, so a
+    // full save garbage-collects the superseded image (#389).
+    assert!(!xo.contains(b"Im1") && !xo.contains(b"Im2"), "redacted-image resource entries left behind: {:?}", xo);
+}
+
+#[test]
+fn redacted_image_bytes_are_gone_from_the_saved_file() {
+    // Regression for #389: a scanned-page image under a mark must not survive in the saved file.
+    // The image carries a canary byte run; after a full-rewrite save it must be absent, because
+    // the page no longer references the original image XObject.
+    const CANARY: &[u8] = &[0xCA, 0xFE, 0xBA, 0xBE, 0x11, 0x22, 0x33, 0x44];
+    // 8×1 DeviceGray/8bpc image whose pixel bytes are the canary; a Flate scan stand-in.
+    let img = stream("/Type /XObject /Subtype /Image /Width 8 /Height 1 /ColorSpace /DeviceGray /BitsPerComponent 8", CANARY);
+    // Fully cover the single image so its `Do` is dropped and the resource entry removed.
+    let src = b"q 80 0 0 10 10 10 cm /Scan Do Q";
+    let mut doc = one_page(src, "/XObject << /Scan 7 0 R >>", vec![img]);
+    mark(&mut doc, 0, &[[0.0, 0.0, 120.0, 40.0]], "GONE");
+    let r = apply(&mut doc, None).unwrap();
+    assert_eq!(r.images_removed, 1, "{r:?}");
+    assert!(doc.full_save_required(), "redaction forces a full save");
+    let p = pdfcraft_model::pages(&doc).swap_remove(0);
+    let res = doc.resolve(p.dict.get(b"Resources").unwrap()).as_dict().cloned().unwrap();
+    let xo = res.get(b"XObject").and_then(|x| doc.resolve(x).as_dict().cloned()).unwrap_or_default();
+    assert!(!xo.contains(b"Scan"), "the original image is still referenced by the page: {:?}", xo);
+    // A full rewrite only writes reachable objects: the canary must be gone.
+    let bytes = write_full(&doc, &SaveOptions::default()).unwrap();
+    assert!(!bytes.windows(CANARY.len()).any(|w| w == CANARY), "redacted image bytes left in the saved file (#389)");
 }
 
 #[test]

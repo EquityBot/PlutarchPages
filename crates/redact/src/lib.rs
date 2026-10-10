@@ -309,10 +309,14 @@ pub fn apply(doc: &mut Document, pages: Option<&[usize]>) -> Result<Report, Reda
             new_list[i] = Object::Ref(doc.add(Object::Stream(Stream::flate(dict, &bytes))));
             changed = true;
         }
-        if changed || !out.xobjects.is_empty() {
+        if changed || !out.xobjects.is_empty() || !out.remove_xobjects.is_empty() {
             let mut res = resources;
-            if !out.xobjects.is_empty() {
+            if !out.xobjects.is_empty() || !out.remove_xobjects.is_empty() {
                 let mut xo = res.get(b"XObject").and_then(|x| doc.resolve(x).as_dict().cloned()).unwrap_or_default();
+                // Drop originals of redacted images first, then add the cleared copies (#389).
+                for n in &out.remove_xobjects {
+                    xo.remove(n);
+                }
                 for (n, r) in &out.xobjects {
                     xo.set(n.clone(), Object::Ref(*r));
                 }

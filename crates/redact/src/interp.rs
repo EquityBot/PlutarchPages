@@ -54,6 +54,11 @@ pub(crate) struct Output {
     pub streams: Vec<Option<Vec<u8>>>,
     /// New XObjects the rewritten content refers to: (resource name, object).
     pub xobjects: Vec<(Vec<u8>, ObjRef)>,
+    /// Original image XObject resource names whose image was redacted (removed or replaced) and
+    /// which no surviving `Do` still references: the caller drops them from the scope's
+    /// `/Resources /XObject`, so a full save garbage-collects the superseded image stream.
+    /// Without this the original (unredacted) image stays in the file and is extractable (#389).
+    pub remove_xobjects: Vec<Vec<u8>>,
     /// Glyphs / inline images still overlapping a region (verify mode).
     pub residue: usize,
 }
@@ -237,6 +242,9 @@ pub(crate) fn process(doc: &mut Document, scope: &mut Scope<'_>, streams: &[Vec<
         }
     }
 
+    // Image XObject names still drawn by a surviving `Do` after rewriting; a redacted image's
+    // original name is dropped from resources only when it is NOT in here (#389).
+    let mut still_drawn: Vec<Vec<u8>> = Vec::new();
     for (piece, mut changed) in pieces.into_iter().zip(rewrite) {
         let mut ops: Vec<Op> = Vec::with_capacity(piece.len());
         for op in piece {
@@ -444,8 +452,20 @@ pub(crate) fn process(doc: &mut Document, scope: &mut Scope<'_>, streams: &[Vec<
         if !path.is_empty() {
             ops.append(&mut path);
         }
+        // Any image XObject a surviving `Do` still draws must stay in resources: an image used
+        // by several draws, only some of them redacted, is kept for the others.
+        for op in &ops {
+            if op.is("Do")
+                && let Some(n) = op.name(0)
+            {
+                still_drawn.push(n.to_vec());
+            }
+        }
         out.streams.push(changed.then(|| serialize_ops(&ops)));
     }
+    out.remove_xobjects.retain(|n| !still_drawn.contains(n));
+    out.remove_xobjects.sort();
+    out.remove_xobjects.dedup();
     out
 }
 
@@ -552,6 +572,9 @@ fn xobject(
             }
             if scope.covered(b) {
                 scope.report.images_removed += 1;
+                // The original image is no longer drawn: mark it for removal from resources so
+                // the superseded (unredacted) stream is garbage-collected on a full save (#389).
+                out.remove_xobjects.push(name);
                 return Some(None);
             }
             match image::clear(doc, s, &gs.ctm, scope.rects) {
@@ -562,10 +585,13 @@ fn xobject(
                     xobjects.set(n.clone(), Object::Ref(nr));
                     out.xobjects.push((n.clone(), nr));
                     scope.report.images_cleared += 1;
+                    // The `Do` now points at the cleared copy; drop the original from resources.
+                    out.remove_xobjects.push(name);
                     Some(Some(Op::new("Do", vec![Object::Name(n)])))
                 }
                 Err(()) => {
                     scope.report.images_removed += 1;
+                    out.remove_xobjects.push(name);
                     Some(None)
                 }
             }
@@ -610,14 +636,17 @@ fn xobject(
                 return None;
             }
             let new_data = inner.streams.into_iter().next().flatten();
-            if new_data.is_none() && inner.xobjects.is_empty() {
+            if new_data.is_none() && inner.xobjects.is_empty() && inner.remove_xobjects.is_empty() {
                 return None;
             }
             let mut dict = s.dict.clone();
             dict.remove(b"Length");
-            if !inner.xobjects.is_empty() {
+            if !inner.xobjects.is_empty() || !inner.remove_xobjects.is_empty() {
                 let mut res = res;
                 let mut xo = res_dict(doc, &res, b"XObject");
+                for n in &inner.remove_xobjects {
+                    xo.remove(n);
+                }
                 for (n, r) in &inner.xobjects {
                     xo.set(n.clone(), Object::Ref(*r));
                 }
