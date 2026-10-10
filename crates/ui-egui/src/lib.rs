@@ -956,7 +956,10 @@ impl PdfCraftApp {
             };
         }
         let initial = doc.initial_view();
-        self.views.push(DocView::new(id, &doc.info, self.view_defaults));
+        let copy_allowed = doc.allows_copy();
+        let mut view = DocView::new(id, &doc.info, self.view_defaults);
+        view.copy_allowed = copy_allowed;
+        self.views.push(view);
         if activate {
             self.active = Some(self.views.len() - 1);
         }

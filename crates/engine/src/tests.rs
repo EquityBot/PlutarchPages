@@ -617,6 +617,8 @@ fn restricted_documents_refuse_changes_unless_opened_by_the_owner() {
     let id = s.open("r.pdf", None, bytes.clone(), None).unwrap();
     let d = s.get(id).unwrap();
     assert!(!d.allows_assembly() && !d.allows_modification());
+    // Print-only permissions clear the copy/extract bit (#568): copying text is refused.
+    assert!(!d.allows_copy(), "copy must be blocked when the extract bit is clear");
     let summary = d.security_summary().unwrap();
     assert!(!summary.owner && summary.permissions.print() && !summary.permissions.copy());
     assert_eq!(s.apply(id, Edit::DeletePages { pages: vec![0] }), Err(EditError::NotPermitted("page changes")));
@@ -626,6 +628,10 @@ fn restricted_documents_refuse_changes_unless_opened_by_the_owner() {
     // The owner password lifts the restrictions.
     let oid = s.open("r.pdf", None, bytes, Some("owner")).unwrap();
     assert!(s.get(oid).unwrap().allows_assembly());
+    assert!(s.get(oid).unwrap().allows_copy(), "the owner password lifts the copy restriction");
+    // An unencrypted document imposes no copy restriction.
+    let plain = s.open("plain.pdf", None, Arc::new(fixture(1)), None).unwrap();
+    assert!(s.get(plain).unwrap().allows_copy());
     s.apply(oid, Edit::DeletePages { pages: vec![0] }).unwrap();
 }
 

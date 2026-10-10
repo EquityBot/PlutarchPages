@@ -3917,3 +3917,41 @@ fn text_extract_with_a_rect_takes_one_column() {
         assert!(matches!(e, ToolError::InvalidArgs(_)), "{bad}: {e}");
     }
 }
+
+/// #568: a document whose security forbids copying (extract bit clear, empty user password)
+/// must refuse text extraction in automation; the owner password lifts the restriction.
+#[test]
+fn copy_restricted_documents_refuse_text_extraction() {
+    use std::sync::Arc;
+    let dir = workdir("copy-restricted");
+    // Print-only permissions (bit 3), copy/extract bit 5 clear, no user password to open.
+    let mut doc = pdfcraft_cos::Document::open(Arc::new(fixture(1))).unwrap();
+    doc.set_encryption(&pdfcraft_cos::NewEncryption {
+        algorithm: pdfcraft_cos::Algorithm::Aes256,
+        user_password: "",
+        owner_password: "owner",
+        permissions: 0b0100,
+        encrypt_metadata: true,
+        seed: [7; 32],
+    })
+    .unwrap();
+    let bytes = pdfcraft_cos::write_full(&doc, &pdfcraft_cos::SaveOptions::default()).unwrap();
+    std::fs::write(dir.join("locked.pdf"), &bytes).unwrap();
+    let mut a = auto(&dir);
+
+    // Opens without a password (empty user password), but text extraction is refused.
+    let id = ok(&mut a, "doc_open", json!({ "path": "locked.pdf" }))["doc"].as_u64().unwrap();
+    let refused = |e: &ToolError| matches!(e, ToolError::Failed(m) if m.contains("don't allow copying"));
+    assert!(refused(&a.call("text_extract", &json!({ "doc": id })).unwrap_err()), "text_extract must be blocked");
+    assert!(refused(&a.call("text_find", &json!({ "doc": id, "query": "Page" })).unwrap_err()), "text_find must be blocked");
+    assert!(
+        refused(&a.call("doc_export_text", &json!({ "doc": id, "path": "out.txt" })).unwrap_err()),
+        "doc_export_text must be blocked"
+    );
+    assert!(!dir.join("out.txt").exists(), "no text file was written for a blocked export");
+
+    // The owner password lifts the restriction.
+    let oid = ok(&mut a, "doc_open", json!({ "path": "locked.pdf", "password": "owner" }))["doc"].as_u64().unwrap();
+    assert_eq!(page_text(&mut a, oid), vec!["Page 1"], "the owner may extract text");
+    let _ = std::fs::remove_dir_all(&dir);
+}

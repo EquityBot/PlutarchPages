@@ -286,6 +286,13 @@ fn text(args: &[String]) -> Result<(), CliError> {
     }
     let password = flag(args, "--password");
     let bytes = read(path)?;
+    // The document's security may forbid extracting text (Table 22, bit 5). The owner password
+    // lifts it; an unencrypted document has no restriction (#568).
+    if let Ok(doc) = pdfcraft_cos::Document::open_with_password(bytes.clone(), password)
+        && doc.permissions().is_some_and(|p| !p.copy())
+    {
+        return Err("text: this document's security settings don't allow copying or extracting text; open it with --password <owner password>".into());
+    }
     let mut r = PageRenderer::new(bytes.clone(), RenderConfig { password: password.map(Arc::from), ..Default::default() });
     // A document the renderer could not open (wrong or missing password, unparseable file) has
     // no pages, and "extract every page" of nothing would print nothing and exit 0 (#132). Ask

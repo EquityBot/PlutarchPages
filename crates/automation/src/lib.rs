@@ -997,6 +997,12 @@ impl Automation {
         let stem = doc.name.trim_end_matches(".pdf").trim_end_matches(".PDF").to_string();
         let mut ex = pdfcraft_engine::export::Exporter::new(doc);
         if tool == "doc_export_text" {
+            // Exporting text is a copy/extract; the document's security may forbid it (#568).
+            if !doc.allows_copy() {
+                return Err(failed(
+                    "this document's security settings don't allow copying or extracting text; open it with the owner password to export text",
+                ));
+            }
             let path = self.resolve(a.str("path")?, true)?;
             let text = ex.text_of(&pages).map_err(failed)?;
             write_atomic(&path, text.as_bytes())?;
@@ -1497,6 +1503,13 @@ impl Automation {
     /// The text of `pages` (0-based), from the cache or extracted in parallel.
     fn page_texts(&mut self, id: DocId, pages: &[usize]) -> Result<Vec<Arc<PageText>>> {
         let doc = self.session.get(id).ok_or_else(|| failed("no such document"))?;
+        // The document's security may forbid extracting text (Table 22, bit 5). Honour it unless
+        // it was opened with the owner password, which lifts every restriction (#568).
+        if !doc.allows_copy() {
+            return Err(failed(
+                "this document's security settings don't allow copying or extracting text; open it with the owner password to extract text",
+            ));
+        }
         let (bytes, n) = (doc.bytes.clone(), doc.info.pages.len());
         let password: Option<Arc<str>> = doc.password.as_deref().map(Arc::from);
         let entry = self.texts.entry(id).or_insert_with(|| (bytes.clone(), Vec::new()));

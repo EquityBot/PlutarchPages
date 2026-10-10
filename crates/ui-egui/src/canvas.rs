@@ -263,6 +263,10 @@ pub struct DocView {
     pub zoom: f32,
     pub fit: Fit,
     pub layout: PageLayout,
+    /// The document's security allows copying / extracting text (Table 22, bit 5). Set from the
+    /// engine on open; owner-password and unencrypted documents are `true`. ⌘C and the context
+    /// menu's Copy honour it (#568).
+    pub copy_allowed: bool,
     /// View rotation in degrees clockwise (0, 90, 180, 270); display only, never saved.
     pub rotation: u16,
     pub current: usize,
@@ -497,6 +501,8 @@ impl DocView {
             zoom: defaults.zoom,
             fit: defaults.fit,
             layout: defaults.layout,
+            // Permissive by default; the opener lowers it for a copy-restricted document (#568).
+            copy_allowed: true,
             rotation: 0,
             current: 0,
             organize: false,
@@ -828,8 +834,12 @@ impl DocView {
         Some(xf.view_rect(g.rect).center())
     }
 
-    /// Selected text, if any (⌘C).
+    /// Selected text, if any (⌘C). Yields nothing when the document's security forbids copying,
+    /// so neither ⌘C nor the Copy menu can extract text from a restricted document (#568).
     pub fn selected_text(&self) -> Option<String> {
+        if !self.copy_allowed {
+            return None;
+        }
         let s = self.selection?;
         let t = self.texts.get(&s.page)?;
         Some(s.text(t)).filter(|x| !x.is_empty())
