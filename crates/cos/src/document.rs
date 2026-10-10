@@ -364,6 +364,17 @@ impl Document {
             pdfcraft_crypt::CryptError::WrongPassword => CosError::WrongPassword,
             other => CosError::Security(other.to_string()),
         })?;
+        // §7.6.4.4: a document can carry a non-empty Document Open (user) password while the
+        // empty password still authenticates as *owner*. Opening owner-first would then reveal
+        // the content with no prompt (#603). When the caller supplied no password and the empty
+        // password did not authenticate as the user, the Document Open password is mandatory:
+        // refuse so the caller prompts, exactly as if the empty password were simply wrong.
+        if password.is_none()
+            && handler.auth() == pdfcraft_crypt::Auth::Owner
+            && !handler.authenticates_empty_user(&id0)
+        {
+            return Err(CosError::NeedsPassword);
+        }
         self.security = Some(Arc::new(handler));
         self.encrypt_num = num;
         // Objects read while locating the catalog were read before decryption was possible.

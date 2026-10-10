@@ -418,6 +418,14 @@ impl Document {
         self.permissions().is_none_or(|p| p.print())
     }
 
+    /// Copying / extracting text and graphics is allowed (Table 22, bit 5). An unencrypted
+    /// document, or one opened with the owner password, always allows it. Enforced by every
+    /// text-extraction path (UI copy, CLI/automation text export) so a Document Open–only
+    /// password's copy restriction is honoured (#568).
+    pub fn allows_copy(&self) -> bool {
+        self.permissions().is_none_or(|p| p.copy())
+    }
+
     /// Page changes (insert, delete, rotate, move, extract) are allowed.
     pub fn allows_assembly(&self) -> bool {
         self.editable() && self.permissions().is_none_or(|p| p.assemble())
@@ -2214,6 +2222,13 @@ impl Session {
 
     fn open_unguarded(&mut self, name: String, path: Option<String>, bytes: Arc<Vec<u8>>, password: Option<&str>) -> Result<DocId, OpenError> {
         let cos = std::panic::catch_unwind(|| pdfcraft_cos::Document::open_with_password(bytes.clone(), password));
+        // §7.6.4.4 (#603): a document may carry a non-empty Document Open password yet have the
+        // empty password authenticate as *owner*. The COS reader refuses that silent open with
+        // NeedsPassword; the renderer (hayro) opens R5/6 owner-first and would not. Honour the
+        // COS verdict so the user is always prompted instead of shown the content.
+        if password.is_none() && matches!(&cos, Ok(Err(pdfcraft_cos::CosError::NeedsPassword))) {
+            return Err(OpenError::NeedsPassword);
+        }
         // The renderer authenticates on its own. It cannot use the owner password of R2–R4
         // files, so give it the user password that owner authentication recovers.
         let (info, render_password) = match inspect(bytes.clone(), password) {

@@ -73,8 +73,24 @@ fn created_encryption_authenticates_owner_and_user() {
 fn empty_user_password_opens_without_asking() {
     for alg in ALL {
         let d = new(alg, "", "secret", -1).dict().clone();
-        let h = SecurityHandler::open(d, ID, None).unwrap();
+        let h = SecurityHandler::open(d.clone(), ID, None).unwrap();
         assert_eq!(h.auth(), Auth::User, "{alg:?}");
+        assert!(h.authenticates_empty_user(ID), "{alg:?}: the empty password is the user password");
+    }
+}
+
+#[test]
+fn a_non_empty_user_password_is_reported_as_mandatory() {
+    // The Document Open prompt rule (#603): with a non-empty user password, the empty password
+    // must NOT authenticate as the user, so a caller that opened the file owner-first can tell
+    // the Document Open password is still required and prompt for it.
+    for alg in ALL {
+        let d = new(alg, "secret", "owner", -1).dict().clone();
+        // `authenticates_empty_user` recomputes from the dict, independent of how it was opened.
+        let owner = SecurityHandler::open(d.clone(), ID, Some("owner")).unwrap();
+        assert!(!owner.authenticates_empty_user(ID), "{alg:?}: empty is not the user password");
+        // The empty password opens neither as user nor as the (non-empty) owner.
+        assert_eq!(SecurityHandler::open(d, ID, None).unwrap_err(), CryptError::WrongPassword, "{alg:?}");
     }
 }
 
