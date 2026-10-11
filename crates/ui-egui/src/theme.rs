@@ -1,9 +1,15 @@
-//! Design tokens and egui style (plan/acrobat/02-ui-ux.md §1: neutral chrome, white panels,
-//! one blue accent; Dark Gray keeps pages white). Every custom widget reads `Tokens::get`.
+//! Design tokens and egui style. PlutarchPages uses the owner's Mermaid colour scheme (black,
+//! ivory, Tyrian purple and crimson): ivory chrome in the light theme, true black (for OLED
+//! screens) in the dark one, crimson as the one accent. Pages stay white. Every custom widget
+//! reads `Tokens::get`.
 
 use std::sync::Arc;
 
 use egui::{Color32, CornerRadius, FontData, FontDefinitions, FontFamily, FontId, Stroke, Visuals};
+
+const IVORY: Color32 = Color32::from_rgb(0xFF, 0xFF, 0xF0);
+const CRIMSON: Color32 = Color32::from_rgb(0x99, 0x00, 0x24);
+const TYRIAN_PURPLE: Color32 = Color32::from_rgb(0x66, 0x02, 0x3C);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
 pub enum ThemeKind {
@@ -70,51 +76,57 @@ pub struct Tokens {
 impl Tokens {
     pub fn for_kind(kind: ThemeKind) -> Self {
         match kind {
+            // Ivory surfaces and black text; the warm greys and purple tints are ivory mixed
+            // with black or Tyrian purple, so no other hue appears.
             ThemeKind::Light => Self {
                 kind,
-                titlebar: Color32::from_rgb(0xE9, 0xE9, 0xEB),
-                chrome: Color32::from_rgb(0xFF, 0xFF, 0xFF),
-                panel: Color32::from_rgb(0xFF, 0xFF, 0xFF),
-                pasteboard: Color32::from_rgb(0xF1, 0xF1, 0xF3),
-                card: Color32::from_rgb(0xFF, 0xFF, 0xFF),
-                border: Color32::from_rgb(0xDA, 0xDA, 0xDE),
-                divider: Color32::from_rgb(0xE8, 0xE8, 0xEB),
-                text: Color32::from_rgb(0x22, 0x22, 0x26),
-                text_muted: Color32::from_rgb(0x5E, 0x5E, 0x66),
-                text_faint: Color32::from_rgb(0x6B, 0x6B, 0x73),
-                icon: Color32::from_rgb(0x44, 0x44, 0x4B),
-                hover: Color32::from_rgb(0xF0, 0xF0, 0xF3),
-                pressed: Color32::from_rgb(0xE4, 0xE4, 0xE9),
-                selected: Color32::from_rgb(0xE6, 0xEE, 0xFD),
-                accent: Color32::from_rgb(0x1B, 0x63, 0xE0),
-                accent_text: Color32::from_rgb(0x17, 0x55, 0xC4),
-                accent_soft: Color32::from_rgb(0xE3, 0xEC, 0xFD),
-                field: Color32::from_rgb(0xFF, 0xFF, 0xFF),
-                badge_new: Color32::from_rgb(0x1B, 0x63, 0xE0),
+                titlebar: Color32::from_rgb(0xEB, 0xEB, 0xDD),
+                chrome: IVORY,
+                panel: IVORY,
+                pasteboard: Color32::from_rgb(0xF2, 0xF2, 0xE4),
+                card: IVORY,
+                border: Color32::from_rgb(0xD6, 0xD6, 0xCA),
+                divider: Color32::from_rgb(0xE6, 0xE6, 0xD8),
+                text: Color32::BLACK,
+                text_muted: Color32::from_rgb(0x4D, 0x4D, 0x4D),
+                text_faint: Color32::from_rgb(0x66, 0x66, 0x66),
+                icon: Color32::from_rgb(0x26, 0x26, 0x26),
+                hover: Color32::from_rgb(0xF0, 0xF0, 0xE2),
+                pressed: Color32::from_rgb(0xE0, 0xE0, 0xD3),
+                selected: Color32::from_rgb(0xEA, 0xDC, 0xD7),
+                accent: CRIMSON,
+                accent_text: CRIMSON,
+                accent_soft: Color32::from_rgb(0xF0, 0xE6, 0xDE),
+                field: IVORY,
+                badge_new: CRIMSON,
                 page_shadow: Color32::from_black_alpha(34),
                 radius: 6,
             },
+            // True black for OLED screens: every surface is #000000 except raised cards and
+            // fields; greys carry no hue, text is ivory. Crimson is the accent and Tyrian purple
+            // marks selection; links use a light crimson, since crimson itself is too dark to
+            // read on black.
             ThemeKind::Dark => Self {
                 kind,
-                titlebar: Color32::from_rgb(0x1B, 0x1B, 0x1E),
-                chrome: Color32::from_rgb(0x26, 0x26, 0x2A),
-                panel: Color32::from_rgb(0x26, 0x26, 0x2A),
-                pasteboard: Color32::from_rgb(0x19, 0x19, 0x1C),
-                card: Color32::from_rgb(0x2E, 0x2E, 0x33),
-                border: Color32::from_rgb(0x3C, 0x3C, 0x43),
-                divider: Color32::from_rgb(0x33, 0x33, 0x39),
-                text: Color32::from_rgb(0xEC, 0xEC, 0xEF),
-                text_muted: Color32::from_rgb(0xAE, 0xAE, 0xB6),
-                text_faint: Color32::from_rgb(0x97, 0x97, 0x9E),
-                icon: Color32::from_rgb(0xD4, 0xD4, 0xDA),
-                hover: Color32::from_rgb(0x34, 0x34, 0x3A),
-                pressed: Color32::from_rgb(0x3E, 0x3E, 0x45),
-                selected: Color32::from_rgb(0x23, 0x3A, 0x63),
-                accent: Color32::from_rgb(0x4B, 0x8B, 0xF5),
-                accent_text: Color32::from_rgb(0x8C, 0xB6, 0xFA),
-                accent_soft: Color32::from_rgb(0x24, 0x36, 0x57),
-                field: Color32::from_rgb(0x1E, 0x1E, 0x22),
-                badge_new: Color32::from_rgb(0x3D, 0x7D, 0xEE),
+                titlebar: Color32::BLACK,
+                chrome: Color32::BLACK,
+                panel: Color32::BLACK,
+                pasteboard: Color32::BLACK,
+                card: Color32::from_rgb(0x0A, 0x0A, 0x0A),
+                border: Color32::from_rgb(0x26, 0x26, 0x26),
+                divider: Color32::from_rgb(0x26, 0x26, 0x26),
+                text: IVORY,
+                text_muted: Color32::from_rgb(0xC8, 0xC8, 0xC8),
+                text_faint: Color32::from_rgb(0x9A, 0x9A, 0x9A),
+                icon: Color32::from_rgb(0xC8, 0xC8, 0xC8),
+                hover: Color32::from_rgb(0x16, 0x16, 0x16),
+                pressed: Color32::from_rgb(0x26, 0x26, 0x26),
+                selected: TYRIAN_PURPLE,
+                accent: CRIMSON,
+                accent_text: Color32::from_rgb(0xFF, 0x9C, 0x91),
+                accent_soft: TYRIAN_PURPLE,
+                field: Color32::from_rgb(0x0A, 0x0A, 0x0A),
+                badge_new: CRIMSON,
                 page_shadow: Color32::from_black_alpha(120),
                 radius: 6,
             },
@@ -316,6 +328,26 @@ mod tests {
         };
         let (x, y) = (lum(a) + 0.05, lum(b) + 0.05);
         x.max(y) / x.min(y)
+    }
+
+    /// The dark theme is true black for OLED screens; both themes take their accent and
+    /// selection from the Mermaid scheme and keep text on them readable.
+    #[test]
+    fn dark_is_true_black_and_the_scheme_colours_stay_readable() {
+        let dark = Tokens::for_kind(ThemeKind::Dark);
+        for c in [dark.titlebar, dark.chrome, dark.panel, dark.pasteboard] {
+            assert_eq!(c, Color32::BLACK);
+        }
+        assert_eq!((dark.text, dark.selected), (IVORY, TYRIAN_PURPLE));
+        for t in [Tokens::for_kind(ThemeKind::Light), dark] {
+            assert_eq!(t.accent, CRIMSON);
+            for (name, fg, bg) in
+                [("text on selected", t.text, t.selected), ("links", t.accent_text, t.panel), ("white on accent", Color32::WHITE, t.accent)]
+            {
+                let r = contrast(fg, bg);
+                assert!(r >= 4.5, "{:?} {name}: {r:.2}:1", t.kind);
+            }
+        }
     }
 
     #[test]
