@@ -11,8 +11,12 @@
 //!
 //! A verification pass then re-reads every redacted page; if any glyph or inline image is still
 //! under a region the whole operation fails (callers keep the previous document: fail-closed).
+//! It fails the same way when content under the marks is also used where the marks don't reach
+//! (another page, or another draw outside the marks), since its original would stay in the file.
 
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
+
+use std::collections::HashSet;
 
 use pdfcraft_cos::{Dict, Document, ObjRef, Object, Stream};
 
@@ -37,6 +41,13 @@ pub enum RedactError {
     Unreadable(usize),
     #[error("redaction could not be verified: {0} item(s) were still found under the marks, so nothing was changed")]
     Residue(usize),
+    /// Content under the marks is shared with places the marks don't cover (other pages, or
+    /// another draw outside the marks): its unredacted original would stay in the file.
+    #[error(
+        "content under the marks is also used {}, outside the marks, so its unredacted original would stay in the file; mark it there too. Nothing was changed",
+        where_used(.0)
+    )]
+    StillUsed(Vec<usize>),
     #[error(transparent)]
     Edit(#[from] pdfcraft_edit::EditError),
     #[error(transparent)]
@@ -263,8 +274,115 @@ fn overlay_content(marks: &[&Mark]) -> Vec<u8> {
     c
 }
 
+/// "on page 2", "on pages 2, 5", or "elsewhere in the document" (`pages` 0-based).
+fn where_used(pages: &[usize]) -> String {
+    match pages {
+        [] => "elsewhere in the document".into(),
+        [p] => format!("on page {}", p + 1),
+        _ => format!("on pages {}", pages.iter().map(|p| (p + 1).to_string()).collect::<Vec<_>>().join(", ")),
+    }
+}
+
+/// The objects reachable from `roots` by following references.
+fn reachable(doc: &Document, roots: &[Object]) -> HashSet<ObjRef> {
+    fn refs(o: &Object, out: &mut Vec<ObjRef>) {
+        match o {
+            Object::Ref(r) => out.push(*r),
+            Object::Array(a) => a.iter().for_each(|x| refs(x, out)),
+            Object::Dict(d) => d.iter().for_each(|(_, v)| refs(v, out)),
+            Object::Stream(s) => s.dict.iter().for_each(|(_, v)| refs(v, out)),
+            _ => {}
+        }
+    }
+    let mut queue = Vec::new();
+    roots.iter().for_each(|o| refs(o, &mut queue));
+    let mut seen = HashSet::new();
+    while let Some(r) = queue.pop() {
+        if seen.insert(r) {
+            refs(&doc.get(r), &mut queue);
+        }
+    }
+    seen
+}
+
+/// `res` without the image and form XObjects whose original redaction retired (none of them
+/// is drawn where this is used; see [`check_retired`]).
+fn without_retired(doc: &Document, res: &Dict, retired: &HashSet<ObjRef>) -> Option<Dict> {
+    let xo = res.get(b"XObject").and_then(|x| doc.resolve(x).as_dict().cloned())?;
+    if !xo.iter().any(|(_, v)| v.as_ref().is_some_and(|r| retired.contains(&r))) {
+        return None;
+    }
+    let kept: Dict = xo.iter().filter(|(_, v)| v.as_ref().is_none_or(|r| !retired.contains(&r))).map(|(k, v)| (k.clone(), v.clone())).collect();
+    let mut res = res.clone();
+    res.set(b"XObject".to_vec(), Object::Dict(kept));
+    Some(res)
+}
+
+/// Fail closed when an original that redaction replaced or removed (an image, a form, a content
+/// stream) could still be saved with the file: a page draws it outside the marks (those pages
+/// are named), or something else still refers to it. Resource entries for it that nothing draws,
+/// such as those inherited from the page tree, are dropped first.
+fn check_retired(doc: &mut Document, retired: &HashSet<ObjRef>) -> Result<(), RedactError> {
+    let all = pdfcraft_model::pages(doc);
+    let mut using = Vec::new();
+    for (i, p) in all.iter().enumerate() {
+        // What the page draws: its contents, the XObjects its content names (conservatively all
+        // of them when it can't be read), its other resources, and annotation appearances.
+        let drawn: Option<HashSet<Vec<u8>>> = page_streams(doc, &p.dict, i).ok().map(|(_, data)| {
+            pdfcraft_content::Pieces::join(&data)
+                .parse()
+                .ops
+                .iter()
+                .filter(|op| op.is("Do"))
+                .filter_map(|op| op.name(0).map(<[u8]>::to_vec))
+                .collect()
+        });
+        let mut roots: Vec<Object> = p.dict.get(b"Contents").cloned().into_iter().collect();
+        if let Some(mut res) = p.dict.get(b"Resources").and_then(|r| doc.resolve(r).as_dict().cloned()) {
+            if let (Some(drawn), Some(xo)) = (&drawn, res.get(b"XObject").and_then(|x| doc.resolve(x).as_dict().cloned())) {
+                let used: Dict = xo.iter().filter(|(k, _)| drawn.contains(k.as_slice())).map(|(k, v)| (k.clone(), v.clone())).collect();
+                res.set(b"XObject".to_vec(), Object::Dict(used));
+            }
+            roots.push(Object::Dict(res));
+        }
+        roots.extend(annots_of(doc, &p.dict).iter().filter_map(|a| doc.resolve(a).as_dict()?.get(b"AP").cloned()));
+        if !reachable(doc, &roots).is_disjoint(retired) {
+            using.push(i);
+        }
+    }
+    if !using.is_empty() {
+        return Err(RedactError::StillUsed(using));
+    }
+    // Nothing draws them: drop their entries from every page's and page-tree node's resources.
+    let mut holders: Vec<ObjRef> = all.iter().map(|p| p.obj).collect();
+    let mut node = doc.root().and_then(|r| doc.get(r).as_dict()?.get(b"Pages")?.as_ref());
+    let mut nodes = Vec::new();
+    while let Some(n) = node.take().or_else(|| nodes.pop()) {
+        if holders.contains(&n) {
+            continue;
+        }
+        holders.push(n);
+        if let Some(kids) = doc.get(n).as_dict().and_then(|d| d.get(b"Kids").map(|k| doc.resolve(k).as_array().cloned().unwrap_or_default())) {
+            nodes.extend(kids.iter().filter_map(Object::as_ref));
+        }
+    }
+    for h in holders {
+        let holder = doc.get(h);
+        let Some(res_obj) = holder.as_dict().and_then(|d| d.get(b"Resources")).cloned() else { continue };
+        let Some(res) = doc.resolve(&res_obj).as_dict().cloned() else { continue };
+        let Some(pruned) = without_retired(doc, &res, retired) else { continue };
+        match res_obj.as_ref() {
+            Some(shared) => doc.set(shared, Object::Dict(pruned)),
+            None => doc.update_dict(h, |d| d.set(b"Resources".to_vec(), Object::Dict(pruned)))?,
+        }
+    }
+    let roots: Vec<Object> = [&b"Root"[..], b"Info"].iter().filter_map(|k| doc.trailer().get(k).cloned()).collect();
+    if reachable(doc, &roots).is_disjoint(retired) { Ok(()) } else { Err(RedactError::StillUsed(Vec::new())) }
+}
+
 /// Apply every redaction mark (or only those on `pages`, 0-based). Irreversible for the saved
-/// file; callers keep the previous document for undo.
+/// file; callers keep the previous document for undo. Refused (with the document left for the
+/// caller to discard) when content under the marks is also used where the marks don't reach.
 pub fn apply(doc: &mut Document, pages: Option<&[usize]>) -> Result<Report, RedactError> {
     let all_marks = marks(doc);
     let chosen: Vec<&Mark> = all_marks.iter().filter(|m| pages.is_none_or(|p| p.contains(&m.page))).collect();
@@ -279,6 +397,7 @@ pub fn apply(doc: &mut Document, pages: Option<&[usize]>) -> Result<Report, Reda
     let mut doomed_fields: Vec<String> = Vec::new();
     let widget_owner: Vec<(ObjRef, String)> =
         pdfcraft_forms::fields(doc).into_iter().flat_map(|f| f.widgets.iter().map(|w| (w.obj, f.name.clone())).collect::<Vec<_>>()).collect();
+    let mut retired: HashSet<ObjRef> = HashSet::new();
 
     for &pi in &by_page {
         let page = pdfcraft_model::pages(doc).swap_remove(pi);
@@ -292,10 +411,15 @@ pub fn apply(doc: &mut Document, pages: Option<&[usize]>) -> Result<Report, Reda
             let mut scope = Scope::new(&rects, Mode::Apply, &mut report);
             process(doc, &mut scope, &data, &resources, pdfcraft_content::Matrix::IDENTITY)
         };
+        retired.extend(&out.retired);
         let mut new_list = list.clone();
         let mut changed = false;
         for (i, new) in out.streams.into_iter().enumerate() {
             let Some(bytes) = new else { continue };
+            // The original stream holds the redacted content; another page may still use it.
+            if let Some(r) = list.get(i).and_then(Object::as_ref) {
+                retired.insert(r);
+            }
             let mut dict = match &*doc.resolve(&list[i]) {
                 Object::Stream(s) => s.dict.clone(),
                 _ => Dict::new(),
@@ -422,6 +546,8 @@ pub fn apply(doc: &mut Document, pages: Option<&[usize]>) -> Result<Report, Reda
     if residue > 0 {
         return Err(RedactError::Residue(residue));
     }
+    // 6. Nothing redacted may stay reachable through another page or draw.
+    check_retired(doc, &retired)?;
     // The previous revision still holds the removed content: the next save must rewrite.
     doc.require_full_save();
     Ok(report)

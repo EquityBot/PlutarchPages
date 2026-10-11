@@ -329,27 +329,65 @@ fn vectors_are_removed_or_clipped_and_inline_images_go() {
 }
 
 #[test]
-fn shared_form_xobjects_are_copied_not_changed() {
+fn shared_form_xobjects_are_redacted_on_every_page_or_refused() {
     let form =
         stream("/Type /XObject /Subtype /Form /BBox [0 0 300 300] /Resources << /Font << /F1 5 0 R >> >>", b"BT /F1 10 Tf 10 100 Td (SECRET) Tj ET");
-    let mut objs: Vec<Vec<u8>> = vec![
-        b"<< /Type /Catalog /Pages 2 0 R >>".to_vec(),
-        b"<< /Type /Pages /Kids [3 0 R 8 0 R] /Count 2 /MediaBox [0 0 300 300] /Resources << /XObject << /Fm 7 0 R >> >> >>".to_vec(),
-        b"<< /Type /Page /Parent 2 0 R /Contents 4 0 R >>".to_vec(),
-        stream("", b"/Fm Do"),
-        FONT.replace("95 0 R", "6 0 R").into_bytes(),
-        widths(),
-        form,
-    ];
-    objs.push(b"<< /Type /Page /Parent 2 0 R /Contents 4 0 R >>".to_vec());
-    let mut doc = pdf(objs);
+    let shared = || {
+        let mut objs: Vec<Vec<u8>> = vec![
+            b"<< /Type /Catalog /Pages 2 0 R >>".to_vec(),
+            b"<< /Type /Pages /Kids [3 0 R 8 0 R] /Count 2 /MediaBox [0 0 300 300] /Resources << /XObject << /Fm 7 0 R >> >> >>".to_vec(),
+            b"<< /Type /Page /Parent 2 0 R /Contents 4 0 R >>".to_vec(),
+            stream("", b"/Fm Do"),
+            FONT.replace("95 0 R", "6 0 R").into_bytes(),
+            widths(),
+            form.clone(),
+        ];
+        objs.push(b"<< /Type /Page /Parent 2 0 R /Contents 4 0 R >>".to_vec());
+        pdf(objs)
+    };
+    // Page 2 draws the same form (and content stream) outside the marks: refused, page named.
+    let mut doc = shared();
     mark(&mut doc, 0, &[[0.0, 90.0, 300.0, 120.0]], "");
+    let err = apply(&mut doc, None).unwrap_err();
+    assert!(matches!(&err, RedactError::StillUsed(p) if p == &[1]), "{err:?}");
+    assert!(err.to_string().contains("on page 2"), "{err}");
+    // Marked on both pages, both are redacted and the original form is gone from the file.
+    let mut doc = shared();
+    mark(&mut doc, 0, &[[0.0, 90.0, 300.0, 120.0]], "");
+    mark(&mut doc, 1, &[[0.0, 90.0, 300.0, 120.0]], "");
     let r = apply(&mut doc, None).unwrap();
-    assert_eq!((r.glyphs, r.forms_rewritten), (6, 1), "{r:?}");
-    assert!(content(&doc, 0).contains("/PCRedacted1 Do"));
-    assert_eq!(content(&doc, 1), "/Fm Do", "page 2 shares the stream and the form: untouched");
-    assert_eq!(under(&mut doc, 1, &[[0.0, 90.0, 300.0, 120.0]]), 6);
+    assert_eq!((r.glyphs, r.forms_rewritten), (12, 2), "{r:?}");
+    assert_eq!(under(&mut doc, 1, &[[0.0, 90.0, 300.0, 120.0]]), 0);
     assert_eq!(under(&mut doc, 0, &[[0.0, 90.0, 300.0, 120.0]]), 0);
+    assert!(!saved_streams_hold(&doc, b"SECRET"));
+}
+
+/// An image shared with another page that draws it outside the marks (clipped or not) can't be
+/// redacted on one page alone; an entry nothing draws, inherited from the page tree, is dropped.
+#[test]
+fn images_used_elsewhere_are_refused_and_unused_entries_dropped() {
+    const SECRET: &[u8] = &[0xCA, 0xFE, 0xBA, 0xBE, 0x11, 0x22, 0x33, 0x44];
+    let img = || stream("/Type /XObject /Subtype /Image /Width 8 /Height 1 /ColorSpace /DeviceGray /BitsPerComponent 8", SECRET);
+    let two_pages = |second: &[u8]| {
+        pdf(vec![
+            b"<< /Type /Catalog /Pages 2 0 R >>".to_vec(),
+            b"<< /Type /Pages /Kids [3 0 R 6 0 R] /Count 2 /MediaBox [0 0 300 300] /Resources << /XObject << /Scan 5 0 R >> >> >>".to_vec(),
+            b"<< /Type /Page /Parent 2 0 R /Contents 4 0 R >>".to_vec(),
+            stream("", b"q 80 0 0 10 10 10 cm /Scan Do Q"),
+            img(),
+            b"<< /Type /Page /Parent 2 0 R /Contents 7 0 R >>".to_vec(),
+            stream("", second),
+        ])
+    };
+    // Page 2 draws it clipped to a corner: refused.
+    let mut doc = two_pages(b"q 10 10 2 2 re W n 80 0 0 10 10 10 cm /Scan Do Q");
+    mark(&mut doc, 0, &[[0.0, 0.0, 120.0, 40.0]], "");
+    assert!(matches!(apply(&mut doc, None), Err(RedactError::StillUsed(p)) if p == [1]));
+    // Page 2 inherits the entry but draws nothing: the entry is dropped and the image is gone.
+    let mut doc = two_pages(b"");
+    mark(&mut doc, 0, &[[0.0, 0.0, 120.0, 40.0]], "");
+    assert_eq!(apply(&mut doc, None).unwrap().images_removed, 1);
+    assert!(!saved_streams_hold(&doc, SECRET), "the inherited entry kept the original image");
 }
 
 #[test]

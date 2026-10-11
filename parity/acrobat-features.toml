@@ -5638,7 +5638,7 @@ milestone = "M8"
 status = "shipped"
 commands = ["redact.apply"]
 tools = ["redact_apply"]
-evidence = ["crates/redact/src/tests.rs::glyphs_under_a_mark_go_and_the_rest_stays_put", "crates/redact/src/tests.rs::kerning_spacing_scaling_and_line_operators_are_honoured", "crates/redact/src/tests.rs::rotated_text_and_composite_fonts", "crates/redact/src/tests.rs::shared_form_xobjects_are_copied_not_changed"]
+evidence = ["crates/redact/src/tests.rs::glyphs_under_a_mark_go_and_the_rest_stays_put", "crates/redact/src/tests.rs::kerning_spacing_scaling_and_line_operators_are_honoured", "crates/redact/src/tests.rs::rotated_text_and_composite_fonts", "crates/redact/src/tests.rs::shared_form_xobjects_are_redacted_on_every_page_or_refused"]
 notes = "TJ displacement keeps the rest in place; simple, composite (CMaps), Type 3 fonts"
 
 [[feature]]

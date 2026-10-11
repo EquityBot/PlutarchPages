@@ -67,6 +67,10 @@ pub(crate) struct Output {
     gone: HashSet<ObjRef>,
     /// Form XObjects rewritten for a draw under the marks.
     forms: HashSet<ObjRef>,
+    /// Every original this scope (and the forms it draws) redacted away: images removed or
+    /// replaced by a cleared copy, and forms rewritten or removed. `apply` refuses to finish
+    /// while any of them is still reachable in the document.
+    pub retired: HashSet<ObjRef>,
     /// Glyphs / inline images still overlapping a region (verify mode).
     pub residue: usize,
 }
@@ -509,6 +513,7 @@ pub(crate) fn process(doc: &mut Document, scope: &mut Scope<'_>, streams: &[Vec<
     out.remove_xobjects =
         xobjects.iter().filter(|(_, v)| v.as_ref().is_some_and(|r| superseded(&r) && !drawn.contains(&r))).map(|(n, _)| n.to_vec()).collect();
     out.remove_xobjects.sort();
+    out.retired.extend(out.gone.iter().chain(copy_of.keys()).chain(&out.forms).copied());
     out.streams = rewritten.into_iter().map(|(ops, changed)| changed.then(|| serialize_ops(&ops))).collect();
     out
 }
@@ -680,6 +685,7 @@ fn xobject(
             let saved_fonts = std::mem::take(&mut scope.fonts);
             scope.depth += 1;
             let inner = process(doc, scope, &[data], &res, fctm);
+            out.retired.extend(&inner.retired);
             scope.depth -= 1;
             scope.fonts = saved_fonts;
             out.residue += inner.residue;
