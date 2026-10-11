@@ -18,7 +18,7 @@
 
 use std::collections::HashSet;
 
-use pdfcraft_cos::{Dict, Document, MAX_DECODED, ObjRef, Object, Stream};
+use pdfcraft_cos::{Dict, Document, ObjRef, Object, Stream};
 
 pub mod codes;
 mod image;
@@ -48,6 +48,12 @@ pub enum RedactError {
         where_used(.0)
     )]
     StillUsed(Vec<usize>),
+    /// A form under the marks is drawn so that its marks can't be carried to its other draws.
+    #[error(
+        "a form under the marks is drawn {} in a way its marks can't be carried to its other appearances, so it can't be redacted safely. Nothing was changed",
+        where_used(.0)
+    )]
+    SharedForm(Vec<usize>),
     #[error(transparent)]
     Edit(#[from] pdfcraft_edit::EditError),
     #[error(transparent)]
@@ -118,6 +124,9 @@ pub struct Report {
     pub fields: usize,
     /// Structure elements that lost alternate/actual text or emptied marked content.
     pub tags: usize,
+    /// Draws of an image or form marked in more than one place, redacted with the marks from
+    /// all of them (so a draw can lose more than its own marks cover).
+    pub shared_redacted: usize,
 }
 
 fn rect_of(doc: &Document, o: Option<&Object>) -> Option<[f64; 4]> {
@@ -314,21 +323,36 @@ fn reachable(doc: &Document, roots: &[Object]) -> HashSet<ObjRef> {
 /// The most content decoded to find the XObject names a page's content draws.
 const DRAWN_BUDGET: usize = 64 << 20;
 
-/// Could this stream be drawn as content (page contents, forms, patterns, Type 3 glyphs,
-/// appearances)? Images, font programs, colour profiles, metadata and embedded files can't.
+/// Could this stream be drawn as content (forms, patterns, Type 3 glyphs, appearances)? A form
+/// always can; images, font programs, colour profiles, metadata and embedded files can't.
 fn content_like(d: &Dict) -> bool {
-    !(matches!(d.name(b"Subtype"), Some(b"Image" | b"Type1C" | b"CIDFontType0C" | b"OpenType" | b"XML"))
-        || matches!(d.name(b"Type"), Some(b"Metadata" | b"EmbeddedFile" | b"XRef" | b"ObjStm"))
-        || [&b"Length1"[..], b"Length2", b"Length3", b"N"].iter().any(|k| d.contains(k)))
+    match d.name(b"Subtype") {
+        Some(b"Form") => true,
+        Some(b"Image" | b"Type1C" | b"CIDFontType0C" | b"OpenType" | b"XML") => false,
+        _ => {
+            !(matches!(d.name(b"Type"), Some(b"Metadata" | b"EmbeddedFile" | b"XRef" | b"ObjStm"))
+                || [&b"Length1"[..], b"Length2", b"Length3", b"N"].iter().any(|k| d.contains(k)))
+        }
+    }
 }
 
-/// Every name a `Do` operator uses in any content reachable from `roots`, including forms that
-/// draw from the resources they inherit. `None` when that content is too large to read (then
-/// every name counts as drawn). Content that can't be decoded draws nothing.
-fn drawn_names(doc: &Document, roots: &[Object]) -> Option<HashSet<Vec<u8>>> {
+/// The names `Do` operators use in `ops`.
+fn do_names(ops: &[pdfcraft_content::Op]) -> impl Iterator<Item = Vec<u8>> + '_ {
+    ops.iter().filter(|op| op.is("Do")).filter_map(|op| op.name(0).map(<[u8]>::to_vec))
+}
+
+/// Every name a `Do` operator uses in page `index`'s contents (its streams read as one, as
+/// operators may be split between them) or in any content reachable from `roots` (its resources
+/// and annotation appearances, including forms that draw from the resources they inherit).
+/// `None`, so that every name counts as drawn, when some of that content can't be read or is
+/// too large to read.
+fn drawn_names(doc: &Document, page: &Dict, index: usize, roots: &[Object]) -> Option<HashSet<Vec<u8>>> {
+    let (_, data) = page_streams(doc, page, index).ok()?;
+    let mut names: HashSet<Vec<u8>> = do_names(&pdfcraft_content::Pieces::join(&data).parse().ops).collect();
+    let mut budget = DRAWN_BUDGET.checked_sub(data.iter().map(Vec::len).sum())?;
     let mut queue = Vec::new();
     roots.iter().for_each(|o| refs_in(o, &mut queue));
-    let (mut seen, mut names, mut budget) = (HashSet::new(), HashSet::new(), DRAWN_BUDGET);
+    let mut seen = HashSet::new();
     while let Some(r) = queue.pop() {
         if !seen.insert(r) {
             continue;
@@ -339,14 +363,9 @@ fn drawn_names(doc: &Document, roots: &[Object]) -> Option<HashSet<Vec<u8>>> {
         if !content_like(&s.dict) {
             continue;
         }
-        let Ok(data) = s.decoded_within(budget) else {
-            if s.decoded_within(MAX_DECODED).is_ok() {
-                return None; // readable, but past the budget
-            }
-            continue;
-        };
+        let data = s.decoded().ok()?;
         budget = budget.checked_sub(data.len())?;
-        names.extend(pdfcraft_content::parse(&data).ops.iter().filter(|op| op.is("Do")).filter_map(|op| op.name(0).map(<[u8]>::to_vec)));
+        names.extend(do_names(&pdfcraft_content::parse(&data).ops));
     }
     Some(names)
 }
@@ -379,9 +398,9 @@ fn check_retired(doc: &mut Document, retired: &HashSet<ObjRef>) -> Result<(), Re
         // annotation appearances.
         let res = p.dict.get(b"Resources").and_then(|r| doc.resolve(r).as_dict().cloned());
         let appearances: Vec<Object> = annots_of(doc, &p.dict).iter().filter_map(|a| doc.resolve(a).as_dict()?.get(b"AP").cloned()).collect();
+        let drawn_from: Vec<Object> = appearances.iter().cloned().chain(res.clone().map(Object::Dict)).collect();
+        let drawn = drawn_names(doc, &p.dict, i, &drawn_from);
         let mut roots: Vec<Object> = p.dict.get(b"Contents").cloned().into_iter().chain(appearances).collect();
-        let all_roots: Vec<Object> = roots.iter().cloned().chain(res.clone().map(Object::Dict)).collect();
-        let drawn = drawn_names(doc, &all_roots);
         if let Some(mut res) = res {
             if let (Some(drawn), Some(xo)) = (&drawn, res.get(b"XObject").and_then(|x| doc.resolve(x).as_dict().cloned())) {
                 let used: Dict = xo.iter().filter(|(k, _)| drawn.contains(k.as_slice())).map(|(k, v)| (k.clone(), v.clone())).collect();
@@ -449,6 +468,7 @@ pub fn apply(doc: &mut Document, pages: Option<&[usize]>) -> Result<Report, Reda
         let resources = page.dict.get(b"Resources").and_then(|r| doc.resolve(r).as_dict().cloned()).unwrap_or_default();
         let mut scratch = Report::default();
         let mut scope = Scope::new(&rects, Mode::Verify, &mut scratch);
+        scope.page = pi;
         scope.shared = std::mem::take(&mut shared);
         process(doc, &mut scope, &data, &resources, pdfcraft_content::Matrix::IDENTITY);
         shared = std::mem::take(&mut scope.shared);
@@ -465,6 +485,7 @@ pub fn apply(doc: &mut Document, pages: Option<&[usize]>) -> Result<Report, Reda
         let resources = page.dict.get(b"Resources").and_then(|r| doc.resolve(r).as_dict().cloned()).unwrap_or_default();
         let out = {
             let mut scope = Scope::new(&rects, Mode::Apply, &mut report);
+            scope.page = pi;
             scope.shared = std::mem::take(&mut shared);
             let out = process(doc, &mut scope, &data, &resources, pdfcraft_content::Matrix::IDENTITY);
             shared = std::mem::take(&mut scope.shared);
@@ -567,9 +588,21 @@ pub fn apply(doc: &mut Document, pages: Option<&[usize]>) -> Result<Report, Reda
         })?;
     }
 
+    // A form whose marks couldn't be carried between its draws could keep, in one draw, what
+    // another draw's marks removed.
+    if !shared.unmapped.is_empty() {
+        let mut pages: Vec<usize> =
+            shared.unmapped.iter().filter_map(|f| shared.forms.get(f)).flat_map(|draws| draws.iter().map(|(page, ..)| *page)).collect();
+        pages.sort_unstable();
+        pages.dedup();
+        return Err(RedactError::SharedForm(pages));
+    }
     // The document's cleared image copies. An image wholly under a mark somewhere is blanked in
     // its copy too, so no draw anywhere keeps pixels a mark covered.
     for (original, img) in std::mem::take(&mut shared.images) {
+        if img.draws > 1 || shared.gone.contains(&original) {
+            report.shared_redacted += img.draws;
+        }
         let stream = if shared.gone.contains(&original) {
             match image::clear(doc, &img.stream, &pdfcraft_content::Matrix::IDENTITY, &[[-1.0, -1.0, 2.0, 2.0]]) {
                 Ok(Some(blank)) => blank,

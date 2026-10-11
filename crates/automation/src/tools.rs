@@ -421,7 +421,7 @@ pub fn tools() -> Vec<ToolDef> {
         t(
             "redact_apply",
             "Apply redactions",
-            "Apply the redaction marks (all, or those on pages): text, images, vectors, comments and form fields under them are removed for good and boxes are drawn in their place. A verification pass fails the operation if anything readable remains. Undoable until saved; the saved file no longer contains the content.",
+            "Apply the redaction marks (all, or those on pages): text, images, vectors, comments and form fields under them are removed for good and boxes are drawn in their place. A verification pass fails the operation if anything readable remains. It also refuses, changing nothing, when content under the marks is drawn somewhere no mark covers (the error names the pages to mark too). An image or form marked in more than one place loses every place's marked parts in each; shared_redacted counts those draws. Undoable until saved; the saved file no longer contains the content.",
         )
         .destructive()
         .with(schema(json!({ "doc": doc(), "pages": pages("whose marks to apply (default: all)") }), &["doc"])),

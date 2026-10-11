@@ -1245,7 +1245,13 @@ pub fn show(app: &mut PdfCraftApp, ctx: &egui::Context) {
         Some(Dialog::RedactApply) => {
             let marks = app.active_ids().and_then(|(_, id)| app.session.get(id)).map_or(0, |d| d.redaction_marks());
             if app.apply_edit(Edit::ApplyRedactions { pages: None }) {
-                if marks == 1 {
+                let shared = app.session.last_redaction_report().map_or(0, |r| r.shared_redacted);
+                if shared > 0 {
+                    app.notify_fmt(
+                        "Applied {n} redaction marks. {shared} appearances of images or forms used in more than one place were redacted with the marks from all of them. Save to remove the content from the file.",
+                        &[("n", &marks.to_string()), ("shared", &shared.to_string())],
+                    );
+                } else if marks == 1 {
                     app.notify_tr("Applied 1 redaction mark. Save to remove the content from the file.");
                 } else {
                     app.notify_fmt("Applied {n} redaction marks. Save to remove the content from the file.", &[("n", &marks.to_string())]);

@@ -1497,6 +1497,8 @@ struct EditCtx {
     xfa_ran_away: bool,
     /// What Convert colours to grayscale did.
     colors: Option<pdfcraft_optimize::ColorReport>,
+    /// What Apply redactions did.
+    redaction: Option<pdfcraft_redact::Report>,
     /// Pages in the document, for `xfa.layout.pageCount()`.
     pages: usize,
     date: Option<String>,
@@ -1524,6 +1526,7 @@ impl EditCtx {
             xfa_datasets: None,
             xfa_ran_away: false,
             colors: None,
+            redaction: None,
             pages: 0,
             date: now.map(pdfcraft_cos::pdf_date),
             today: (1970, 1, 1),
@@ -1809,7 +1812,7 @@ fn run_edit(doc: &mut pdfcraft_cos::Document, edit: &Edit, cx: &mut EditCtx) -> 
             pdfcraft_edit::update_content(doc, *page, *index, &AddedContent::Image(pdfcraft_edit::AddedImage { image, ..old }))?;
         }
         Edit::ApplyRedactions { pages } => {
-            pdfcraft_redact::apply(doc, pages.as_deref())?;
+            cx.redaction = Some(pdfcraft_redact::apply(doc, pages.as_deref())?);
         }
         Edit::ConvertToGray { pages } => {
             let report = pdfcraft_optimize::convert_to_gray(doc, (!pages.is_empty()).then_some(pages.as_slice()))
@@ -2092,6 +2095,8 @@ pub struct Session {
     external: external::ExternalConverters,
     /// What the last Convert colours to grayscale did.
     last_color_report: Option<pdfcraft_optimize::ColorReport>,
+    /// What the last Apply redactions did.
+    last_redaction_report: Option<pdfcraft_redact::Report>,
 }
 
 /// Lay a dynamic XFA form out (pages and fields) and give its widgets appearances.
@@ -2494,6 +2499,7 @@ impl Session {
     /// Apply an edit. On success the previous state is undoable and the view data is refreshed.
     pub fn apply(&mut self, id: DocId, edit: Edit) -> Result<(), EditError> {
         self.last_color_report = None;
+        self.last_redaction_report = None;
         let now = self.now();
         let today = self.today();
         let js_off = self.js_off;
@@ -2609,7 +2615,13 @@ impl Session {
             doc.js_output.errors.push(XFA_SCRIPTS_OFF.into());
         }
         self.last_color_report = cx.colors.take();
+        self.last_redaction_report = cx.redaction.take();
         Ok(())
+    }
+
+    /// What the last Apply redactions did (`None` after any other edit).
+    pub fn last_redaction_report(&self) -> Option<&pdfcraft_redact::Report> {
+        self.last_redaction_report.as_ref()
     }
 
     /// What the last Convert colours to grayscale did (`None` after any other edit).

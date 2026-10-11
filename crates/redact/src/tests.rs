@@ -425,7 +425,8 @@ fn shared_images_and_forms_are_redacted_with_every_pages_marks() {
     let mut doc = two_pages(scan, scan, b"");
     mark(&mut doc, 0, &[[0.0, 0.0, 50.0, 40.0]], "");
     mark(&mut doc, 1, &[[50.0, 0.0, 120.0, 40.0]], "");
-    assert_eq!(apply(&mut doc, None).unwrap().images_cleared, 2);
+    let r = apply(&mut doc, None).unwrap();
+    assert_eq!((r.images_cleared, r.shared_redacted), (2, 2), "{r:?}");
     {
         let copy = |i: usize| {
             let p = pdfcraft_model::pages(&doc).swap_remove(i);
@@ -439,7 +440,7 @@ fn shared_images_and_forms_are_redacted_with_every_pages_marks() {
     let mut doc = two_pages(scan, scan, b"");
     mark(&mut doc, 0, &[[0.0, 0.0, 50.0, 40.0]], "");
     mark(&mut doc, 1, &[[0.0, 0.0, 120.0, 40.0]], "");
-    apply(&mut doc, None).unwrap();
+    assert_eq!(apply(&mut doc, None).unwrap().shared_redacted, 1, "page 1's draw is blanked by page 2's mark");
     let second = content(&doc, 1);
     assert!(!second.contains("/Scan Do") && !second.contains("/PCRedacted1 Do"), "{second}");
     assert!(!leaks(&doc), "page 1's copy kept pixels page 2's mark covered");
@@ -450,11 +451,58 @@ fn shared_images_and_forms_are_redacted_with_every_pages_marks() {
     mark(&mut doc, 0, &[[0.0, 90.0, 120.0, 120.0]], "");
     mark(&mut doc, 1, &[[190.0, 90.0, 300.0, 120.0]], "");
     let r = apply(&mut doc, None).unwrap();
-    assert_eq!(r.forms_rewritten, 2, "{r:?}");
+    assert_eq!((r.forms_rewritten, r.shared_redacted), (2, 2), "{r:?}");
     assert!(
         !saved_streams_hold(&doc, b"LEFTSECRET") && !saved_streams_hold(&doc, b"RIGHTSECRET"),
         "a copy kept a word the other page's mark removed"
     );
+}
+
+/// Final-review findings on ac75a54: an unmarked draw split across a page's content streams, or
+/// made by a form with unusual keys, still counts as a draw (redaction refuses instead of pruning
+/// the image from under it), and a form whose marks can't be carried between its draws (a
+/// singular matrix, or too many draws) makes redaction refuse.
+#[test]
+fn unusual_draws_make_redaction_refuse_rather_than_break_content() {
+    let img = stream("/Type /XObject /Subtype /Image /Width 8 /Height 1 /ColorSpace /DeviceGray /BitsPerComponent 8", &[7; 8]);
+    let words = b"BT /F1 10 Tf 10 100 Td (LEFTSECRET) Tj 190 0 Td (RIGHTSECRET) Tj ET";
+    // Objects: 1 catalog, 2 pages (shared resources), 3 and 6 pages, 4 and 7 contents, 5 the
+    // image, 8 a form, 9 the font, 10 its widths, 11 a second content stream for page 2.
+    let doc_with = |second_contents: &str, second: &[u8], form_dict: &str, form: &[u8], first: &[u8]| {
+        pdf(vec![
+            b"<< /Type /Catalog /Pages 2 0 R >>".to_vec(),
+            b"<< /Type /Pages /Kids [3 0 R 6 0 R] /Count 2 /MediaBox [0 0 300 300] /Resources << /XObject << /Scan 5 0 R /Fm 8 0 R >> /Font << /F1 9 0 R >> >> >>".to_vec(),
+            b"<< /Type /Page /Parent 2 0 R /Contents 4 0 R >>".to_vec(),
+            stream("", first),
+            img.clone(),
+            format!("<< /Type /Page /Parent 2 0 R /Contents {second_contents} >>").into_bytes(),
+            stream("", second),
+            stream(form_dict, form),
+            FONT.replace("95 0 R", "10 0 R").into_bytes(),
+            widths(),
+            stream("", b" Do Q"),
+        ])
+    };
+    let scan = b"q 80 0 0 10 10 10 cm /Scan Do Q";
+    let still_used_on_page_2 = |doc: &mut Document| matches!(apply(doc, None), Err(RedactError::StillUsed(p)) if p == [1]);
+    // Page 2 draws the image with `/Scan` ending one content stream and `Do` starting the next.
+    let mut doc = doc_with("[7 0 R 11 0 R]", b"q 80 0 0 10 10 10 cm /Scan", "/Type /XObject /Subtype /Form /BBox [0 0 300 300]", b"", scan);
+    mark(&mut doc, 0, &[[0.0, 0.0, 120.0, 40.0]], "");
+    assert!(still_used_on_page_2(&mut doc), "a draw split across content streams was missed");
+    // Page 2 draws a form that has a stray /N, and the form draws the inherited image.
+    let mut doc = doc_with("7 0 R", b"/Fm Do", "/Type /XObject /Subtype /Form /BBox [0 0 300 300] /N 1", scan, scan);
+    mark(&mut doc, 0, &[[0.0, 0.0, 120.0, 40.0]], "");
+    assert!(still_used_on_page_2(&mut doc), "a form with a stray /N was not read");
+    // A form drawn normally on page 1 and through a singular matrix on page 2, both marked.
+    let mut doc = doc_with("7 0 R", b"q 1 1 1 1 0 0 cm /Fm Do Q", "/Type /XObject /Subtype /Form /BBox [0 0 300 300]", words, b"/Fm Do");
+    mark(&mut doc, 0, &[[0.0, 90.0, 120.0, 120.0]], "");
+    mark(&mut doc, 1, &[[0.0, 0.0, 300.0, 300.0]], "");
+    assert!(matches!(apply(&mut doc, None), Err(RedactError::SharedForm(_))), "a singular draw's marks were dropped");
+    // One form drawn more often than its marks can be carried between.
+    let many: Vec<u8> = (0..300).flat_map(|i| format!("q 1 0 0 1 0 {} cm /Fm Do Q ", i % 300).into_bytes()).collect();
+    let mut doc = doc_with("7 0 R", b"", "/Type /XObject /Subtype /Form /BBox [0 0 300 300]", words, &many);
+    mark(&mut doc, 0, &[[0.0, 0.0, 300.0, 300.0]], "");
+    assert!(matches!(apply(&mut doc, None), Err(RedactError::SharedForm(p)) if p == [0]));
 }
 
 #[test]

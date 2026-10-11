@@ -28,6 +28,8 @@ use crate::{Report, image};
 use pdfcraft_fonts::pdf::Metrics;
 
 const MAX_DEPTH: usize = 12;
+/// The most distinct draws of one form over the marks that redaction carries marks between.
+const MAX_FORM_DRAWS: usize = 256;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Mode {
@@ -91,25 +93,32 @@ pub(crate) struct Shared {
     pub images: HashMap<ObjRef, SharedImage>,
     /// Images wholly under a mark at some draw, or that can't be cleared.
     pub gone: HashSet<ObjRef>,
-    /// Where each form XObject is drawn over the marks: the form-to-page matrix of each draw
-    /// and that page's marks (collected by a first pass, see `apply`).
+    /// Where each form XObject is drawn over the marks: the page, the form-to-page matrix of
+    /// each draw and that page's marks (collected by a first pass, see `apply`).
     pub forms: HashMap<ObjRef, Vec<FormDraw>>,
+    /// Forms whose marks can't be carried between their draws (a matrix with no inverse, a
+    /// result that isn't finite, or more than [`MAX_FORM_DRAWS`] draws): `apply` refuses.
+    pub unmapped: HashSet<ObjRef>,
     /// The first pass: record form draws, change nothing.
     pub collect: bool,
 }
 
-/// A form XObject's draw over the marks: its form-to-page matrix and that page's marks.
-type FormDraw = (Matrix, Vec<[f64; 4]>);
+/// A form XObject's draw over the marks: the page, its form-to-page matrix and that page's marks.
+type FormDraw = (usize, Matrix, Vec<[f64; 4]>);
 
 pub(crate) struct SharedImage {
     /// Reserved when first needed; `apply` writes the final stream into it.
     pub copy: ObjRef,
     pub stream: Stream,
+    /// The draws that use it.
+    pub draws: usize,
 }
 
 pub(crate) struct Scope<'a> {
     pub rects: Cow<'a, [[f64; 4]]>,
     pub shared: Shared,
+    /// The page being processed (0-based).
+    pub page: usize,
     pub mode: Mode,
     pub report: &'a mut Report,
     /// Sanitize: remove hidden text (invisible render modes, or wholly outside this page box).
@@ -129,6 +138,7 @@ impl<'a> Scope<'a> {
         Scope {
             rects: Cow::Borrowed(rects),
             shared: Shared::default(),
+            page: 0,
             mode,
             report,
             hidden_text: None,
@@ -660,10 +670,13 @@ fn xobject(
                 Ok(Some(new)) => {
                     scope.report.images_cleared += 1;
                     match scope.shared.images.get_mut(&r) {
-                        Some(c) => c.stream = new,
+                        Some(c) => {
+                            c.stream = new;
+                            c.draws += 1;
+                        }
                         None => {
                             let copy = doc.add(Object::Null);
-                            scope.shared.images.insert(r, SharedImage { copy, stream: new });
+                            scope.shared.images.insert(r, SharedImage { copy, stream: new, draws: 1 });
                         }
                     }
                     let n = match out.cleared.iter().find(|c| c.original == r) {
@@ -700,7 +713,15 @@ fn xobject(
                 return None;
             }
             if scope.shared.collect {
-                scope.shared.forms.entry(r).or_default().push((fctm, scope.rects.to_vec()));
+                let draw = (scope.page, fctm, scope.rects.to_vec());
+                let draws = scope.shared.forms.entry(r).or_default();
+                if !draws.contains(&draw) {
+                    if draws.len() < MAX_FORM_DRAWS {
+                        draws.push(draw);
+                    } else {
+                        scope.shared.unmapped.insert(r);
+                    }
+                }
             }
             if scope.depth >= MAX_DEPTH {
                 if scope.mode == Mode::Verify {
@@ -724,20 +745,36 @@ fn xobject(
             // Every draw of this form over the marks, on any page, redacts the same content: the
             // marks of its other draws, mapped through the form into this draw's page space, are
             // added here. No copy then keeps what another draw's marks removed.
-            let others: Vec<[f64; 4]> = match scope.shared.forms.get(&r) {
-                Some(draws) if scope.mode == Mode::Apply => draws
-                    .iter()
+            let mut others: Vec<[f64; 4]> = Vec::new();
+            if scope.mode == Mode::Apply
+                && let Some(draws) = scope.shared.forms.get(&r)
+            {
+                let mut unmapped = false;
+                for (page, m, rects) in draws {
                     // This draw (or one placed and marked the same way) adds nothing.
-                    .filter(|(m, rects)| !(*m == fctm && rects.as_slice() == &*scope.rects))
-                    .filter_map(|(m, rects)| {
-                        let to_form = m.invert()?;
-                        Some(rects.iter().map(move |q| fctm.bbox(to_form.bbox(*q))))
-                    })
-                    .flatten()
-                    .filter(|q| q.iter().all(|v| v.is_finite()))
-                    .collect(),
-                _ => Vec::new(),
-            };
+                    if *page == scope.page && *m == fctm && rects.as_slice() == &*scope.rects {
+                        continue;
+                    }
+                    let Some(to_form) = m.invert() else {
+                        unmapped = true;
+                        continue;
+                    };
+                    for q in rects {
+                        let mapped = fctm.bbox(to_form.bbox(*q));
+                        if mapped.iter().all(|v| v.is_finite()) {
+                            others.push(mapped);
+                        } else {
+                            unmapped = true;
+                        }
+                    }
+                }
+                if unmapped {
+                    scope.shared.unmapped.insert(r);
+                }
+                if !others.is_empty() {
+                    scope.report.shared_redacted += 1;
+                }
+            }
             let saved_rects = (!others.is_empty()).then(|| {
                 let all: Vec<[f64; 4]> = scope.rects.iter().copied().chain(others).collect();
                 std::mem::replace(&mut scope.rects, Cow::Owned(all))
