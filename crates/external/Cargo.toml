@@ -1,0 +1,20 @@
+[package]
+name = "pdfcraft-external"
+description = "Optional external programs: Office and HTML conversion through installed LibreOffice and Chrome or Edge, and Read Out Loud through the system's speech command"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+thiserror = { workspace = true }
+# Private, unpredictable conversion folders (owner-only on Unix).
+tempfile = "3.27"
+# Web addresses and file: URLs for the browser.
+url = "2.5.8"
+
+[target.'cfg(unix)'.dependencies]
+# Ending a converter's whole process group; std has no killpg and this crate forbids unsafe.
+rustix = { version = "1", features = ["process"] }

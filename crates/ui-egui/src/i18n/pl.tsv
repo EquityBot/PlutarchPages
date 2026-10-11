@@ -2191,3 +2191,27 @@ key	Space	Spacja
 	Text used as a clipping path cannot be moved with this selection.	Tekstu używanego jako ścieżka przycinania nie można przenieść razem z tym zaznaczeniem.
 	These objects could not be moved. Select them again and try a smaller move.	Nie udało się przenieść tych obiektów. Zaznacz je ponownie i spróbuj mniejszego przesunięcia.
 	This page contains objects that cannot be selected together.	Ta strona zawiera obiekty, których nie można zaznaczyć razem.
+# PlutarchPages: external converters, Read Out Loud, grayscale, Excel export, links.
+	Create PDF from web page…	Utwórz PDF ze strony internetowej…
+	Read this page aloud	Przeczytaj tę stronę na głos
+	Read to end of document	Czytaj do końca dokumentu
+	Stop reading	Zatrzymaj czytanie
+	Convert colours to grayscale	Konwertuj kolory na skalę szarości
+	Export to Excel…	Eksportuj do programu Excel…
+	Report a problem	Zgłoś problem
+	Upstream PdfCraft	Oryginalny PdfCraft
+	Web page	Strona internetowa
+	A fork of PdfCraft by the ArtCraft team. PlutarchPages is not an ArtCraft product.	Fork PdfCraft zespołu ArtCraft. PlutarchPages nie jest produktem ArtCraft.
+	Based on PdfCraft by the ArtCraft team. Report problems with PlutarchPages on GitHub.	Na podstawie PdfCraft zespołu ArtCraft. Problemy z PlutarchPages zgłaszaj w serwisie GitHub.
+	Convert Office files, HTML files and web pages with installed programs	Konwertuj pliki Office, pliki HTML i strony internetowe zainstalowanymi programami
+	Converted to grayscale: {ops} colours, {images} images, {forms} forms; {left} left as they were	Przekonwertowano na skalę szarości: kolory {ops}, obrazy {images}, formularze {forms}; bez zmian {left}
+	Create PDF from web page	Utwórz PDF ze strony internetowej
+	Discard external cross-references	Odrzuć zewnętrzne odsyłacze
+	Discard form submission, import and reset actions	Odrzuć akcje wysyłania, importowania i resetowania formularzy
+	External converters	Zewnętrzne konwertery
+	External converters are off. Turn them on in Preferences to use your installed Chrome or Edge.	Zewnętrzne konwertery są wyłączone. Włącz je w Preferencjach, aby używać zainstalowanej przeglądarki Chrome lub Edge.
+	PlutarchPages is a fork of PdfCraft	PlutarchPages to fork PdfCraft
+	Remove PDF/A and PDF/X identification	Usuń identyfikację PDF/A i PDF/X
+	Uses LibreOffice (26.2.5 or later) for Office files and Chrome or Edge for HTML and web pages, each in a fresh private profile. Local HTML opens with scripts and network off. These programs are not sandboxed by PlutarchPages: convert only files you trust.	Używa LibreOffice (26.2.5 lub nowszego) do plików Office oraz Chrome lub Edge do HTML i stron internetowych, za każdym razem z nowym prywatnym profilem. Lokalny HTML otwiera się bez skryptów i sieci. PlutarchPages nie izoluje tych programów: konwertuj tylko zaufane pliki.
+	Web address (http or https)	Adres internetowy (http lub https)
+	The page opens in a fresh, private window of your installed Chrome or Edge and is printed to PDF. Addresses on this computer or a private network are refused.	Strona otwiera się w nowym prywatnym oknie zainstalowanej przeglądarki Chrome lub Edge i jest drukowana do PDF. Adresy na tym komputerze lub w sieci prywatnej są odrzucane.

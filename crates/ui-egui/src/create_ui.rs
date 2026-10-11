@@ -85,18 +85,33 @@ fn stem(name: &str) -> &str {
 }
 
 impl PdfCraftApp {
-    /// Convert a non-PDF file (image, text) into a new tab. Returns `None` when `bytes` is not
-    /// something Create understands (the caller then tries to open it as a PDF).
+    /// Convert a non-PDF file (image, text, CSV, Markdown, email) into a new tab, and say what the
+    /// conversion couldn't keep. Returns `None` when `bytes` is not something Create understands
+    /// (the caller then tries to open it as a PDF).
     pub(crate) fn open_converted(&mut self, name: &str, bytes: &[u8]) -> Option<Result<(), String>> {
         use pdfcraft_engine::SourceKind;
-        if !matches!(pdfcraft_engine::source_kind(name, bytes), Some(SourceKind::Image | SourceKind::Text)) {
-            return None;
+        match pdfcraft_engine::source_kind(name, bytes) {
+            None | Some(SourceKind::Pdf) => return None,
+            Some(kind @ (SourceKind::Html | SourceKind::Office)) => {
+                // Converted by an installed program on its own thread; opens when ready.
+                self.convert_external(kind, name, bytes.to_vec());
+                return Some(Ok(()));
+            }
+            Some(_) => {}
         }
-        let created = self.session.convert_to_pdf(name, &Arc::new(bytes.to_vec())).map(|(_, pdf)| pdf);
-        Some(self.open_created_bytes(&format!("{}.pdf", stem(name)), created.map_err(|e| e.to_string())))
+        let created = self.session.convert_to_pdf_noted(name, &Arc::new(bytes.to_vec()));
+        let (pdf, notes) = match created {
+            Ok((_, pdf, notes)) => (Ok(pdf), notes),
+            Err(e) => (Err(e.to_string()), Vec::new()),
+        };
+        let opened = self.open_created_bytes(&format!("{}.pdf", stem(name)), pdf);
+        if opened.is_ok() && !notes.is_empty() {
+            self.notify_fmt("Converted {name}: {notes}", &[("name", name), ("notes", &notes.join("; "))]);
+        }
+        Some(opened)
     }
 
-    fn open_created_bytes(&mut self, name: &str, created: Result<Arc<Vec<u8>>, String>) -> Result<(), String> {
+    pub(crate) fn open_created_bytes(&mut self, name: &str, created: Result<Arc<Vec<u8>>, String>) -> Result<(), String> {
         let bytes = created?;
         let id = self.session.open_new(name, bytes).map_err(|e| e.to_string())?;
         let view = self.view_for(id).ok_or("the new document could not be opened")?;

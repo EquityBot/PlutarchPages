@@ -92,6 +92,11 @@ pub struct Automation {
     renderers: HashMap<DocId, (Arc<Vec<u8>>, PageRenderer)>,
     /// Extracted page text per document version (the working bytes it was taken from).
     texts: HashMap<DocId, TextCache>,
+    /// Read Out Loud in progress, and the speech program (detected unless set).
+    #[cfg(not(target_arch = "wasm32"))]
+    speech: pdfcraft_engine::Speech,
+    #[cfg(not(target_arch = "wasm32"))]
+    speech_backend: Option<pdfcraft_engine::SpeechBackend>,
 }
 
 impl Default for Automation {
@@ -101,8 +106,35 @@ impl Default for Automation {
 }
 
 impl Automation {
+    /// A new session. The external converters follow the environment
+    /// (`PDFCRAFT_EXTERNAL_CONVERTERS=1`, `PDFCRAFT_CHROME`, `PDFCRAFT_SOFFICE`): off unless the user
+    /// who started the CLI or MCP server turned them on.
     pub fn new() -> Self {
-        Self { session: Session::new(), root: None, renderers: HashMap::new(), texts: HashMap::new() }
+        let mut session = Session::new();
+        session.set_external_converters(pdfcraft_engine::ExternalConverters::from_env());
+        Self {
+            session,
+            root: None,
+            renderers: HashMap::new(),
+            texts: HashMap::new(),
+            #[cfg(not(target_arch = "wasm32"))]
+            speech: pdfcraft_engine::Speech::default(),
+            #[cfg(not(target_arch = "wasm32"))]
+            speech_backend: None,
+        }
+    }
+
+    /// Use these external converters instead of the environment's (tests, embedding apps).
+    pub fn with_external_converters(mut self, converters: pdfcraft_engine::ExternalConverters) -> Self {
+        self.session.set_external_converters(converters);
+        self
+    }
+
+    /// Read aloud with this speech program instead of the one detected (tests).
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn with_speech_backend(mut self, backend: pdfcraft_engine::SpeechBackend) -> Self {
+        self.speech_backend = Some(backend);
+        self
     }
 
     /// Confine every path the tools read or write to `root` (relative paths resolve inside it).
@@ -208,6 +240,18 @@ impl Automation {
             "page_extract" => self.page_extract(&a)?,
             "doc_combine" => self.doc_combine(&a)?,
             "doc_create_multiple" => self.doc_create_multiple(&a)?,
+            "doc_convert_gray" => {
+                let pages = match a.opt_ints("pages")? {
+                    Some(_) => self.pages(&a, "pages")?,
+                    None => Vec::new(),
+                };
+                self.apply(&a, Edit::ConvertToGray { pages })?;
+                let r = self.session.last_color_report().cloned().unwrap_or_default();
+                json!({ "pages": r.pages, "colours": r.operators, "images": r.images, "forms": r.forms, "left": r.left })
+            }
+            "speech_start" => self.speech_start(&a)?,
+            "speech_stop" => self.speech_stop(),
+            "speech_status" => self.speech_status(),
             "doc_split" => self.doc_split(&a)?,
             "edit_undo" => {
                 let id = self.doc(&a)?.id;
@@ -271,6 +315,15 @@ impl Automation {
             "bookmark_set_page" => {
                 let (path, page) = (a.path("path")?, self.page(&a)?);
                 self.apply(&a, Edit::SetBookmarkPage { path, page })?
+            }
+            "bookmark_set_style" => {
+                let path = a.path("path")?;
+                let color = match a.opt_str("color")? {
+                    None | Some("") => None,
+                    Some(hex) => Some(hex_rgb(hex).ok_or_else(|| ToolError::InvalidArgs(format!("color must be #RRGGBB, not {hex:?}")))?),
+                };
+                let (bold, italic) = (a.opt_bool("bold")?.unwrap_or(false), a.opt_bool("italic")?.unwrap_or(false));
+                self.apply(&a, Edit::SetBookmarkStyle { path, color, bold, italic })?
             }
             "bookmark_from_structure" => {
                 let mut out = self.apply(&a, Edit::BookmarksFromStructure)?;
@@ -853,6 +906,9 @@ impl Automation {
             ("flate_unencoded", &mut settings.flate_unencoded),
             ("remove_invalid_links", &mut settings.remove_invalid_links),
             ("remove_unreferenced_dests", &mut settings.remove_unreferenced_dests),
+            ("discard_form_actions", &mut settings.discard_form_actions),
+            ("discard_external_refs", &mut settings.discard_external_refs),
+            ("remove_standards_id", &mut settings.remove_standards_id),
         ] {
             if let Some(b) = a.opt_bool(key)? {
                 *flag = b;
@@ -891,6 +947,9 @@ impl Automation {
             "invalid_bookmarks": o.invalid_bookmarks,
             "unreferenced_dests": o.unreferenced_dests,
             "unused_xobjects": o.unused_xobjects,
+            "form_actions": o.form_actions,
+            "external_refs": o.external_refs,
+            "standards_ids": o.standards_ids,
             "merged_objects": r.merged,
             "discarded": r.discarded.iter().map(|(h, n)| json!({ "category": h.id(), "count": n })).collect::<Vec<_>>(),
         }))
@@ -1051,6 +1110,7 @@ impl Automation {
     }
 
     fn doc_create(&mut self, a: &Args) -> Result<Value> {
+        let mut notes: Vec<String> = Vec::new();
         let (name, bytes) = match a.str("from")? {
             "blank" => {
                 let n = a.opt_int("pages")?.unwrap_or(1).clamp(1, 10_000) as usize;
@@ -1084,11 +1144,122 @@ impl Automation {
                 };
                 (format!("{title}.pdf"), self.session.create_from_text(&title, &text).map_err(failed)?)
             }
+            "csv" | "markdown" => {
+                let (title, file, text) = match (a.opt_str("text")?, a.opt_str("path")?) {
+                    (Some(t), _) => {
+                        let csv = a.str("from")? == "csv";
+                        ((if csv { "Table" } else { "Text" }).to_string(), (if csv { "table.csv" } else { "text.md" }).to_string(), t.to_string())
+                    }
+                    (None, Some(p)) => {
+                        let path = self.resolve(p, false)?;
+                        let t = std::fs::read(&path).map_err(|e| failed(format!("{}: {e}", path.display())))?;
+                        let stem = path.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
+                        let file = path.file_name().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
+                        (stem, file, pdfcraft_engine::decode_text(&t))
+                    }
+                    (None, None) => return Err(ToolError::InvalidArgs("csv and markdown need `text` or `path`".into())),
+                };
+                let bytes = if a.str("from")? == "csv" {
+                    let (bytes, report) = pdfcraft_engine::guard(|| self.session.create_from_csv(&title, &file, &text))
+                        .map_err(|_| failed("the table could not be read"))?
+                        .map_err(failed)?;
+                    notes = pdfcraft_engine::conversion_notes_csv(&report);
+                    bytes
+                } else {
+                    let (bytes, replaced) = pdfcraft_engine::guard(|| self.session.create_from_markdown(&title, &text))
+                        .map_err(|_| failed("the Markdown could not be read"))?
+                        .map_err(failed)?;
+                    notes = pdfcraft_engine::conversion_note_replaced(replaced).into_iter().collect();
+                    bytes
+                };
+                (format!("{title}.pdf"), bytes)
+            }
+            "email" => {
+                let path = self.resolve(a.str("path")?, false)?;
+                let raw = std::fs::read(&path).map_err(|e| failed(format!("{}: {e}", path.display())))?;
+                let stem = path.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
+                let embed = a.opt_bool("embed_attachments")?.unwrap_or(false);
+                let (bytes, report) = pdfcraft_engine::guard(|| self.session.create_from_email(&stem, &raw, embed))
+                    .map_err(|_| failed("the message could not be read"))?
+                    .map_err(failed)?;
+                notes = pdfcraft_engine::conversion_notes_email(&report);
+                (format!("{stem}.pdf"), bytes)
+            }
+            kind @ ("html" | "office") => {
+                let path = self.resolve(a.str("path")?, false)?;
+                let raw = std::fs::read(&path).map_err(|e| failed(format!("{}: {e}", path.display())))?;
+                let file = path.file_name().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
+                let stem = path.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
+                let want = if kind == "html" { pdfcraft_engine::SourceKind::Html } else { pdfcraft_engine::SourceKind::Office };
+                if pdfcraft_engine::source_kind(&file, &raw) != Some(want) {
+                    return Err(ToolError::InvalidArgs(format!("{file}: not an {kind} file this converter takes")));
+                }
+                let converters = self.session.external_converters().clone();
+                let bytes = converters.convert(want, &file, &raw, &std::sync::atomic::AtomicBool::new(false)).map_err(failed)?;
+                (format!("{stem}.pdf"), Arc::new(bytes))
+            }
+            "web_page" => {
+                let url = a.str("url")?;
+                let name = pdfcraft_engine::external::web_page_name(url).map_err(failed)?;
+                let bytes = self.session.create_from_web_page(url).map_err(failed)?;
+                (format!("{}.pdf", name.trim_end_matches(".html")), bytes)
+            }
             other => return Err(ToolError::InvalidArgs(format!("unknown source {other:?}"))),
         };
         let name = a.opt_str("name")?.map(str::to_owned).unwrap_or(name);
         let id = self.session.open_new(name, bytes).map_err(failed)?;
-        Ok(summary(self.session.get(id).ok_or_else(|| failed("the document vanished"))?))
+        let mut out = summary(self.session.get(id).ok_or_else(|| failed("the document vanished"))?);
+        if !notes.is_empty()
+            && let Some(o) = out.as_object_mut()
+        {
+            o.insert("notes".into(), json!(notes));
+        }
+        Ok(out)
+    }
+
+    /// Read Out Loud: speak `pages` (default: all, at most 50) of a document with the system's speech
+    /// program. Assistive reading is allowed whatever the copy permission; the text goes only to
+    /// the speech program and is never returned.
+    #[cfg(not(target_arch = "wasm32"))]
+    fn speech_start(&mut self, a: &Args) -> Result<Value> {
+        let doc = self.doc(a)?;
+        let id = doc.id;
+        let pages = match a.opt_ints("pages")? {
+            Some(_) => self.pages(a, "pages")?,
+            None => (0..doc.info.pages.len().min(50)).collect(),
+        };
+        let mut text = String::new();
+        for p in &pages {
+            text.push_str(&self.session.speech_text(id, *p).map_err(failed)?);
+            text.push('\n');
+        }
+        let backend = self
+            .speech_backend
+            .clone()
+            .or_else(pdfcraft_engine::SpeechBackend::detect)
+            .ok_or_else(|| failed("no speech program was found (Windows speech, macOS say, or eSpeak NG on Linux)"))?;
+        self.speech.start(&backend, &text).map_err(failed)?;
+        Ok(
+            json!({ "speaking": true, "program": backend.name(), "pages": pages.iter().map(|p| p + 1).collect::<Vec<_>>(), "characters": text.chars().count() }),
+        )
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    fn speech_start(&mut self, _a: &Args) -> Result<Value> {
+        Err(failed("Read Out Loud needs the desktop app"))
+    }
+
+    fn speech_stop(&mut self) -> Value {
+        #[cfg(not(target_arch = "wasm32"))]
+        self.speech.stop();
+        json!({ "speaking": false })
+    }
+
+    fn speech_status(&mut self) -> Value {
+        #[cfg(not(target_arch = "wasm32"))]
+        return json!({ "speaking": self.speech.speaking() });
+        #[cfg(target_arch = "wasm32")]
+        json!({ "speaking": false })
     }
 
     fn page_set_box(&mut self, a: &Args) -> Result<Value> {
@@ -1890,7 +2061,37 @@ fn view_rect(i: &pdfcraft_render::DocInfo, page: usize, rect: [f32; 4]) -> [f32;
 }
 
 fn outline(items: &[pdfcraft_render::OutlineItem]) -> Value {
-    Value::Array(items.iter().map(|o| json!({ "title": o.title, "page": o.page.map(|p| p + 1), "children": outline(&o.children) })).collect())
+    Value::Array(
+        items
+            .iter()
+            .map(|o| {
+                let mut v = json!({ "title": o.title, "page": o.page.map(|p| p + 1), "children": outline(&o.children) });
+                if let Some(m) = v.as_object_mut() {
+                    if let Some([r, g, b]) = o.color {
+                        let byte = |c: f32| (c.clamp(0.0, 1.0) * 255.0).round() as u8;
+                        m.insert("color".into(), json!(format!("#{:02X}{:02X}{:02X}", byte(r), byte(g), byte(b))));
+                    }
+                    if o.bold {
+                        m.insert("bold".into(), json!(true));
+                    }
+                    if o.italic {
+                        m.insert("italic".into(), json!(true));
+                    }
+                }
+                v
+            })
+            .collect(),
+    )
+}
+
+/// `#RRGGBB` (or `RRGGBB`) as RGB 0–1.
+fn hex_rgb(s: &str) -> Option<[f64; 3]> {
+    let h = s.trim().trim_start_matches('#');
+    if h.len() != 6 || !h.is_ascii() {
+        return None;
+    }
+    let part = |i: usize| h.get(i..i + 2).and_then(|p| u8::from_str_radix(p, 16).ok()).map(|v| f64::from(v) / 255.0);
+    Some([part(0)?, part(2)?, part(4)?])
 }
 
 fn encode_png(width: u32, height: u32, premultiplied: &[u8]) -> Result<Vec<u8>> {

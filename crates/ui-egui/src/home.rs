@@ -29,7 +29,8 @@ pub fn show(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
                     ui.set_width(ui.available_width());
                     ui.label(egui::RichText::new(tl!("PlutarchPages is a fork of PdfCraft")).font(theme::semibold(15.0)));
                     ui.label(
-                        egui::RichText::new(tl!("Based on PdfCraft by the ArtCraft team. Report problems with PlutarchPages on GitHub.")).color(t.text_muted),
+                        egui::RichText::new(tl!("Based on PdfCraft by the ArtCraft team. Report problems with PlutarchPages on GitHub."))
+                            .color(t.text_muted),
                     );
                     ui.add_space(8.0);
                     if let Some(cmd) = widgets::community_links(ui) {
@@ -124,7 +125,9 @@ pub fn show(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
             });
             ui.add_space(8.0);
             if app.recent.is_empty() {
-                ui.label(egui::RichText::new(tl!("Files you open in PlutarchPages appear here. Drop a PDF anywhere to open it.")).color(t.text_muted));
+                ui.label(
+                    egui::RichText::new(tl!("Files you open in PlutarchPages appear here. Drop a PDF anywhere to open it.")).color(t.text_muted),
+                );
             }
             let mut open = None;
             let mut remove = None;

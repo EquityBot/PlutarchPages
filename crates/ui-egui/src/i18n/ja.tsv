@@ -2196,3 +2196,27 @@ key	Space	スペース
 	Resize panel window	パネルウィンドウのサイズを変更
 	Tools	ツール
 	Inspector	インスペクター
+# PlutarchPages: external converters, Read Out Loud, grayscale, Excel export, links.
+	Create PDF from web page…	Webページから PDF を作成…
+	Read this page aloud	このページを読み上げ
+	Read to end of document	文書の最後まで読み上げ
+	Stop reading	読み上げを停止
+	Convert colours to grayscale	カラーをグレースケールに変換
+	Export to Excel…	Excel に書き出し…
+	Report a problem	問題を報告
+	Upstream PdfCraft	元の PdfCraft
+	Web page	Webページ
+	A fork of PdfCraft by the ArtCraft team. PlutarchPages is not an ArtCraft product.	ArtCraft チームの PdfCraft のフォークです。PlutarchPages は ArtCraft の製品ではありません。
+	Based on PdfCraft by the ArtCraft team. Report problems with PlutarchPages on GitHub.	ArtCraft チームの PdfCraft に基づいています。PlutarchPages の問題は GitHub で報告してください。
+	Convert Office files, HTML files and web pages with installed programs	インストール済みのプログラムで Office ファイル、HTML ファイル、Webページを変換
+	Converted to grayscale: {ops} colours, {images} images, {forms} forms; {left} left as they were	グレースケールに変換しました: カラー {ops} 件、画像 {images} 件、フォーム {forms} 件。{left} 件はそのままです
+	Create PDF from web page	Webページから PDF を作成
+	Discard external cross-references	外部相互参照を破棄
+	Discard form submission, import and reset actions	フォームの送信、読み込み、リセットのアクションを破棄
+	External converters	外部コンバーター
+	External converters are off. Turn them on in Preferences to use your installed Chrome or Edge.	外部コンバーターはオフです。インストール済みの Chrome または Edge を使うには、環境設定でオンにしてください。
+	PlutarchPages is a fork of PdfCraft	PlutarchPages は PdfCraft のフォークです
+	Remove PDF/A and PDF/X identification	PDF/A と PDF/X の識別情報を削除
+	Uses LibreOffice (26.2.5 or later) for Office files and Chrome or Edge for HTML and web pages, each in a fresh private profile. Local HTML opens with scripts and network off. These programs are not sandboxed by PlutarchPages: convert only files you trust.	Office ファイルには LibreOffice (26.2.5 以降)、HTML と Webページには Chrome または Edge を使い、それぞれ新しいプライベートプロファイルで実行します。ローカルの HTML はスクリプトとネットワークを切って開きます。PlutarchPages はこれらのプログラムをサンドボックス化しないため、信頼できるファイルだけを変換してください。
+	Web address (http or https)	Web アドレス (http または https)
+	The page opens in a fresh, private window of your installed Chrome or Edge and is printed to PDF. Addresses on this computer or a private network are refused.	ページはインストール済みの Chrome または Edge の新しいプライベートウィンドウで開かれ、PDF に印刷されます。このコンピューターやプライベートネットワーク上のアドレスは拒否されます。

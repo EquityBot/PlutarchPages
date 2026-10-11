@@ -1259,11 +1259,11 @@ title = "Highlight the current bookmark"
 area = "B"
 tier = "P2"
 milestone = "M4"
-status = "planned"
+status = "shipped"
 commands = []
 tools = []
-evidence = []
-notes = ""
+evidence = ["crates/ui-egui/src/panels.rs::the_current_bookmark_is_the_last_section_started"]
+notes = "PlutarchPages (PDF-XChange Bookmarks plug-in): the bookmarks panel shades the bookmark for the current page (the furthest-reaching bookmark at or before it; a sub-section beats its section). Always on; no preference to turn it off."
 
 [[feature]]
 id = "view.attachments-panel"
@@ -3247,11 +3247,11 @@ title = "Bookmark style and colour"
 area = "D"
 tier = "P2"
 milestone = "M4"
-status = "planned"
+status = "shipped"
 commands = []
-tools = []
-evidence = []
-notes = ""
+tools = ["bookmark_set_style"]
+evidence = ["crates/automation/tests/automation.rs::bookmark_style_sets_colour_bold_and_italic"]
+notes = "PlutarchPages (PDF-XChange Bookmarks plug-in): colour (/C) and bold and italic (/F) from the bookmark context menu's Style submenu (six colours) and bookmark_set_style (any #RRGGBB). The panel shows colour and bold; italic shows only as a check mark (the interface fonts have no italic face)."
 
 [[feature]]
 id = "organize.bookmark-actions"
@@ -6763,11 +6763,35 @@ title = "Create PDF from Markdown"
 area = "J"
 tier = "P2"
 milestone = "M10"
-status = "planned"
-commands = []
-tools = []
-evidence = []
-notes = ""
+status = "shipped"
+commands = ["file.open"]
+tools = ["doc_create"]
+evidence = ["crates/create/src/markdown.rs::headings_emphasis_lists_and_links", "crates/create/src/markdown.rs::code_blocks_tables_and_images", "crates/automation/tests/automation.rs::doc_create_lays_out_csv_markdown_and_email"]
+notes = "PlutarchPages (PDF-XChange Markdown plug-in parity): CommonMark with tables, strikethrough and task lists through pulldown-cmark; headings, emphasis, code, quotes, nested lists, rules, tables and link annotations. Images are not fetched (alt text shows) and raw HTML is left out. Set in the standard 14 fonts: characters outside WinAnsi print as ? and the result says how many."
+
+[[feature]]
+id = "create.from-csv"
+title = "Create PDF from CSV (a table)"
+area = "J"
+tier = "P2"
+milestone = "M10"
+status = "shipped"
+commands = ["file.open"]
+tools = ["doc_create"]
+evidence = ["crates/create/src/csv.rs::makes_a_table_document", "crates/create/src/csv.rs::quotes_delimiters_and_line_breaks", "crates/automation/tests/automation.rs::doc_create_lays_out_csv_markdown_and_email"]
+notes = "PlutarchPages (PDF-XChange CSV plug-in parity): RFC 4180 CSV and TSV (delimiter sniffed), a header row repeated on every page, wide tables on landscape pages in smaller type. At most 100,000 rows and 64 columns; what is cut is reported. Standard 14 fonts (WinAnsi)."
+
+[[feature]]
+id = "create.from-email"
+title = "Create PDF from an email message (.eml)"
+area = "J"
+tier = "P2"
+milestone = "M10"
+status = "shipped"
+commands = ["file.open"]
+tools = ["doc_create"]
+evidence = ["crates/create/src/email.rs::plain_message_with_an_attachment", "crates/create/src/email.rs::html_only_message_becomes_text_without_fetching", "crates/automation/tests/automation.rs::doc_create_lays_out_csv_markdown_and_email"]
+notes = "PlutarchPages (PDF-XChange EML converter parity): RFC 5322/MIME through mail-parser; subject, addresses, date and every text body. HTML-only messages become plain text without fetching anything. Attachments are listed; doc_create embed_attachments=true embeds them as file attachments (sanitised names). Standard 14 fonts (WinAnsi)."
 
 [[feature]]
 id = "create.from-clipboard"
@@ -6811,11 +6835,11 @@ title = "Create PDF from an HTML file"
 area = "J"
 tier = "P2"
 milestone = "M10"
-status = "planned"
-commands = []
-tools = []
-evidence = []
-notes = ""
+status = "shipped"
+commands = ["file.open"]
+tools = ["doc_create"]
+evidence = ["crates/external/src/lib.rs::browser_arguments_keep_the_target_inert", "crates/external/src/lib.rs::fake_converters_fail_cleanly", "crates/automation/tests/automation.rs::doc_create_through_external_converters"]
+notes = "PlutarchPages (PDF-XChange browser-to-PDF parity): an installed Chrome, Edge or Chromium prints a local HTML file with scripts off and network refused (unknown hosts and a dead proxy), in a fresh profile. Off unless External converters are on; a local file can still include other local files it names. Real-browser isolation is not tested in CI."
 
 [[feature]]
 id = "create.from-web-page"
@@ -6823,11 +6847,11 @@ title = "Create PDF from a web page URL"
 area = "J"
 tier = "P2"
 milestone = "M10"
-status = "planned"
-commands = []
-tools = []
-evidence = []
-notes = ""
+status = "shipped"
+commands = ["create.web_page"]
+tools = ["doc_create"]
+evidence = ["crates/external/src/web.rs::local_private_and_odd_addresses_are_refused", "crates/engine/src/external.rs::converters_are_off_by_default_and_web_addresses_are_checked_first", "crates/automation/tests/automation.rs::doc_create_through_external_converters"]
+notes = "PlutarchPages: Create ▸ From web page prints a public http or https page through an installed Chrome or Edge in a fresh private profile. Addresses on this computer or a private network (any numeric spelling) and addresses with credentials are refused; a public name that resolves to a private address is not caught. Off unless External converters are on."
 
 [[feature]]
 id = "create.from-office"
@@ -6835,11 +6859,11 @@ title = "Create PDF from Office documents (LibreOffice sidecar)"
 area = "J"
 tier = "P2"
 milestone = "M10"
-status = "planned"
-commands = []
-tools = []
-evidence = []
-notes = ""
+status = "shipped"
+commands = ["file.open"]
+tools = ["doc_create"]
+evidence = ["crates/external/src/lib.rs::extensions_are_allowlisted", "crates/external/src/lib.rs::versions_parse", "crates/engine/src/tests.rs::files_that_cannot_be_converted_are_refused_clearly"]
+notes = "PlutarchPages (PDF-XChange Office2PDF parity): an installed LibreOffice 26.2.5 or later converts doc, docx, odt, rtf, xls, xlsx, ods, ppt, pptx and odp (no macro-enabled formats) in a fresh profile and private folder, with a deadline and process-tree kill. Off unless the user turns on External converters (Preferences, or PDFCRAFT_EXTERNAL_CONVERTERS=1); not an OS sandbox. The end-to-end test uses a fake converter; a real LibreOffice run is not part of CI."
 
 [[feature]]
 id = "create.create-multiple"
@@ -6931,11 +6955,11 @@ title = "Export to Excel (.xlsx) with table detection"
 area = "J"
 tier = "P1"
 milestone = "M10"
-status = "planned"
-commands = []
-tools = []
-evidence = []
-notes = ""
+status = "shipped"
+commands = ["export.xlsx"]
+tools = ["doc_export_office"]
+evidence = ["crates/export/src/xlsx.rs::a_page_with_a_table_becomes_a_sheet", "crates/export/src/xlsx.rs::columns_and_numbers", "crates/automation/tests/automation.rs::exporting_to_word_html_and_rtf"]
+notes = "PlutarchPages (PDF-XChange Convert to MS Office): one worksheet per page; tables found by the Word export's layout detection become rows and columns (spanning headers merged), other paragraphs one row each, plain numbers (1,234.50, -7) as numbers, bold kept. Missing: dates, currency and percentages as typed values, one sheet across pages, images, column widths. Not yet opened in Excel by a test."
 
 [[feature]]
 id = "create.export-pptx"
@@ -7343,11 +7367,11 @@ title = "Discard form submit, import and reset actions"
 area = "K"
 tier = "P2"
 milestone = "M11"
-status = "planned"
+status = "shipped"
 commands = []
-tools = []
-evidence = []
-notes = ""
+tools = ["doc_optimize"]
+evidence = ["crates/automation/tests/automation.rs::optimize_discards_form_actions_external_refs_and_standards_id", "crates/optimize/src/actions.rs::form_and_external_actions_go_and_others_stay"]
+notes = "PlutarchPages (PDF-XChange Optimizer): SubmitForm, ImportData and ResetForm actions are removed from annotations, fields, pages, the catalog and /Next chains (32 deep). Off by default."
 
 [[feature]]
 id = "optimize.flatten-form-fields"
@@ -7415,11 +7439,11 @@ title = "Discard external cross-references"
 area = "K"
 tier = "P2"
 milestone = "M11"
-status = "planned"
+status = "shipped"
 commands = []
-tools = []
-evidence = []
-notes = ""
+tools = ["doc_optimize"]
+evidence = ["crates/automation/tests/automation.rs::optimize_discards_form_actions_external_refs_and_standards_id", "crates/optimize/src/actions.rs::form_and_external_actions_go_and_others_stay"]
+notes = "PlutarchPages: GoToR and Launch actions (links to other files and programs) are removed; web (URI) links stay. Off by default."
 
 [[feature]]
 id = "optimize.discard-hidden-layers"
@@ -7811,11 +7835,11 @@ title = "Remove PDF/A or PDF/X identification"
 area = "K"
 tier = "P2"
 milestone = "M11"
-status = "planned"
+status = "shipped"
 commands = []
-tools = []
-evidence = []
-notes = ""
+tools = ["doc_optimize"]
+evidence = ["crates/automation/tests/automation.rs::optimize_discards_form_actions_external_refs_and_standards_id", "crates/optimize/src/standards.rs::a_document_stops_claiming_pdfa_and_pdfx"]
+notes = "PlutarchPages: an Optimizer option removes the XMP pdfaid properties and PDF/X version properties and the PDF/X information keys. The content is unchanged; there is no Standards-panel button yet."
 
 [[feature]]
 id = "optimize.pdfx5-reference-xobjects"
@@ -8187,11 +8211,11 @@ title = "Convert colours"
 area = "L"
 tier = "P1"
 milestone = "M11"
-status = "planned"
-commands = []
-tools = []
-evidence = []
-notes = ""
+status = "partial"
+commands = ["edit.convert_gray"]
+tools = ["doc_convert_gray"]
+evidence = ["crates/automation/tests/automation.rs::doc_convert_gray_rewrites_colours", "crates/optimize/src/colors.rs::device_colours_become_gray_and_others_stay", "crates/optimize/src/colors.rs::rgb_images_become_gray"]
+notes = "PlutarchPages (PDF-XChange Color Converter): convert to grayscale only. RGB, CMYK, CalRGB, CalGray and ICC-based fill and stroke colours in page content and nested forms, and 8-bit RGB images (Flate or JPEG), become DeviceGray. Missing: other target spaces (CMYK, RGB), ICC conversion, separations, DeviceN, Indexed, Lab, patterns, shadings, inline images and annotation appearances (left and counted)."
 
 [[feature]]
 id = "print.ink-manager"
@@ -8995,11 +9019,11 @@ title = "Read out loud (platform TTS)"
 area = "M"
 tier = "P2"
 milestone = "M12"
-status = "planned"
-commands = []
-tools = []
-evidence = []
-notes = ""
+status = "shipped"
+commands = ["view.read_aloud", "view.read_aloud_to_end", "view.stop_reading"]
+tools = ["speech_start", "speech_stop", "speech_status"]
+evidence = ["crates/external/src/speech.rs::text_never_reaches_the_command_line", "crates/external/src/speech.rs::stop_ends_a_program_that_never_finishes", "crates/engine/src/external.rs::speech_text_ignores_the_copy_permission_but_not_the_page_range", "crates/automation/tests/automation.rs::read_out_loud_sends_text_only_to_the_speech_program"]
+notes = "PlutarchPages (PDF-XChange Read-out-Loud parity): the current page or the rest of the document (50 pages at most) through Windows speech, macOS say or eSpeak NG, text on standard input only. Allowed whatever the copy permission (ISO 32000-2 assistive use); the text is never returned to tools. No voice, rate or word highlighting yet."
 
 [[feature]]
 id = "a11y.read-aloud-options"

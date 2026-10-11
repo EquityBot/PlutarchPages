@@ -322,7 +322,16 @@ fn source_kind_tells_pdfs_images_and_text_apart() {
     // Text that merely starts like a BMP stays text; a truncated BMP header is not an image.
     assert_eq!(source_kind("b.txt", b"BMW drivers"), Some(SourceKind::Text));
     assert_eq!(source_kind("b.bmp", b"BM"), None);
-    assert_eq!(source_kind("a.docx", b"PK\x03\x04"), None);
+    assert_eq!(source_kind("a.docx", b"PK\x03\x04"), Some(SourceKind::Office), "converted through LibreOffice when allowed");
+    assert_eq!(source_kind("macro.docm", b"PK\x03\x04"), None, "macro-enabled formats are not offered");
+    assert_eq!(source_kind("page.HTM", b"<p>"), Some(SourceKind::Html));
+    assert_eq!(source_kind("a.zip", b"PK\x03\x04"), None);
+    assert_eq!(source_kind("books.CSV", b"a,b"), Some(SourceKind::Csv));
+    assert_eq!(source_kind("t.tsv", b"a\tb"), Some(SourceKind::Csv));
+    assert_eq!(source_kind("readme.md", b"# Hi"), Some(SourceKind::Markdown));
+    assert_eq!(source_kind("notes.markdown", b""), Some(SourceKind::Markdown));
+    assert_eq!(source_kind("mail.eml", b"From: a@example.org"), Some(SourceKind::Email));
+    assert_eq!(source_kind("md", b"no extension"), None);
     assert_eq!(source_kind("", b""), None);
 }
 

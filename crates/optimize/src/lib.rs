@@ -8,7 +8,8 @@
 //!   faithfully (CMYK and other colour spaces, masks, decode arrays other than the default,
 //!   JPEG 2000, JBIG2, CCITT, other than 8 bits) are left alone.
 //! - **Discard objects:** page thumbnails, alternate images, document tags (structure tree),
-//!   print settings.
+//!   print settings, form submit/import/reset actions, external cross-references (`GoToR`,
+//!   `Launch`), and PDF/A and PDF/X identification.
 //! - **Clean up:** drop images and forms that pages list but never draw (such as a deleted
 //!   image); Flate-compress streams that have no filter.
 //!
@@ -18,12 +19,16 @@
 
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
 
+mod actions;
 mod audit;
+mod colors;
 mod images;
 mod links;
+mod standards;
 mod unused;
 
 pub use audit::{SpaceCategory, SpaceUse, audit_space};
+pub use colors::{ColorReport, convert_to_gray};
 
 use pdfcraft_cos::{Document, ObjRef, Object, Stream};
 
@@ -90,6 +95,14 @@ pub struct Settings {
     pub remove_invalid_links: bool,
     /// Clean Up: remove named destinations nothing refers to.
     pub remove_unreferenced_dests: bool,
+    /// Discard Objects: form submit, import and reset actions (buttons then do nothing).
+    pub discard_form_actions: bool,
+    /// Discard Objects: external cross-references, actions that open another file or launch a
+    /// program (`GoToR`, `Launch`). Web links stay.
+    pub discard_external_refs: bool,
+    /// Remove PDF/A and PDF/X identification (XMP `pdfaid:` and PDF/X version properties, PDF/X
+    /// information keys), for a file that no longer has to meet the standard.
+    pub remove_standards_id: bool,
 }
 
 impl Default for Settings {
@@ -105,6 +118,9 @@ impl Default for Settings {
             flate_unencoded: true,
             remove_invalid_links: true,
             remove_unreferenced_dests: true,
+            discard_form_actions: false,
+            discard_external_refs: false,
+            remove_standards_id: false,
         }
     }
 }
@@ -129,6 +145,12 @@ pub struct Report {
     pub unreferenced_dests: usize,
     /// Images and forms the pages listed but never drew, dropped (Clean Up).
     pub unused_xobjects: usize,
+    /// Form submit, import and reset actions removed.
+    pub form_actions: usize,
+    /// Go-to-another-file and launch actions removed.
+    pub external_refs: usize,
+    /// PDF/A and PDF/X claims removed.
+    pub standards_ids: usize,
 }
 
 /// Optimize `doc` in place.
@@ -212,6 +234,15 @@ pub fn optimize_with_progress(doc: &mut Document, settings: &Settings, progress:
             }
             _ => {}
         }
+    }
+    if settings.discard_form_actions {
+        report.form_actions = actions::discard(doc, actions::FORM_ACTIONS)?;
+    }
+    if settings.discard_external_refs {
+        report.external_refs = actions::discard(doc, actions::EXTERNAL_ACTIONS)?;
+    }
+    if settings.remove_standards_id {
+        report.standards_ids = standards::remove_identification(doc)?;
     }
     if settings.remove_invalid_links {
         let (l, b) = links::remove_invalid(doc, &pages)?;

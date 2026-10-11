@@ -57,6 +57,7 @@ pub fn show(app: &mut PdfCraftApp, ctx: &egui::Context) {
     let mut ocr_now = false;
     let mut compare_now = false;
     let mut images_now = false;
+    let mut web_now = false;
     let mut stamp_now = false;
     let mut alt_now = false;
     let t = Tokens::get(ctx);
@@ -82,6 +83,12 @@ pub fn show(app: &mut PdfCraftApp, ctx: &egui::Context) {
             Dialog::CreateImages => {
                 let (go, cancel) = crate::create_ui::image_import_body(ui, app);
                 images_now = go;
+                close = go || cancel;
+                return;
+            }
+            Dialog::WebPage => {
+                let (go, cancel) = crate::external_ui::web_page_body(ui, app);
+                web_now = go;
                 close = go || cancel;
                 return;
             }
@@ -1320,6 +1327,9 @@ pub fn show(app: &mut PdfCraftApp, ctx: &egui::Context) {
     }
     if stamp_now {
         app.save_custom_stamp();
+    }
+    if web_now {
+        app.start_web_page();
     }
     if images_now {
         app.finish_image_import();

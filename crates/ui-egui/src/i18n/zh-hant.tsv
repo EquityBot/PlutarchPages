@@ -2082,3 +2082,27 @@ key	Space	空格
 	Resize panel window	調整面板視窗大小
 	Tools	工具
 	Inspector	檢查器
+# PlutarchPages: external converters, Read Out Loud, grayscale, Excel export, links.
+	Create PDF from web page…	從網頁建立 PDF…
+	Read this page aloud	朗讀此頁
+	Read to end of document	朗讀到文件結尾
+	Stop reading	停止朗讀
+	Convert colours to grayscale	將色彩轉換為灰階
+	Export to Excel…	匯出至 Excel…
+	Report a problem	回報問題
+	Upstream PdfCraft	上游 PdfCraft
+	Web page	網頁
+	A fork of PdfCraft by the ArtCraft team. PlutarchPages is not an ArtCraft product.	ArtCraft 團隊的 PdfCraft 的分支。PlutarchPages 不是 ArtCraft 產品。
+	Based on PdfCraft by the ArtCraft team. Report problems with PlutarchPages on GitHub.	以 ArtCraft 團隊的 PdfCraft 為基礎。請在 GitHub 上回報 PlutarchPages 的問題。
+	Convert Office files, HTML files and web pages with installed programs	使用已安裝的程式轉換 Office 檔案、HTML 檔案和網頁
+	Converted to grayscale: {ops} colours, {images} images, {forms} forms; {left} left as they were	已轉換為灰階：{ops} 種色彩、{images} 張影像、{forms} 個表單；{left} 項維持不變
+	Create PDF from web page	從網頁建立 PDF
+	Discard external cross-references	捨棄外部交互參照
+	Discard form submission, import and reset actions	捨棄表單的提交、匯入和重設動作
+	External converters	外部轉換器
+	External converters are off. Turn them on in Preferences to use your installed Chrome or Edge.	外部轉換器已關閉。請在偏好設定中開啟，以使用已安裝的 Chrome 或 Edge。
+	PlutarchPages is a fork of PdfCraft	PlutarchPages 是 PdfCraft 的分支
+	Remove PDF/A and PDF/X identification	移除 PDF/A 和 PDF/X 識別資訊
+	Uses LibreOffice (26.2.5 or later) for Office files and Chrome or Edge for HTML and web pages, each in a fresh private profile. Local HTML opens with scripts and network off. These programs are not sandboxed by PlutarchPages: convert only files you trust.	Office 檔案使用 LibreOffice（26.2.5 或更新版本），HTML 和網頁使用 Chrome 或 Edge，每次都在全新的私人設定檔中執行。本機 HTML 會在關閉指令碼和網路的情況下開啟。PlutarchPages 不會將這些程式放入沙箱：請只轉換您信任的檔案。
+	Web address (http or https)	網址（http 或 https）
+	The page opens in a fresh, private window of your installed Chrome or Edge and is printed to PDF. Addresses on this computer or a private network are refused.	頁面會在已安裝的 Chrome 或 Edge 的全新私人視窗中開啟並列印為 PDF。本機或私人網路上的位址會被拒絕。

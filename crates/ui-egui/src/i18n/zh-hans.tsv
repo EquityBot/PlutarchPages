@@ -2160,3 +2160,27 @@ key	Space	空格
 	Resize panel window	调整面板窗口大小
 	Tools	工具
 	Inspector	检查器
+# PlutarchPages: external converters, Read Out Loud, grayscale, Excel export, links.
+	Create PDF from web page…	从网页创建 PDF…
+	Read this page aloud	朗读此页
+	Read to end of document	朗读到文档末尾
+	Stop reading	停止朗读
+	Convert colours to grayscale	将颜色转换为灰度
+	Export to Excel…	导出到 Excel…
+	Report a problem	报告问题
+	Upstream PdfCraft	上游 PdfCraft
+	Web page	网页
+	A fork of PdfCraft by the ArtCraft team. PlutarchPages is not an ArtCraft product.	ArtCraft 团队的 PdfCraft 的分支。PlutarchPages 不是 ArtCraft 产品。
+	Based on PdfCraft by the ArtCraft team. Report problems with PlutarchPages on GitHub.	基于 ArtCraft 团队的 PdfCraft。请在 GitHub 上报告 PlutarchPages 的问题。
+	Convert Office files, HTML files and web pages with installed programs	使用已安装的程序转换 Office 文件、HTML 文件和网页
+	Converted to grayscale: {ops} colours, {images} images, {forms} forms; {left} left as they were	已转换为灰度：{ops} 种颜色、{images} 张图像、{forms} 个表单；{left} 项保持不变
+	Create PDF from web page	从网页创建 PDF
+	Discard external cross-references	丢弃外部交叉引用
+	Discard form submission, import and reset actions	丢弃表单的提交、导入和重置操作
+	External converters	外部转换器
+	External converters are off. Turn them on in Preferences to use your installed Chrome or Edge.	外部转换器已关闭。请在首选项中打开，以使用已安装的 Chrome 或 Edge。
+	PlutarchPages is a fork of PdfCraft	PlutarchPages 是 PdfCraft 的分支
+	Remove PDF/A and PDF/X identification	移除 PDF/A 和 PDF/X 标识
+	Uses LibreOffice (26.2.5 or later) for Office files and Chrome or Edge for HTML and web pages, each in a fresh private profile. Local HTML opens with scripts and network off. These programs are not sandboxed by PlutarchPages: convert only files you trust.	Office 文件使用 LibreOffice（26.2.5 或更高版本），HTML 和网页使用 Chrome 或 Edge，每次都在全新的私有配置文件中运行。本地 HTML 在关闭脚本和网络的情况下打开。PlutarchPages 不会对这些程序进行沙盒隔离：请只转换您信任的文件。
+	Web address (http or https)	网址（http 或 https）
+	The page opens in a fresh, private window of your installed Chrome or Edge and is printed to PDF. Addresses on this computer or a private network are refused.	页面会在已安装的 Chrome 或 Edge 的全新私有窗口中打开并打印为 PDF。本机或专用网络上的地址会被拒绝。

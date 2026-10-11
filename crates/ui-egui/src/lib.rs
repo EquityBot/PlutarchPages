@@ -43,6 +43,7 @@ mod credits;
 mod crop;
 mod drag_pointer;
 mod export_ui;
+mod external_ui;
 mod js_ui;
 mod marks_ui;
 mod measure_ui;
@@ -226,6 +227,8 @@ struct GridDrop {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Dialog {
     CreateImages,
+    /// Create ▸ From web page (external converters).
+    WebPage,
     Properties(PropsTab),
     About,
     Shortcuts,
@@ -430,6 +433,8 @@ pub struct PdfCraftApp {
     /// How to ask for the latest release (the desktop app sets it; see `updates`).
     pub update_source: Option<updates::UpdateSource>,
     pub(crate) updates: updates::Updates,
+    /// External converters running and Read Out Loud (PlutarchPages).
+    pub(crate) external: external_ui::External,
     /// Lists the Print dialog's printers in the background (the desktop app sets it; see
     /// [`PrinterSource`]).
     pub printer_source: Option<PrinterSource>,
@@ -707,7 +712,13 @@ fn rgb_triple(v: &serde_json::Value) -> Option<[f64; 3]> {
 impl PdfCraftApp {
     pub fn new() -> Self {
         Self {
-            session: Session::new(),
+            session: {
+                // External converters: off unless the user turns them on (Preferences, restored later,
+                // or the environment of the user who started the app).
+                let mut s = Session::new();
+                s.set_external_converters(pdfcraft_engine::ExternalConverters::from_env());
+                s
+            },
             views: Vec::new(),
             active: None,
             mode: Mode::AllTools,
@@ -736,6 +747,7 @@ impl PdfCraftApp {
             dialog: None,
             update_source: None,
             updates: updates::Updates::default(),
+            external: external_ui::External::default(),
             printer_source: None,
             print_tasks: print_ui::PrintTasks::default(),
             palette_open: false,
@@ -1438,6 +1450,7 @@ impl PdfCraftApp {
             "trusted": trusted,
             "custom_stamps": stamps_ui::encode(&self.custom_stamps),
             "javascript": self.session.javascript(),
+            "external_converters": self.session.external_converters().enabled,
             "actions": actions_ui::encode(&self.custom_actions),
             "combine_columns": self.combine_columns.to_json(),
             "combine_view": self.combine_view.as_str(),
@@ -1562,6 +1575,11 @@ impl PdfCraftApp {
         }
         self.custom_stamps = stamps_ui::decode(&v["custom_stamps"]);
         self.custom_actions = actions_ui::decode(&v["actions"]);
+        if let Some(on) = v["external_converters"].as_bool() {
+            let mut c = self.session.external_converters().clone();
+            c.enabled = on;
+            self.session.set_external_converters(c);
+        }
         if let Some(on) = v["javascript"].as_bool() {
             self.session.set_javascript(on);
         }
@@ -2032,6 +2050,7 @@ impl eframe::App for PdfCraftApp {
             }
         }
         self.poll_updates();
+        self.poll_external();
         self.poll_print();
         // Shortcuts deferred last frame: the text field has taken that frame's typing since.
         let deferred = std::mem::take(&mut self.deferred_commands);

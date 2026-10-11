@@ -465,15 +465,47 @@ Every other Linux build needs glibc 2.35 or newer (Ubuntu 22.04+, Debian 12+, Fe
 
 ## Fork changes
 
-Changes in PlutarchPages, on top of upstream PdfCraft:
+Changes in PlutarchPages, on top of upstream PdfCraft. The feature list follows PDF-XChange Pro's
+published components (names and descriptions only; nothing from its program code), implemented
+from public specifications like the rest of PdfCraft.
 
-- The app is called PlutarchPages wherever it shows its name. Settings folders, binaries, crates and
-  the markers it writes into PDFs keep their upstream `pdfcraft` names, so upstream changes still merge.
-- Security fixes from [kopitiam-io/pdfkopi](https://github.com/kopitiam-io/pdfkopi) for upstream issues
-  [#603](https://github.com/storytold/pdfcraft/issues/603) (Document Open password),
+- **Name and brand.** The app is called PlutarchPages wherever it shows its name. Settings folders,
+  binaries, crates and the markers it writes into PDFs keep their upstream `pdfcraft` names, so
+  upstream changes still merge. The ArtCraft name, wordmark and logos are removed (upstream brand
+  licence).
+- **Security fixes** from [kopitiam-io/pdfkopi](https://github.com/kopitiam-io/pdfkopi) for upstream
+  issues [#603](https://github.com/storytold/pdfcraft/issues/603) (Document Open password),
   [#568](https://github.com/storytold/pdfcraft/issues/568) (copy permission) and
-  [#389](https://github.com/storytold/pdfcraft/issues/389) (redacted images left in the file).
-- The ArtCraft name, wordmark and logos are removed (upstream brand licence).
+  [#389](https://github.com/storytold/pdfcraft/issues/389) (redacted images left in the file), tightened
+  after review: an explicit empty password never skips the prompt or lifts restrictions, the CLI
+  refuses encrypted files whose permissions it can't check, and every document view takes its copy
+  permission from the engine.
+- **Create from CSV, Markdown and email** (PDF-XChange's CSV, Markdown and EML converters): open or
+  combine `.csv`/`.tsv` (a table with a repeated header row), `.md` and `.eml` files, or use
+  `doc_create`. Email attachments are listed, and embedded only when asked. Text is set in the
+  standard PDF fonts; characters they can't show are reported.
+- **External converters**, off by default (Preferences ▸ External converters, or
+  `PDFCRAFT_EXTERNAL_CONVERTERS=1`): Office files through an installed LibreOffice 26.2.5 or later,
+  HTML files and web pages (Create PDF from web page) through an installed Chrome or Edge. Each run
+  uses a fresh private profile and folder, a deadline and a process-tree kill; local HTML opens with
+  scripts and network off; private web addresses are refused. They are not sandboxed: convert only
+  files you trust.
+- **Read Out Loud** (View menu, `speech_start`): the current page or the rest of the document through
+  Windows speech, macOS `say` or eSpeak NG, with the text sent only on standard input.
+- **Bookmarks** (PDF-XChange's Bookmarks plug-in): colour, bold and italic from the bookmark menu or
+  `bookmark_set_style`, and the bookmark for the current page is shaded in the panel.
+- **PDF Optimizer**: discard form submit, import and reset actions, discard external
+  cross-references, and remove PDF/A and PDF/X identification.
+- **Convert colours to grayscale** (PDF-XChange's Color Converter; Edit menu, `doc_convert_gray`).
+- **Export to Excel** (PDF-XChange's Convert to MS Office; File menu, `doc_export_office` with an
+  `.xlsx` path): one worksheet per page, detected tables as rows and columns, plain numbers as numbers.
+
+Not implemented, and why: cloud storage connectors (Box, Dropbox, Google Drive, OneDrive,
+SharePoint need registered OAuth apps), FileOpen and Azure RMS DRM (proprietary vendor SDKs), the
+virtual printer driver, legacy browser plug-ins, the Office add-in, the licence key installer, spell
+checking (no permissively licensed dictionary or checker, and Windows' own checker needs unsafe
+code), and, for now, 3D content, export to PowerPoint, enhanced OCR clean-up, an AI assistant and
+an Explorer "Combine" menu.
 
 ---
 

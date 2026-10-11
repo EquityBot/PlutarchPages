@@ -89,7 +89,7 @@ If you find an asset that breaks these rules, stop and remove it from the reposi
 
 - Never read, disassemble or copy anything inside the Acrobat bundle. Only names and listings are allowed, and **never** open `Contents/Resources/JavaScripts/`.
 - Behaviour comes only from public specifications (ISO 32000-2, the Arlington model), public documentation and black-box observation.
-- Never copy GPL/AGPL code. Copyleft tools run only as external oracle processes.
+- Never copy GPL/AGPL code. Copyleft tools run only as external oracle processes, with one exception in PlutarchPages: programs the user installed separately (LibreOffice, Chrome or Edge, eSpeak NG) may serve as optional runtime backends through `crates/external`. They are off by default where they convert files, launched as separate processes, and never linked, copied, bundled or downloaded (owner decision, 11 October 2026).
 - Observe Acrobat only with synthetic fixtures. Never capture personal data, account information or recent files.
 - Shared real-file test oracles (Photoshop-authored PSDs, etc.) live in [`storytold/photocraft-corpus`](https://github.com/storytold/photocraft-corpus), explained in [craftrules `standards/test-corpora.md`](https://github.com/storytold/craftrules/blob/main/standards/test-corpora.md) (internal). Never commit large binary fixtures to this repo; fetch them pinned by commit and sha256-verified, as PhotoCraft does with `cargo xtask corpus`.
 

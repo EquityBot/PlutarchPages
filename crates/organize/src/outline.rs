@@ -539,6 +539,16 @@ pub fn rename_bookmark(doc: &mut Document, path: &[usize], title: &str) -> Resul
     put(doc, r, b"Title", Some(Object::String(PdfString::text(title))))
 }
 
+/// A bookmark's text style (ISO 32000-2 §12.3.3, Table 151): `color` as RGB 0–1 (`None` or black
+/// removes `/C`), and bold and italic as `/F` bits 2 and 1 (both off removes `/F`).
+pub fn set_bookmark_style(doc: &mut Document, path: &[usize], color: Option<[f64; 3]>, bold: bool, italic: bool) -> Result<()> {
+    let (r, _) = resolve_path(doc, path)?;
+    let color = color.map(|c| c.map(|v| if v.is_finite() { v.clamp(0.0, 1.0) } else { 0.0 })).filter(|c| *c != [0.0; 3]);
+    put(doc, r, b"C", color.map(|c| Object::Array(c.iter().map(|v| Object::Real(*v)).collect())))?;
+    let flags = i64::from(italic) | (i64::from(bold) << 1);
+    put(doc, r, b"F", (flags != 0).then_some(Object::Int(flags)))
+}
+
 /// Point a bookmark at `page` (0-based), replacing its destination or GoTo action.
 pub fn set_bookmark_page(doc: &mut Document, path: &[usize], page: usize) -> Result<()> {
     let dest = destination(doc, page)?;

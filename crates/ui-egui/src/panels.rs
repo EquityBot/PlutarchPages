@@ -544,6 +544,7 @@ pub fn right_panel(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
                             expand: bm_expand,
                             matches: &bookmark_matches,
                             searching: !bookmark_query.is_empty(),
+                            highlight: current_bookmark(&info.outline, view.current),
                         };
                         if ctx.searching && bookmark_matches.is_empty() && !info.outline.is_empty() {
                             ui.label(tl!("No matches."));
@@ -727,6 +728,47 @@ pub enum BmAction {
     Outdent(Vec<usize>),
     /// Bookmarks from the tagged headings, under a new first "Untitled" bookmark.
     FromStructure,
+    /// Text colour (RGB 0–1, `None` for black), bold and italic.
+    Style(Vec<usize>, Option<[f64; 3]>, bool, bool),
+}
+
+/// The colours the bookmark Style menu offers (Acrobat's bookmark Properties has a free picker).
+const BOOKMARK_COLORS: [(&str, Option<[f64; 3]>); 6] = [
+    ("Default", None),
+    ("Red", Some([0.8, 0.1, 0.1])),
+    ("Orange", Some([0.9, 0.45, 0.0])),
+    ("Green", Some([0.1, 0.55, 0.2])),
+    ("Blue", Some([0.1, 0.3, 0.85])),
+    ("Purple", Some([0.5, 0.2, 0.7])),
+];
+
+/// The bookmark for page `page` (Acrobat's Highlight Current Bookmark): of the bookmarks that go
+/// to `page` or an earlier page, the one going furthest; on a tie the later one in outline order
+/// (so a sub-section beats its section).
+fn current_bookmark(items: &[OutlineItem], page: usize) -> Option<Vec<usize>> {
+    let mut best: Option<(usize, Vec<usize>)> = None;
+    // One entry per open level: its items and how many have been visited.
+    let mut levels: Vec<(&[OutlineItem], usize)> = vec![(items, 0)];
+    while let Some(&(list, next)) = levels.last() {
+        let Some(item) = list.get(next) else {
+            levels.pop();
+            continue;
+        };
+        if let Some(top) = levels.last_mut() {
+            top.1 += 1;
+        }
+        let path: Vec<usize> = levels.iter().map(|(_, n)| n.saturating_sub(1)).collect();
+        if let Some(p) = item.page
+            && p <= page
+            && best.as_ref().is_none_or(|(b, _)| p >= *b)
+        {
+            best = Some((p, path));
+        }
+        if !item.children.is_empty() {
+            levels.push((&item.children, 0));
+        }
+    }
+    best.map(|(_, path)| path)
 }
 
 /// Matching titles plus their ancestors, keeping document paths rather than filtered indexes.
@@ -763,6 +805,8 @@ struct OutlineCtx<'a> {
     expand: Option<usize>,
     matches: &'a std::collections::HashSet<Vec<usize>>,
     searching: bool,
+    /// The bookmark for the current page, shaded.
+    highlight: Option<Vec<usize>>,
 }
 
 /// The destination page label gets its own right-aligned column in a bookmark row; drawing
@@ -842,14 +886,19 @@ fn outline_item(ui: &mut egui::Ui, t: &Tokens, info: &DocInfo, item: &OutlineIte
             })
         });
         let label_w = label_galley.as_ref().map_or(0.0, |g| g.size().x);
-        let font = if depth == 0 { theme::medium(13.0) } else { theme::regular(13.0) };
+        let font = if depth == 0 || item.bold { theme::medium(13.0) } else { theme::regular(13.0) };
         let wrap_w = (ui.available_width() - indent - 20.0 - label_w - 12.0).max(60.0);
-        let galley = ui.fonts_mut(|f| f.layout(item.title.clone(), font, t.text, wrap_w));
+        // A bookmark's own colour (/C) when it has one; italic needs an italic face the
+        // interface fonts don't include, so it shows only in the Style menu's check mark.
+        let colour = item.color.map_or(t.text, |[r, g, b]| egui::Color32::from_rgb((r * 255.0) as u8, (g * 255.0) as u8, (b * 255.0) as u8));
+        let galley = ui.fonts_mut(|f| f.layout(item.title.clone(), font, colour, wrap_w));
         let h = (galley.size().y + 12.0).max(28.0);
         let (rect, resp) = ui.allocate_exact_size(vec2(ui.available_width(), h), Sense::click());
         resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, &item.title));
         if resp.hovered() {
             ui.painter().rect_filled(rect, CornerRadius::same(6), t.hover);
+        } else if cx.highlight.as_deref() == Some(path) {
+            ui.painter().rect_filled(rect, CornerRadius::same(6), t.accent.gamma_multiply(0.18));
         }
         let x0 = rect.left() + indent;
         if !item.children.is_empty() {
@@ -860,7 +909,7 @@ fn outline_item(ui: &mut egui::Ui, t: &Tokens, info: &DocInfo, item: &OutlineIte
                 ui.data_mut(|d| d.insert_temp(id, open));
             }
         }
-        ui.painter().galley(pos2(x0 + 20.0, rect.top() + 6.0), galley, t.text);
+        ui.painter().galley(pos2(x0 + 20.0, rect.top() + 6.0), galley, colour);
         if let Some(g) = label_galley {
             // Right-aligned, vertically centred at the first line, inside the column the title
             // wrapped around.
@@ -894,8 +943,36 @@ fn outline_item(ui: &mut egui::Ui, t: &Tokens, info: &DocInfo, item: &OutlineIte
                 pick(ui, tl!("Move down"), i + 1 < siblings, BmAction::MoveDown(path.to_vec()));
                 pick(ui, tl!("Indent"), i > 0, BmAction::Indent(path.to_vec()));
                 pick(ui, tl!("Outdent"), depth > 0, BmAction::Outdent(path.to_vec()));
+                let mut style = None;
+                ui.menu_button(tl!("Style"), |ui| {
+                    for (name, rgb) in BOOKMARK_COLORS {
+                        let current = item.color.map(|c| c.map(f64::from));
+                        let chosen = match (current, rgb) {
+                            (None, None) => true,
+                            (Some(a), Some(b)) => a.iter().zip(b).all(|(x, y)| (x - y).abs() < 0.02),
+                            _ => false,
+                        };
+                        if ui.radio(chosen, tl!(name)).clicked() {
+                            style = Some(BmAction::Style(path.to_vec(), rgb, item.bold, item.italic));
+                            ui.close();
+                        }
+                    }
+                    ui.separator();
+                    let current = item.color.map(|c| c.map(f64::from));
+                    if ui.checkbox(&mut item.bold.clone(), tl!("Bold")).clicked() {
+                        style = Some(BmAction::Style(path.to_vec(), current, !item.bold, item.italic));
+                        ui.close();
+                    }
+                    if ui.checkbox(&mut item.italic.clone(), tl!("Italic")).clicked() {
+                        style = Some(BmAction::Style(path.to_vec(), current, item.bold, !item.italic));
+                        ui.close();
+                    }
+                });
                 ui.separator();
                 pick(ui, tl!("Delete"), true, BmAction::Delete(path.to_vec()));
+                if style.is_some() {
+                    *cx.action = style;
+                }
             });
         }
     }
@@ -1311,5 +1388,30 @@ mod label_column {
         });
         assert!(calls <= super::LABEL_MEASURE_CHARS + 1, "{calls} measurements");
         assert!(shown.ends_with('\u{2026}') && label.starts_with(shown.trim_end_matches('\u{2026}')), "{shown:?}");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn item(title: &str, page: Option<usize>, children: Vec<OutlineItem>) -> OutlineItem {
+        OutlineItem { title: title.into(), page, view: pdfcraft_render::DestView::Top, children, open: true, color: None, bold: false, italic: false }
+    }
+
+    #[test]
+    fn the_current_bookmark_is_the_last_section_started() {
+        let outline = vec![
+            item("Cover", Some(0), vec![]),
+            item("Part 1", Some(1), vec![item("1.1", Some(1), vec![]), item("1.2", Some(4), vec![])]),
+            item("Part 2", Some(8), vec![]),
+            item("No page", None, vec![]),
+        ];
+        assert_eq!(current_bookmark(&outline, 0), Some(vec![0]));
+        assert_eq!(current_bookmark(&outline, 2), Some(vec![1, 0]), "the sub-section on the same page wins");
+        assert_eq!(current_bookmark(&outline, 6), Some(vec![1, 1]));
+        assert_eq!(current_bookmark(&outline, 99), Some(vec![2]));
+        assert_eq!(current_bookmark(&[item("Late", Some(5), vec![])], 1), None);
+        assert_eq!(current_bookmark(&[], 3), None);
     }
 }

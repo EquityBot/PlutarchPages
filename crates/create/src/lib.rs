@@ -1,11 +1,18 @@
-//! pdfcraft-create — create PDFs from nothing, images or text (L4). See the README.
+//! pdfcraft-create — create PDFs from nothing, images, text, Markdown, CSV tables or email (L4). See the README.
 
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
 
 use pdfcraft_cos::{Dict, Document, ObjRef, Object, PdfString, Stream};
 
+mod csv;
+mod email;
 mod extract;
+mod flow;
+mod markdown;
+pub use csv::{CsvReport, from_csv};
+pub use email::{EmailReport, from_email};
 pub use extract::{ExtractedImage, ImageExport, extract_images, image_file};
+pub use markdown::from_markdown;
 use pdfcraft_fonts::{literal, win_ansi, wrap};
 
 #[derive(Debug, thiserror::Error, PartialEq)]
@@ -50,7 +57,7 @@ fn add_page(doc: &mut Document, w: f64, h: f64, resources: Dict, content: Option
 fn set_title(doc: &mut Document, title: &str) {
     let mut info = Dict::new();
     info.set(b"Title".to_vec(), PdfString::text(title));
-    info.set(b"Producer".to_vec(), PdfString::text("PdfCraft"));
+    info.set(b"Producer".to_vec(), PdfString::text("PlutarchPages"));
     let r = doc.add(info);
     doc.trailer_mut().set(b"Info".to_vec(), Object::Ref(r));
 }
@@ -470,10 +477,30 @@ pub enum SourceKind {
     Pdf,
     Image,
     Text,
+    /// Comma- or tab-separated values (`.csv`, `.tsv`), set as a table.
+    Csv,
+    /// Markdown (`.md`, `.markdown`).
+    Markdown,
+    /// An email message (`.eml`).
+    Email,
+    /// An HTML file, converted by an installed browser when the user allows external converters.
+    Html,
+    /// An Office file, converted by an installed LibreOffice when the user allows external converters.
+    Office,
 }
 
-/// File extensions Create converts to PDF (images and plain text).
-pub const CONVERTIBLE: [&str; 12] = ["png", "jpg", "jpeg", "tif", "tiff", "gif", "bmp", "jp2", "j2k", "jpx", "txt", "text"];
+/// HTML extensions (converted through an installed browser; see `pdfcraft-external`).
+pub const HTML_FILES: [&str; 3] = ["html", "htm", "xhtml"];
+/// Office extensions (converted through an installed LibreOffice; see `pdfcraft-external`).
+/// Macro-enabled formats are not offered.
+pub const OFFICE_FILES: [&str; 10] = ["doc", "docx", "odt", "rtf", "xls", "xlsx", "ods", "ppt", "pptx", "odp"];
+
+/// File extensions Create converts to PDF: images, plain text, CSV, Markdown and email here, and
+/// HTML and Office files through installed programs when the user allows it.
+pub const CONVERTIBLE: [&str; 30] = [
+    "png", "jpg", "jpeg", "tif", "tiff", "gif", "bmp", "jp2", "j2k", "jpx", "txt", "text", "csv", "tsv", "md", "markdown", "eml", "html", "htm",
+    "xhtml", "doc", "docx", "odt", "rtf", "xls", "xlsx", "ods", "ppt", "pptx", "odp",
+];
 
 fn is_image(bytes: &[u8]) -> bool {
     bytes.starts_with(&[0xFF, 0xD8])
@@ -489,8 +516,9 @@ fn is_image(bytes: &[u8]) -> bool {
             && bytes.get(14..18).and_then(|h| <[u8; 4]>::try_from(h).ok()).is_some_and(|h| matches!(u32::from_le_bytes(h), 12 | 40 | 52 | 56 | 108 | 124)))
 }
 
-/// Whether `bytes` named `name` is a PDF, an image Create can embed, or plain text (a `.txt` or
-/// `.text` file). `None` for anything else.
+/// Whether `bytes` named `name` is a PDF, an image Create can embed, or text Create lays out: plain
+/// text (`.txt`, `.text`), CSV (`.csv`, `.tsv`), Markdown (`.md`, `.markdown`) or an email
+/// message (`.eml`). `None` for anything else.
 pub fn source_kind(name: &str, bytes: &[u8]) -> Option<SourceKind> {
     let head = bytes.get(..bytes.len().min(1024)).unwrap_or_default();
     if head.windows(5).any(|w| w == b"%PDF-") {
@@ -500,7 +528,16 @@ pub fn source_kind(name: &str, bytes: &[u8]) -> Option<SourceKind> {
         return Some(SourceKind::Image);
     }
     let lower = name.to_ascii_lowercase();
-    (lower.ends_with(".txt") || lower.ends_with(".text")).then_some(SourceKind::Text)
+    let ext = lower.rsplit_once('.').map_or("", |(_, e)| e);
+    match ext {
+        "txt" | "text" => Some(SourceKind::Text),
+        "csv" | "tsv" => Some(SourceKind::Csv),
+        "md" | "markdown" => Some(SourceKind::Markdown),
+        "eml" => Some(SourceKind::Email),
+        e if HTML_FILES.contains(&e) => Some(SourceKind::Html),
+        e if OFFICE_FILES.contains(&e) => Some(SourceKind::Office),
+        _ => None,
+    }
 }
 
 /// Detect the image format from its bytes; a TIFF may hold several pages.

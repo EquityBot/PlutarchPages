@@ -2196,3 +2196,27 @@ key	Space	Espace
 	Resize panel window	Redimensionner la fenêtre du panneau
 	Tools	Outils
 	Inspector	Inspecteur
+# PlutarchPages: external converters, Read Out Loud, grayscale, Excel export, links.
+	Create PDF from web page…	Créer un PDF à partir d’une page web…
+	Read this page aloud	Lire cette page à voix haute
+	Read to end of document	Lire jusqu’à la fin du document
+	Stop reading	Arrêter la lecture
+	Convert colours to grayscale	Convertir les couleurs en niveaux de gris
+	Export to Excel…	Exporter vers Excel…
+	Report a problem	Signaler un problème
+	Upstream PdfCraft	PdfCraft d’origine
+	Web page	Page web
+	A fork of PdfCraft by the ArtCraft team. PlutarchPages is not an ArtCraft product.	Un fork de PdfCraft de l’équipe ArtCraft. PlutarchPages n’est pas un produit ArtCraft.
+	Based on PdfCraft by the ArtCraft team. Report problems with PlutarchPages on GitHub.	Basé sur PdfCraft de l’équipe ArtCraft. Signalez les problèmes de PlutarchPages sur GitHub.
+	Convert Office files, HTML files and web pages with installed programs	Convertir les fichiers Office, les fichiers HTML et les pages web avec les programmes installés
+	Converted to grayscale: {ops} colours, {images} images, {forms} forms; {left} left as they were	Converti en niveaux de gris : {ops} couleurs, {images} images, {forms} formulaires ; {left} laissés tels quels
+	Create PDF from web page	Créer un PDF à partir d’une page web
+	Discard external cross-references	Supprimer les renvois externes
+	Discard form submission, import and reset actions	Supprimer les actions d’envoi, d’importation et de réinitialisation de formulaire
+	External converters	Convertisseurs externes
+	External converters are off. Turn them on in Preferences to use your installed Chrome or Edge.	Les convertisseurs externes sont désactivés. Activez-les dans les Préférences pour utiliser votre Chrome ou Edge installé.
+	PlutarchPages is a fork of PdfCraft	PlutarchPages est un fork de PdfCraft
+	Remove PDF/A and PDF/X identification	Supprimer l’identification PDF/A et PDF/X
+	Uses LibreOffice (26.2.5 or later) for Office files and Chrome or Edge for HTML and web pages, each in a fresh private profile. Local HTML opens with scripts and network off. These programs are not sandboxed by PlutarchPages: convert only files you trust.	Utilise LibreOffice (26.2.5 ou plus récent) pour les fichiers Office, et Chrome ou Edge pour le HTML et les pages web, chacun dans un nouveau profil privé. Le HTML local s’ouvre sans scripts ni réseau. PlutarchPages n’isole pas ces programmes : ne convertissez que des fichiers de confiance.
+	Web address (http or https)	Adresse web (http ou https)
+	The page opens in a fresh, private window of your installed Chrome or Edge and is printed to PDF. Addresses on this computer or a private network are refused.	La page s’ouvre dans une nouvelle fenêtre privée de votre Chrome ou Edge installé et est imprimée en PDF. Les adresses de cet ordinateur ou d’un réseau privé sont refusées.

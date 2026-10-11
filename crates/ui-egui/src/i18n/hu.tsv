@@ -2194,3 +2194,27 @@ key	Space	Szóköz
 	Resize panel window	Panelablak átméretezése
 	Tools	Eszközök
 	Inspector	Tulajdonságvizsgáló
+# PlutarchPages: external converters, Read Out Loud, grayscale, Excel export, links.
+	Create PDF from web page…	PDF létrehozása weboldalból…
+	Read this page aloud	Az oldal felolvasása
+	Read to end of document	Felolvasás a dokumentum végéig
+	Stop reading	Felolvasás leállítása
+	Convert colours to grayscale	Színek átalakítása szürkeárnyalatossá
+	Export to Excel…	Exportálás Excelbe…
+	Report a problem	Probléma bejelentése
+	Upstream PdfCraft	Eredeti PdfCraft
+	Web page	Weboldal
+	A fork of PdfCraft by the ArtCraft team. PlutarchPages is not an ArtCraft product.	Az ArtCraft csapat PdfCraft alkalmazásának forkja. A PlutarchPages nem ArtCraft termék.
+	Based on PdfCraft by the ArtCraft team. Report problems with PlutarchPages on GitHub.	Az ArtCraft csapat PdfCraft alkalmazásán alapul. A PlutarchPages hibáit a GitHubon jelentse.
+	Convert Office files, HTML files and web pages with installed programs	Office-fájlok, HTML-fájlok és weboldalak átalakítása telepített programokkal
+	Converted to grayscale: {ops} colours, {images} images, {forms} forms; {left} left as they were	Szürkeárnyalatossá alakítva: {ops} szín, {images} kép, {forms} űrlap; {left} változatlanul maradt
+	Create PDF from web page	PDF létrehozása weboldalból
+	Discard external cross-references	Külső kereszthivatkozások elvetése
+	Discard form submission, import and reset actions	Űrlapküldési, -importálási és -visszaállítási műveletek elvetése
+	External converters	Külső konverterek
+	External converters are off. Turn them on in Preferences to use your installed Chrome or Edge.	A külső konverterek ki vannak kapcsolva. A telepített Chrome vagy Edge használatához kapcsolja be őket a Beállításokban.
+	PlutarchPages is a fork of PdfCraft	A PlutarchPages a PdfCraft forkja
+	Remove PDF/A and PDF/X identification	PDF/A- és PDF/X-azonosítás eltávolítása
+	Uses LibreOffice (26.2.5 or later) for Office files and Chrome or Edge for HTML and web pages, each in a fresh private profile. Local HTML opens with scripts and network off. These programs are not sandboxed by PlutarchPages: convert only files you trust.	Office-fájlokhoz a LibreOffice (26.2.5 vagy újabb), HTML-hez és weboldalakhoz a Chrome vagy az Edge kerül használatra, mindig új, privát profillal. A helyi HTML szkriptek és hálózat nélkül nyílik meg. A PlutarchPages nem különíti el ezeket a programokat: csak megbízható fájlokat alakítson át.
+	Web address (http or https)	Webcím (http vagy https)
+	The page opens in a fresh, private window of your installed Chrome or Edge and is printed to PDF. Addresses on this computer or a private network are refused.	Az oldal a telepített Chrome vagy Edge új, privát ablakában nyílik meg, és PDF-be nyomtatódik. Az ezen a számítógépen vagy magánhálózaton lévő címeket a program elutasítja.

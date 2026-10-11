@@ -190,6 +190,9 @@ pub(crate) fn body(ui: &mut egui::Ui, d: &mut OptimizeDraft, t: &Tokens) -> (boo
             ui.checkbox(&mut s.discard_thumbnails, tl!("Discard embedded page thumbnails"));
             ui.checkbox(&mut s.discard_tags, tl!("Discard document tags"));
             ui.checkbox(&mut s.discard_print_settings, tl!("Discard embedded print settings"));
+            ui.checkbox(&mut s.discard_form_actions, tl!("Discard form submission, import and reset actions"));
+            ui.checkbox(&mut s.discard_external_refs, tl!("Discard external cross-references"));
+            ui.checkbox(&mut s.remove_standards_id, tl!("Remove PDF/A and PDF/X identification"));
             discard_box(ui, &mut d.discard, Hidden::Bookmarks, "Discard bookmarks");
             discard_box(ui, &mut d.discard, Hidden::FormFields, "Flatten form fields");
             discard_box(ui, &mut d.discard, Hidden::HiddenLayers, "Discard hidden layer content");

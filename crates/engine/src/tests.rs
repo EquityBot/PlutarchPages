@@ -567,8 +567,19 @@ fn a_page_with_a_form_field_shown_twice_keeps_one_field() {
 #[test]
 fn files_that_cannot_be_converted_are_refused_clearly() {
     let s = Session::new();
-    let err = s.convert_to_pdf("report.docx", &Arc::new(b"PK\x03\x04".to_vec())).unwrap_err();
-    assert_eq!(err, EditError::Source("report.docx: this file type can't be converted; use a PDF, an image or a .txt file".into()));
+    let err = s.convert_to_pdf("report.zip", &Arc::new(b"PK\x03\x04".to_vec())).unwrap_err();
+    assert_eq!(
+        err,
+        EditError::Source("report.zip: this file type can't be converted; use a PDF, an image, or a .txt, .csv, .md or .eml file".into())
+    );
+    // Office and HTML files need the external converters, which are off unless the user turns them on.
+    for name in ["report.docx", "page.html"] {
+        let err = s.convert_to_pdf(name, &Arc::new(b"PK\x03\x04".to_vec())).unwrap_err();
+        assert!(
+            matches!(&err, EditError::Source(m) if m.starts_with(name) && m.contains("can't be converted") && m.contains("External converters")),
+            "{err}"
+        );
+    }
     assert!(matches!(s.convert_to_pdf("empty", &Arc::new(Vec::new())), Err(EditError::Source(_))));
     // Damaged inputs of a known type fail with an error, not a panic.
     assert!(s.convert_to_pdf("bad.png", &Arc::new(b"\x89PNG\r\n\x1a\nnope".to_vec())).is_err());
@@ -644,8 +655,15 @@ fn empty_passwords_never_lift_restrictions_or_skip_the_open_prompt() {
     use pdfcraft_cos::Algorithm::{Aes128, Aes256, Rc4_40, Rc4_128};
     let make = |algorithm, user, owner| {
         let mut doc = pdfcraft_cos::Document::open(Arc::new(fixture(1))).unwrap();
-        doc.set_encryption(&pdfcraft_cos::NewEncryption { algorithm, user_password: user, owner_password: owner, permissions: 0b0100, encrypt_metadata: true, seed: [3; 32] })
-            .unwrap();
+        doc.set_encryption(&pdfcraft_cos::NewEncryption {
+            algorithm,
+            user_password: user,
+            owner_password: owner,
+            permissions: 0b0100,
+            encrypt_metadata: true,
+            seed: [3; 32],
+        })
+        .unwrap();
         Arc::new(pdfcraft_cos::write_full(&doc, &Default::default()).unwrap())
     };
     for alg in [Rc4_40, Rc4_128, Aes128, Aes256] {

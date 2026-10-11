@@ -175,6 +175,7 @@ pub const COMMANDS: &[CommandSpec] = &[
     c("create.multiple", "Create PDF from multiple files…", FILE, None, Nothing, "files"),
     c("create.images", "Create PDF from images…", FILE, None, Nothing, "image"),
     c("create.clipboard", "Create PDF from clipboard", FILE, None, Nothing, "copy-plus"),
+    c("create.web_page", "Create PDF from web page…", FILE, None, Nothing, "globe"),
     c("page.combine", "Combine files…", FILE, None, Nothing, "files"),
     c("file.save", "Save", FILE, Some(Shortcut::cmd("S")), Document, "save"),
     c("file.save_as", "Save as…", FILE, Some(Shortcut::cmd_shift("S")), Document, "save"),
@@ -188,6 +189,9 @@ pub const COMMANDS: &[CommandSpec] = &[
     c("edit.find", "Find…", EDIT, Some(Shortcut::cmd("F")), Document, "search"),
     c("edit.advanced_search", "Advanced search…", EDIT, Some(Shortcut::cmd_shift("F")), Document, "search"),
     c("view.palette", "Find tools and commands…", VIEW, Some(Shortcut::cmd("K")), Nothing, "search"),
+    c("view.read_aloud", "Read this page aloud", VIEW, None, Document, "mic"),
+    c("view.read_aloud_to_end", "Read to end of document", VIEW, None, Document, "mic"),
+    c("view.stop_reading", "Stop reading", VIEW, None, Nothing, "square"),
     // Page display: View ▸ Page display and the rail's button list these as radios, so
     // `menu = None` keeps them out of the generated menus. The palette still runs them.
     c("view.layout.continuous", "Continuous scrolling", None, None, Document, "arrow-up-down"),
@@ -250,6 +254,7 @@ pub const COMMANDS: &[CommandSpec] = &[
     c("actions.optimize_scans", "Optimize scanned documents…", None, None, Nothing, "scan-text"),
     c("doc.compare", "Compare files…", None, None, Document, "git-compare"),
     c("form.detect", "Detect form fields", None, None, Modification, "scan"),
+    c("edit.convert_gray", "Convert colours to grayscale", EDIT, None, Modification, "contrast"),
     c("form.merge_data", "Merge data files into spreadsheet…", None, None, Nothing, "file-spreadsheet"),
     c("form.flatten", "Flatten form fields", None, None, HasFields, "layers"),
     c("form.prepare", "Prepare a form", None, None, Modification, "text-cursor-input"),
@@ -303,6 +308,7 @@ pub const COMMANDS: &[CommandSpec] = &[
     c("optimize.advanced", "Optimize PDF…", FILE, None, Document, "settings-2"),
     c("export.text", "Export to text…", FILE, None, Document, "type"),
     c("export.docx", "Export to Word…", FILE, None, Document, "file-text"),
+    c("export.xlsx", "Export to Excel…", FILE, None, Document, "file-spreadsheet"),
     c("export.html", "Export to HTML…", FILE, None, Document, "file-symlink"),
     c("export.rtf", "Export to RTF…", FILE, None, Document, "file-text"),
     c("app.preferences", "Preferences…", EDIT, Some(Shortcut::cmd(",")), Nothing, "settings"),

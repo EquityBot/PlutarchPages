@@ -292,7 +292,9 @@ fn text(args: &[String]) -> Result<(), CliError> {
     // authenticates on its own (fail closed).
     match pdfcraft_cos::Document::open_with_password(bytes.clone(), password) {
         Ok(doc) if doc.permissions().is_some_and(|p| !p.copy()) => {
-            return Err("text: this document's security settings don't allow copying or extracting text; open it with --password <owner password>".into());
+            return Err(
+                "text: this document's security settings don't allow copying or extracting text; open it with --password <owner password>".into()
+            );
         }
         Ok(_) => {}
         Err(pdfcraft_cos::CosError::NeedsPassword) => return Err("text: this document needs a password; pass --password <password>".into()),

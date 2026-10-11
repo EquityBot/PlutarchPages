@@ -504,7 +504,8 @@ fn the_print_script_renders_the_job_and_reaches_the_spooler() {
         "if (Get-PrintJob -Name 'PlutarchPages Test Print') { (Get-PrintJob -Name 'PlutarchPages Test Print' | Measure-Object).Count } else { 0 }",
         &[],
     );
-    let cleaned = windows_powershell("Get-PrintJob -Name 'PlutarchPages Test Print' | Remove-PrintJob; Remove-Printer -Name 'PlutarchPages Test Print'", &[]);
+    let cleaned =
+        windows_powershell("Get-PrintJob -Name 'PlutarchPages Test Print' | Remove-PrintJob; Remove-Printer -Name 'PlutarchPages Test Print'", &[]);
     assert!(sent.is_ok(), "{sent:?}");
     assert_eq!(queued.as_deref().map(str::trim), Ok("1"), "the job is in the paused printer's queue: {queued:?}");
     assert!(cleaned.is_ok(), "the test printer is removed again: {cleaned:?}");

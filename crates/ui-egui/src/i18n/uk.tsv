@@ -2217,3 +2217,27 @@ key	Space	Пробіл
 	Panels	Панелі
 	Resize panels	Змінити розмір панелей
 	Resize panel window	Змінити розмір вікна панелі
+# PlutarchPages: external converters, Read Out Loud, grayscale, Excel export, links.
+	Create PDF from web page…	Створити PDF із вебсторінки…
+	Read this page aloud	Прочитати цю сторінку вголос
+	Read to end of document	Читати до кінця документа
+	Stop reading	Зупинити читання
+	Convert colours to grayscale	Перетворити кольори на відтінки сірого
+	Export to Excel…	Експортувати в Excel…
+	Report a problem	Повідомити про проблему
+	Upstream PdfCraft	Оригінальний PdfCraft
+	Web page	Вебсторінка
+	A fork of PdfCraft by the ArtCraft team. PlutarchPages is not an ArtCraft product.	Форк PdfCraft від команди ArtCraft. PlutarchPages не є продуктом ArtCraft.
+	Based on PdfCraft by the ArtCraft team. Report problems with PlutarchPages on GitHub.	На основі PdfCraft від команди ArtCraft. Повідомляйте про проблеми PlutarchPages на GitHub.
+	Convert Office files, HTML files and web pages with installed programs	Перетворювати файли Office, файли HTML і вебсторінки встановленими програмами
+	Converted to grayscale: {ops} colours, {images} images, {forms} forms; {left} left as they were	Перетворено на відтінки сірого: кольорів — {ops}, зображень — {images}, форм — {forms}; без змін — {left}
+	Create PDF from web page	Створити PDF із вебсторінки
+	Discard external cross-references	Видалити зовнішні перехресні посилання
+	Discard form submission, import and reset actions	Видалити дії надсилання, імпорту та скидання форм
+	External converters	Зовнішні конвертери
+	External converters are off. Turn them on in Preferences to use your installed Chrome or Edge.	Зовнішні конвертери вимкнено. Увімкніть їх у налаштуваннях, щоб використовувати встановлений Chrome або Edge.
+	PlutarchPages is a fork of PdfCraft	PlutarchPages — форк PdfCraft
+	Remove PDF/A and PDF/X identification	Видалити ідентифікацію PDF/A і PDF/X
+	Uses LibreOffice (26.2.5 or later) for Office files and Chrome or Edge for HTML and web pages, each in a fresh private profile. Local HTML opens with scripts and network off. These programs are not sandboxed by PlutarchPages: convert only files you trust.	Використовує LibreOffice (26.2.5 або новіший) для файлів Office і Chrome або Edge для HTML і вебсторінок, щоразу з новим приватним профілем. Локальний HTML відкривається без скриптів і мережі. PlutarchPages не ізолює ці програми: перетворюйте лише файли, яким довіряєте.
+	Web address (http or https)	Вебадреса (http або https)
+	The page opens in a fresh, private window of your installed Chrome or Edge and is printed to PDF. Addresses on this computer or a private network are refused.	Сторінка відкривається в новому приватному вікні встановленого Chrome або Edge і друкується в PDF. Адреси на цьому комп’ютері або в приватній мережі відхиляються.

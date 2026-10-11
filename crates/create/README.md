@@ -17,5 +17,18 @@ Layer L4. Create a PDF (Acrobat's Create a PDF tool), execution plan M10.2:
   for one point per pixel, or `ImageResolution::Embedded` for the same behavior as
   `from_images`. The largest page side is still capped at 14,400 points;
 - `from_text(text, …)`: plain text set in Helvetica, wrapped and paginated.
+- `from_markdown(title, text, page)`: CommonMark (tables, strikethrough, task lists) through
+  pulldown-cmark, laid out by `flow`: headings, emphasis, inline and block code, quotes, nested
+  lists, rules, tables and link annotations (http, https and mailto only). Images are never
+  fetched; their alt text shows. Raw HTML is left out;
+- `from_csv(title, name, text, page)`: an RFC 4180 CSV or TSV file (delimiter sniffed among
+  `,` `;` tab `|`) as one table whose header row repeats on every page; more than 6 columns turn
+  the page and shrink the type. At most 100,000 rows and 64 columns; `CsvReport` says what was cut;
+- `from_email(title, bytes, page, embed_attachments)`: an `.eml` message through mail-parser:
+  subject, addresses, date and every text body (an HTML-only body becomes plain text here, with
+  nothing fetched). Attachments are listed, and embedded as file attachments only when asked.
+
+`flow` sets text in the standard 14 fonts with WinAnsiEncoding, so a character outside it prints
+as `?`; every flow-based function reports how many, so callers can say so.
 
 Every function returns a `pdfcraft_cos::Document`; the caller writes it.
