@@ -479,10 +479,11 @@ from public specifications like the rest of PdfCraft.
   [#389](https://github.com/storytold/pdfcraft/issues/389) (redacted images left in the file), tightened
   after review: an explicit empty password never skips the prompt or lifts restrictions, the CLI
   refuses encrypted files whose permissions it can't check, and every document view takes its copy
-  permission from the engine. Redaction clears an image's marked pixels for every draw of it on the
-  page, drops the unredacted originals of images, forms and content streams, and refuses (changing
-  nothing) when content under the marks is also used where the marks don't reach, naming the pages
-  to mark as well.
+  permission from the engine. Redaction clears an image's marked pixels in one copy that every
+  marked draw of it uses, applies a shared form's marks to each marked draw of it, drops the
+  unredacted originals of images, forms and content streams, and refuses (changing nothing) when
+  content under the marks is also used where the marks don't reach, naming the pages to mark as
+  well.
 - **Create from CSV, Markdown and email** (PDF-XChange's CSV, Markdown and EML converters): open or
   combine `.csv`/`.tsv` (a table with a repeated header row), `.md` and `.eml` files, or use
   `doc_create`. Email attachments are listed, and embedded only when asked. Text is set in the

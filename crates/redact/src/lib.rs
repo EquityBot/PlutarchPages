@@ -18,7 +18,7 @@
 
 use std::collections::HashSet;
 
-use pdfcraft_cos::{Dict, Document, ObjRef, Object, Stream};
+use pdfcraft_cos::{Dict, Document, MAX_DECODED, ObjRef, Object, Stream};
 
 pub mod codes;
 mod image;
@@ -283,26 +283,72 @@ fn where_used(pages: &[usize]) -> String {
     }
 }
 
-/// The objects reachable from `roots` by following references.
-fn reachable(doc: &Document, roots: &[Object]) -> HashSet<ObjRef> {
-    fn refs(o: &Object, out: &mut Vec<ObjRef>) {
+/// Push the references in `o` (and in the arrays and dictionaries it holds) onto `out`. Iterative,
+/// so deeply nested objects can't exhaust the stack.
+fn refs_in(o: &Object, out: &mut Vec<ObjRef>) {
+    let mut stack = vec![o];
+    while let Some(o) = stack.pop() {
         match o {
             Object::Ref(r) => out.push(*r),
-            Object::Array(a) => a.iter().for_each(|x| refs(x, out)),
-            Object::Dict(d) => d.iter().for_each(|(_, v)| refs(v, out)),
-            Object::Stream(s) => s.dict.iter().for_each(|(_, v)| refs(v, out)),
+            Object::Array(a) => stack.extend(a.iter()),
+            Object::Dict(d) => stack.extend(d.iter().map(|(_, v)| v)),
+            Object::Stream(s) => stack.extend(s.dict.iter().map(|(_, v)| v)),
             _ => {}
         }
     }
+}
+
+/// The objects reachable from `roots` by following references.
+fn reachable(doc: &Document, roots: &[Object]) -> HashSet<ObjRef> {
     let mut queue = Vec::new();
-    roots.iter().for_each(|o| refs(o, &mut queue));
+    roots.iter().for_each(|o| refs_in(o, &mut queue));
     let mut seen = HashSet::new();
     while let Some(r) = queue.pop() {
         if seen.insert(r) {
-            refs(&doc.get(r), &mut queue);
+            refs_in(&doc.get(r), &mut queue);
         }
     }
     seen
+}
+
+/// The most content decoded to find the XObject names a page's content draws.
+const DRAWN_BUDGET: usize = 64 << 20;
+
+/// Could this stream be drawn as content (page contents, forms, patterns, Type 3 glyphs,
+/// appearances)? Images, font programs, colour profiles, metadata and embedded files can't.
+fn content_like(d: &Dict) -> bool {
+    !(matches!(d.name(b"Subtype"), Some(b"Image" | b"Type1C" | b"CIDFontType0C" | b"OpenType" | b"XML"))
+        || matches!(d.name(b"Type"), Some(b"Metadata" | b"EmbeddedFile" | b"XRef" | b"ObjStm"))
+        || [&b"Length1"[..], b"Length2", b"Length3", b"N"].iter().any(|k| d.contains(k)))
+}
+
+/// Every name a `Do` operator uses in any content reachable from `roots`, including forms that
+/// draw from the resources they inherit. `None` when that content is too large to read (then
+/// every name counts as drawn). Content that can't be decoded draws nothing.
+fn drawn_names(doc: &Document, roots: &[Object]) -> Option<HashSet<Vec<u8>>> {
+    let mut queue = Vec::new();
+    roots.iter().for_each(|o| refs_in(o, &mut queue));
+    let (mut seen, mut names, mut budget) = (HashSet::new(), HashSet::new(), DRAWN_BUDGET);
+    while let Some(r) = queue.pop() {
+        if !seen.insert(r) {
+            continue;
+        }
+        let obj = doc.get(r);
+        refs_in(&obj, &mut queue);
+        let Object::Stream(s) = &*obj else { continue };
+        if !content_like(&s.dict) {
+            continue;
+        }
+        let Ok(data) = s.decoded_within(budget) else {
+            if s.decoded_within(MAX_DECODED).is_ok() {
+                return None; // readable, but past the budget
+            }
+            continue;
+        };
+        budget = budget.checked_sub(data.len())?;
+        names.extend(pdfcraft_content::parse(&data).ops.iter().filter(|op| op.is("Do")).filter_map(|op| op.name(0).map(<[u8]>::to_vec)));
+    }
+    Some(names)
 }
 
 /// `res` without the image and form XObjects whose original redaction retired (none of them
@@ -320,32 +366,29 @@ fn without_retired(doc: &Document, res: &Dict, retired: &HashSet<ObjRef>) -> Opt
 
 /// Fail closed when an original that redaction replaced or removed (an image, a form, a content
 /// stream) could still be saved with the file: a page draws it outside the marks (those pages
-/// are named), or something else still refers to it. Resource entries for it that nothing draws,
-/// such as those inherited from the page tree, are dropped first.
+/// are named), or something else still refers to it. Resource entries for it that no content
+/// names, such as those inherited from the page tree, are dropped first: each page and page-tree
+/// node gets its own copy of its resources without them, so a resource dictionary shared with
+/// anything else is left as it is (and then fails the final check if it still reaches them).
 fn check_retired(doc: &mut Document, retired: &HashSet<ObjRef>) -> Result<(), RedactError> {
     let all = pdfcraft_model::pages(doc);
     let mut using = Vec::new();
     for (i, p) in all.iter().enumerate() {
-        // What the page draws: its contents, the XObjects its content names (conservatively all
-        // of them when it can't be read), its other resources, and annotation appearances.
-        let drawn: Option<HashSet<Vec<u8>>> = page_streams(doc, &p.dict, i).ok().map(|(_, data)| {
-            pdfcraft_content::Pieces::join(&data)
-                .parse()
-                .ops
-                .iter()
-                .filter(|op| op.is("Do"))
-                .filter_map(|op| op.name(0).map(<[u8]>::to_vec))
-                .collect()
-        });
-        let mut roots: Vec<Object> = p.dict.get(b"Contents").cloned().into_iter().collect();
-        if let Some(mut res) = p.dict.get(b"Resources").and_then(|r| doc.resolve(r).as_dict().cloned()) {
+        // What the page draws: its contents, the XObjects named by any content it can reach
+        // (forms drawing from inherited resources included), its other resources, and
+        // annotation appearances.
+        let res = p.dict.get(b"Resources").and_then(|r| doc.resolve(r).as_dict().cloned());
+        let appearances: Vec<Object> = annots_of(doc, &p.dict).iter().filter_map(|a| doc.resolve(a).as_dict()?.get(b"AP").cloned()).collect();
+        let mut roots: Vec<Object> = p.dict.get(b"Contents").cloned().into_iter().chain(appearances).collect();
+        let all_roots: Vec<Object> = roots.iter().cloned().chain(res.clone().map(Object::Dict)).collect();
+        let drawn = drawn_names(doc, &all_roots);
+        if let Some(mut res) = res {
             if let (Some(drawn), Some(xo)) = (&drawn, res.get(b"XObject").and_then(|x| doc.resolve(x).as_dict().cloned())) {
                 let used: Dict = xo.iter().filter(|(k, _)| drawn.contains(k.as_slice())).map(|(k, v)| (k.clone(), v.clone())).collect();
                 res.set(b"XObject".to_vec(), Object::Dict(used));
             }
             roots.push(Object::Dict(res));
         }
-        roots.extend(annots_of(doc, &p.dict).iter().filter_map(|a| doc.resolve(a).as_dict()?.get(b"AP").cloned()));
         if !reachable(doc, &roots).is_disjoint(retired) {
             using.push(i);
         }
@@ -353,7 +396,7 @@ fn check_retired(doc: &mut Document, retired: &HashSet<ObjRef>) -> Result<(), Re
     if !using.is_empty() {
         return Err(RedactError::StillUsed(using));
     }
-    // Nothing draws them: drop their entries from every page's and page-tree node's resources.
+    // No content names them: give every page and page-tree node its own resources without them.
     let mut holders: Vec<ObjRef> = all.iter().map(|p| p.obj).collect();
     let mut node = doc.root().and_then(|r| doc.get(r).as_dict()?.get(b"Pages")?.as_ref());
     let mut nodes = Vec::new();
@@ -368,12 +411,9 @@ fn check_retired(doc: &mut Document, retired: &HashSet<ObjRef>) -> Result<(), Re
     }
     for h in holders {
         let holder = doc.get(h);
-        let Some(res_obj) = holder.as_dict().and_then(|d| d.get(b"Resources")).cloned() else { continue };
-        let Some(res) = doc.resolve(&res_obj).as_dict().cloned() else { continue };
-        let Some(pruned) = without_retired(doc, &res, retired) else { continue };
-        match res_obj.as_ref() {
-            Some(shared) => doc.set(shared, Object::Dict(pruned)),
-            None => doc.update_dict(h, |d| d.set(b"Resources".to_vec(), Object::Dict(pruned)))?,
+        let Some(res) = holder.as_dict().and_then(|d| d.get(b"Resources")).and_then(|r| doc.resolve(r).as_dict().cloned()) else { continue };
+        if let Some(pruned) = without_retired(doc, &res, retired) {
+            doc.update_dict(h, |d| d.set(b"Resources".to_vec(), Object::Dict(pruned)))?;
         }
     }
     let roots: Vec<Object> = [&b"Root"[..], b"Info"].iter().filter_map(|k| doc.trailer().get(k).cloned()).collect();
@@ -399,6 +439,22 @@ pub fn apply(doc: &mut Document, pages: Option<&[usize]>) -> Result<Report, Reda
         pdfcraft_forms::fields(doc).into_iter().flat_map(|f| f.widgets.iter().map(|w| (w.obj, f.name.clone())).collect::<Vec<_>>()).collect();
     let mut retired: HashSet<ObjRef> = HashSet::new();
 
+    // 0. Where each form XObject is drawn over the marks, on every page, so each such draw is
+    // redacted with the marks of all of them (changes nothing).
+    let mut shared = interp::Shared { collect: true, ..Default::default() };
+    for &pi in &by_page {
+        let page = pdfcraft_model::pages(doc).swap_remove(pi);
+        let rects: Vec<[f64; 4]> = chosen.iter().filter(|m| m.page == pi).flat_map(|m| m.rects.iter().copied()).collect();
+        let (_, data) = page_streams(doc, &page.dict, pi)?;
+        let resources = page.dict.get(b"Resources").and_then(|r| doc.resolve(r).as_dict().cloned()).unwrap_or_default();
+        let mut scratch = Report::default();
+        let mut scope = Scope::new(&rects, Mode::Verify, &mut scratch);
+        scope.shared = std::mem::take(&mut shared);
+        process(doc, &mut scope, &data, &resources, pdfcraft_content::Matrix::IDENTITY);
+        shared = std::mem::take(&mut scope.shared);
+    }
+    shared.collect = false;
+
     for &pi in &by_page {
         let page = pdfcraft_model::pages(doc).swap_remove(pi);
         let page_marks: Vec<&Mark> = chosen.iter().copied().filter(|m| m.page == pi).collect();
@@ -409,7 +465,10 @@ pub fn apply(doc: &mut Document, pages: Option<&[usize]>) -> Result<Report, Reda
         let resources = page.dict.get(b"Resources").and_then(|r| doc.resolve(r).as_dict().cloned()).unwrap_or_default();
         let out = {
             let mut scope = Scope::new(&rects, Mode::Apply, &mut report);
-            process(doc, &mut scope, &data, &resources, pdfcraft_content::Matrix::IDENTITY)
+            scope.shared = std::mem::take(&mut shared);
+            let out = process(doc, &mut scope, &data, &resources, pdfcraft_content::Matrix::IDENTITY);
+            shared = std::mem::take(&mut scope.shared);
+            out
         };
         retired.extend(&out.retired);
         let mut new_list = list.clone();
@@ -506,6 +565,20 @@ pub fn apply(doc: &mut Document, pages: Option<&[usize]>) -> Result<Report, Reda
                 d.set(b"Annots".to_vec(), Object::Array(kept));
             }
         })?;
+    }
+
+    // The document's cleared image copies. An image wholly under a mark somewhere is blanked in
+    // its copy too, so no draw anywhere keeps pixels a mark covered.
+    for (original, img) in std::mem::take(&mut shared.images) {
+        let stream = if shared.gone.contains(&original) {
+            match image::clear(doc, &img.stream, &pdfcraft_content::Matrix::IDENTITY, &[[-1.0, -1.0, 2.0, 2.0]]) {
+                Ok(Some(blank)) => blank,
+                _ => return Err(RedactError::StillUsed(Vec::new())),
+            }
+        } else {
+            img.stream
+        };
+        doc.set(img.copy, Object::Stream(stream));
     }
 
     // 3. Form fields with a widget under a mark (all their widgets go).

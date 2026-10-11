@@ -390,6 +390,73 @@ fn images_used_elsewhere_are_refused_and_unused_entries_dropped() {
     assert!(!saved_streams_hold(&doc, SECRET), "the inherited entry kept the original image");
 }
 
+/// Final-review findings on 78b92a5: a form that draws from the resources it inherits counts as
+/// drawing those names (so its image is not pruned from under it), and one image or form drawn
+/// on several pages is redacted with every page's marks.
+#[test]
+fn shared_images_and_forms_are_redacted_with_every_pages_marks() {
+    const LEFT: &[u8] = &[0xCA, 0xFE, 0xBA, 0xBE];
+    const RIGHT: &[u8] = &[0x11, 0x22, 0x33, 0x44];
+    let img = || stream("/Type /XObject /Subtype /Image /Width 8 /Height 1 /ColorSpace /DeviceGray /BitsPerComponent 8", &[LEFT, RIGHT].concat());
+    let leaks = |doc: &Document| saved_streams_hold(doc, LEFT) || saved_streams_hold(doc, RIGHT);
+    // Objects: 1 catalog, 2 pages (shared resources), 3 and 6 pages, 4 and 7 contents, 5 the
+    // image, 8 a form, 9 the font, 10 its widths.
+    let two_pages = |first: &[u8], second: &[u8], form: &[u8]| {
+        pdf(vec![
+            b"<< /Type /Catalog /Pages 2 0 R >>".to_vec(),
+            b"<< /Type /Pages /Kids [3 0 R 6 0 R] /Count 2 /MediaBox [0 0 300 300] /Resources << /XObject << /Scan 5 0 R /Fm 8 0 R >> /Font << /F1 9 0 R >> >> >>".to_vec(),
+            b"<< /Type /Page /Parent 2 0 R /Contents 4 0 R >>".to_vec(),
+            stream("", first),
+            img(),
+            b"<< /Type /Page /Parent 2 0 R /Contents 7 0 R >>".to_vec(),
+            stream("", second),
+            stream("/Type /XObject /Subtype /Form /BBox [0 0 300 300]", form),
+            FONT.replace("95 0 R", "10 0 R").into_bytes(),
+            widths(),
+        ])
+    };
+    let scan = b"q 80 0 0 10 10 10 cm /Scan Do Q";
+    // Page 2 draws a form without resources of its own, which draws /Scan from page 2's.
+    let mut doc = two_pages(scan, b"/Fm Do", scan);
+    mark(&mut doc, 0, &[[0.0, 0.0, 120.0, 40.0]], "");
+    assert!(matches!(apply(&mut doc, None), Err(RedactError::StillUsed(p)) if p == [1]), "the form's image must not be pruned");
+    // The image on both pages: page 1 marks its left half, page 2 its right half. One copy,
+    // with both halves cleared, is drawn on both pages.
+    let mut doc = two_pages(scan, scan, b"");
+    mark(&mut doc, 0, &[[0.0, 0.0, 50.0, 40.0]], "");
+    mark(&mut doc, 1, &[[50.0, 0.0, 120.0, 40.0]], "");
+    assert_eq!(apply(&mut doc, None).unwrap().images_cleared, 2);
+    {
+        let copy = |i: usize| {
+            let p = pdfcraft_model::pages(&doc).swap_remove(i);
+            let res = doc.resolve(p.dict.get(b"Resources").unwrap()).as_dict().cloned().unwrap();
+            doc.resolve(res.get(b"XObject").unwrap()).as_dict().and_then(|x| x.get(b"PCRedacted1").and_then(Object::as_ref))
+        };
+        assert!(copy(0).is_some() && copy(0) == copy(1), "both pages draw the same copy");
+    }
+    assert!(!leaks(&doc), "a page's copy kept pixels the other page's mark cleared");
+    // Partly marked on page 1, wholly on page 2: page 2 drops it and page 1's copy is blank.
+    let mut doc = two_pages(scan, scan, b"");
+    mark(&mut doc, 0, &[[0.0, 0.0, 50.0, 40.0]], "");
+    mark(&mut doc, 1, &[[0.0, 0.0, 120.0, 40.0]], "");
+    apply(&mut doc, None).unwrap();
+    let second = content(&doc, 1);
+    assert!(!second.contains("/Scan Do") && !second.contains("/PCRedacted1 Do"), "{second}");
+    assert!(!leaks(&doc), "page 1's copy kept pixels page 2's mark covered");
+    // A form on both pages: page 1 marks its left word, page 2 its right word. Both copies
+    // lose both words.
+    let words = b"BT /F1 10 Tf 10 100 Td (LEFTSECRET) Tj 190 0 Td (RIGHTSECRET) Tj ET";
+    let mut doc = two_pages(b"/Fm Do", b"/Fm Do", words);
+    mark(&mut doc, 0, &[[0.0, 90.0, 120.0, 120.0]], "");
+    mark(&mut doc, 1, &[[190.0, 90.0, 300.0, 120.0]], "");
+    let r = apply(&mut doc, None).unwrap();
+    assert_eq!(r.forms_rewritten, 2, "{r:?}");
+    assert!(
+        !saved_streams_hold(&doc, b"LEFTSECRET") && !saved_streams_hold(&doc, b"RIGHTSECRET"),
+        "a copy kept a word the other page's mark removed"
+    );
+}
+
 #[test]
 fn comments_links_and_fields_under_a_mark_go() {
     let mut doc = one_page(b"", "", vec![]);
