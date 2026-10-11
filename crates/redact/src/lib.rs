@@ -107,9 +107,6 @@ pub struct Report {
     pub fields: usize,
     /// Structure elements that lost alternate/actual text or emptied marked content.
     pub tags: usize,
-    /// Images removed under a mark that another draw on the same page still shows outside the
-    /// marks: that draw keeps the original image, so its data stays in the file.
-    pub images_still_drawn: usize,
 }
 
 fn rect_of(doc: &Document, o: Option<&Object>) -> Option<[f64; 4]> {

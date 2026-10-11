@@ -17,7 +17,7 @@
 //! In verify mode nothing changes; glyphs and inline images that still overlap a region are
 //! counted.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 use pdfcraft_content::{Matrix, Op, Pieces, contains, num, overlaps, serialize_ops, string};
@@ -54,17 +54,28 @@ pub(crate) struct Output {
     pub streams: Vec<Option<Vec<u8>>>,
     /// New XObjects the rewritten content refers to: (resource name, object).
     pub xobjects: Vec<(Vec<u8>, ObjRef)>,
-    /// Original image XObject resource names whose image was redacted (removed or replaced) and
-    /// which no surviving `Do` still references: the caller drops them from the scope's
-    /// `/Resources /XObject`, so a full save garbage-collects the superseded image stream.
-    /// Without this the original (unredacted) image stays in the file and is extractable (#389).
+    /// Resource names (aliases included) of redacted image and form XObjects that no surviving
+    /// `Do` still draws: the caller drops them from the scope's `/Resources /XObject`, so a full
+    /// save garbage-collects the superseded stream. Without this the original (unredacted)
+    /// image stays in the file and is extractable (#389).
     pub remove_xobjects: Vec<Vec<u8>>,
-    /// Images whose pixels were cleared in a copy: (original resource name, the copy's name).
-    /// Other draws of the same image in this scope are pointed at the copy too, so the pixels
-    /// under the mark don't survive in an unredacted draw elsewhere on the page.
-    pub cleared: Vec<(Vec<u8>, Vec<u8>)>,
+    /// Images partly under the marks: one cleared copy each, with the pixels under every draw's
+    /// marks cleared, used by every draw of that image in this scope.
+    cleared: Vec<Cleared>,
+    /// Images wholly under a mark (or that can't be cleared): every draw of them in this scope
+    /// is removed.
+    gone: HashSet<ObjRef>,
+    /// Form XObjects rewritten for a draw under the marks.
+    forms: HashSet<ObjRef>,
     /// Glyphs / inline images still overlapping a region (verify mode).
     pub residue: usize,
+}
+
+/// An image's cleared copy: the original object, the copy's resource name and its stream.
+struct Cleared {
+    original: ObjRef,
+    name: Vec<u8>,
+    stream: Stream,
 }
 
 pub(crate) struct Scope<'a> {
@@ -457,37 +468,47 @@ pub(crate) fn process(doc: &mut Document, scope: &mut Scope<'_>, streams: &[Vec<
         }
         rewritten.push((ops, changed));
     }
-    // An image whose pixels were cleared for one draw is cleared for every draw in this scope:
-    // the other draws now use the cleared copy, so the redacted pixels can't survive in an
-    // unredacted (or clipped) draw elsewhere. Draws are matched by image object, so a draw
-    // through another resource name for the same image is pointed at the copy as well.
+    // A redacted image is redacted in every draw of it in this scope, matched by object (so
+    // through any resource name): an image wholly under a mark (or that can't be cleared)
+    // leaves every draw, and a partly covered one is drawn from its single cleared copy. Its
+    // redacted pixels then survive in no other draw, visible or clipped.
     let target = |n: &[u8]| xobjects.get(n).and_then(Object::as_ref);
-    let copies: std::collections::HashMap<ObjRef, Vec<u8>> = out.cleared.iter().filter_map(|(old, new)| Some((target(old)?, new.clone()))).collect();
-    for (ops, changed) in &mut rewritten {
-        for op in ops.iter_mut() {
-            if op.is("Do")
-                && let Some(new) = op.name(0).and_then(target).and_then(|r| copies.get(&r))
-            {
-                *op = Op::new("Do", vec![Object::Name(new.clone())]);
-                *changed = true;
-            }
+    let copy_names: HashMap<Vec<u8>, ObjRef> = out.cleared.iter().map(|c| (c.name.clone(), c.original)).collect();
+    let mut copy_of: HashMap<ObjRef, Vec<u8>> = HashMap::new();
+    for c in std::mem::take(&mut out.cleared) {
+        if !out.gone.contains(&c.original) {
+            out.xobjects.push((c.name.clone(), doc.add(Object::Stream(c.stream))));
+            copy_of.insert(c.original, c.name);
         }
     }
-    // The objects surviving `Do`s still draw stay; every resource name (aliases included) of a
-    // superseded original that nothing draws any more is dropped, so a full save drops the
-    // original image stream (#389). An original still drawn here (a draw outside the marks of
-    // an image another draw had removed whole) is counted.
-    let drawn: std::collections::HashSet<ObjRef> =
+    for (ops, changed) in &mut rewritten {
+        let before = ops.len();
+        ops.retain_mut(|op| {
+            let Some(name) = op.name(0).filter(|_| op.is("Do")) else { return true };
+            let Some(original) = copy_names.get(name).copied().or_else(|| target(name)) else { return true };
+            if out.gone.contains(&original) {
+                scope.report.images_removed += 1;
+                return false;
+            }
+            if let Some(copy) = copy_of.get(&original)
+                && copy.as_slice() != name
+            {
+                *op = Op::new("Do", vec![Object::Name(copy.clone())]);
+                *changed = true;
+            }
+            true
+        });
+        *changed |= ops.len() != before;
+    }
+    // Every resource name of a superseded original that nothing draws any more is dropped, so a
+    // full save drops the original stream (#389). A form drawn again outside the marks keeps its
+    // original for that draw.
+    let drawn: HashSet<ObjRef> =
         rewritten.iter().flat_map(|(ops, _)| ops.iter()).filter(|op| op.is("Do")).filter_map(|op| op.name(0).and_then(target)).collect();
-    let superseded: std::collections::HashSet<ObjRef> = out.remove_xobjects.iter().filter_map(|n| target(n)).collect();
-    scope.report.images_still_drawn += superseded.intersection(&drawn).count();
-    out.remove_xobjects = xobjects
-        .iter()
-        .filter(|(_, v)| v.as_ref().is_some_and(|r| superseded.contains(&r) && !drawn.contains(&r)))
-        .map(|(n, _)| n.to_vec())
-        .collect();
+    let superseded = |r: &ObjRef| out.gone.contains(r) || copy_of.contains_key(r) || out.forms.contains(r);
+    out.remove_xobjects =
+        xobjects.iter().filter(|(_, v)| v.as_ref().is_some_and(|r| superseded(&r) && !drawn.contains(&r))).map(|(n, _)| n.to_vec()).collect();
     out.remove_xobjects.sort();
-    out.remove_xobjects.dedup();
     out.streams = rewritten.into_iter().map(|(ops, changed)| changed.then(|| serialize_ops(&ops))).collect();
     out
 }
@@ -593,29 +614,33 @@ fn xobject(
             if !scope.hits(b) || scope.mode == Mode::Verify {
                 return None;
             }
-            if scope.covered(b) {
-                scope.report.images_removed += 1;
-                // The original image is no longer drawn: mark it for removal from resources so
-                // the superseded (unredacted) stream is garbage-collected on a full save (#389).
-                out.remove_xobjects.push(name);
-                return Some(None);
-            }
-            match image::clear(doc, s, &gs.ctm, scope.rects) {
-                Ok(None) => None,
-                Ok(Some(new)) => {
-                    let nr = doc.add(Object::Stream(new));
-                    let n = fresh_name(scope, xobjects);
-                    xobjects.set(n.clone(), Object::Ref(nr));
-                    out.xobjects.push((n.clone(), nr));
+            // Partly covered: clear this draw's pixels in the image's cleared copy (made from the
+            // original at its first such draw), which every draw of it then uses (see `process`).
+            let copy = out.cleared.iter().position(|c| c.original == r);
+            let cleared = if scope.covered(b) {
+                Err(())
+            } else {
+                image::clear(doc, copy.and_then(|i| out.cleared.get(i)).map_or(s, |c| &c.stream), &gs.ctm, scope.rects)
+            };
+            match (cleared, copy) {
+                (Ok(None), _) => None,
+                (Ok(Some(new)), Some(i)) => {
                     scope.report.images_cleared += 1;
-                    // The `Do` now points at the cleared copy; drop the original from resources.
-                    out.cleared.push((name.clone(), n.clone()));
-                    out.remove_xobjects.push(name);
+                    let c = out.cleared.get_mut(i)?;
+                    c.stream = new;
+                    Some(Some(Op::new("Do", vec![Object::Name(c.name.clone())])))
+                }
+                (Ok(Some(new)), None) => {
+                    scope.report.images_cleared += 1;
+                    let n = fresh_name(scope, xobjects);
+                    out.cleared.push(Cleared { original: r, name: n.clone(), stream: new });
                     Some(Some(Op::new("Do", vec![Object::Name(n)])))
                 }
-                Err(()) => {
+                // Wholly covered, or can't be cleared: this draw goes, and `process` removes the
+                // image's other draws too.
+                (Err(()), _) => {
                     scope.report.images_removed += 1;
-                    out.remove_xobjects.push(name);
+                    out.gone.insert(r);
                     Some(None)
                 }
             }
@@ -638,12 +663,14 @@ fn xobject(
                     return None;
                 }
                 scope.report.forms_removed += 1;
+                out.forms.insert(r);
                 return Some(None);
             }
             let data = match s.decoded() {
                 Ok(d) => d,
                 Err(_) if scope.mode == Mode::Apply => {
                     scope.report.forms_removed += 1;
+                    out.forms.insert(r);
                     return Some(None);
                 }
                 Err(_) => return None,
@@ -686,6 +713,7 @@ fn xobject(
             xobjects.set(n.clone(), Object::Ref(nr));
             out.xobjects.push((n.clone(), nr));
             scope.report.forms_rewritten += 1;
+            out.forms.insert(r);
             Some(Some(Op::new("Do", vec![Object::Name(n)])))
         }
         _ => None,

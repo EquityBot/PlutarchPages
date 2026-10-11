@@ -205,10 +205,12 @@ fn rotated_text_and_composite_fonts() {
 
 #[test]
 fn images_are_removed_or_have_their_pixels_cleared() {
-    // Image 1 is fully covered; image 2 (4×1 gray, all white) is half covered.
-    let img = stream("/Type /XObject /Subtype /Image /Width 4 /Height 1 /ColorSpace /DeviceGray /BitsPerComponent 8", &[255, 255, 255, 255]);
+    // Image 1 is fully covered; image 2 (4×1 gray, all white) is half covered. They are two
+    // objects: one image drawn at both places would go from both (see
+    // `aliases_and_other_draws_of_a_redacted_image_do_not_keep_the_original`).
+    let img = || stream("/Type /XObject /Subtype /Image /Width 4 /Height 1 /ColorSpace /DeviceGray /BitsPerComponent 8", &[255, 255, 255, 255]);
     let src = b"q 10 0 0 10 10 10 cm /Im1 Do Q q 40 0 0 10 100 100 cm /Im2 Do Q";
-    let mut doc = one_page(src, "/XObject << /Im1 7 0 R /Im2 7 0 R >>", vec![img]);
+    let mut doc = one_page(src, "/XObject << /Im1 8 0 R /Im2 7 0 R >>", vec![img(), img()]);
     mark(&mut doc, 0, &[[5.0, 5.0, 25.0, 25.0], [95.0, 95.0, 120.0, 115.0]], "");
     let r = apply(&mut doc, None).unwrap();
     assert_eq!((r.images_removed, r.images_cleared), (1, 1), "{r:?}");
@@ -251,35 +253,65 @@ fn redacted_image_bytes_are_gone_from_the_saved_file() {
     assert!(!bytes.windows(CANARY.len()).any(|w| w == CANARY), "redacted image bytes left in the saved file (#389)");
 }
 
-/// Final-review finding F1: a second resource name for the same image, and a second draw of a
-/// partly redacted image, must not keep the original image (and its canary) in the saved file.
+/// Whether any stream of `doc`, saved and decoded, still holds `secret`.
+fn saved_streams_hold(doc: &Document, secret: &[u8]) -> bool {
+    let saved = Document::open(Arc::new(write_full(doc, &SaveOptions::default()).unwrap())).unwrap();
+    saved.scan_objects().any(|(_, o)| matches!(&*o, Object::Stream(s) if s.decoded().is_ok_and(|d| d.windows(secret.len()).any(|w| w == secret))))
+}
+
+/// Final-review finding F1: no draw of a redacted image, through any resource name, visible or
+/// clipped, may keep pixels that were under a mark in the saved file.
 #[test]
 fn aliases_and_other_draws_of_a_redacted_image_do_not_keep_the_original() {
-    const CANARY: &[u8] = &[0xCA, 0xFE, 0xBA, 0xBE, 0x11, 0x22, 0x33, 0x44];
-    let img = || stream("/Type /XObject /Subtype /Image /Width 8 /Height 1 /ColorSpace /DeviceGray /BitsPerComponent 8", CANARY);
-    // Whether any stream of the saved file, decoded, still holds the whole canary.
-    let leaks = |doc: &Document| {
-        let saved = Document::open(Arc::new(write_full(doc, &SaveOptions::default()).unwrap())).unwrap();
-        saved.scan_objects().any(|(_, o)| matches!(&*o, Object::Stream(s) if s.decoded().is_ok_and(|d| d.windows(CANARY.len()).any(|w| w == CANARY))))
-    };
+    // An 8×1 image: the left half under one mark at its first draw, the right half under
+    // another at its second.
+    const LEFT: &[u8] = &[0xCA, 0xFE, 0xBA, 0xBE];
+    const RIGHT: &[u8] = &[0x11, 0x22, 0x33, 0x44];
+    let img = || stream("/Type /XObject /Subtype /Image /Width 8 /Height 1 /ColorSpace /DeviceGray /BitsPerComponent 8", &[LEFT, RIGHT].concat());
+    let leaks = |doc: &Document| saved_streams_hold(doc, LEFT) || saved_streams_hold(doc, RIGHT);
     // Two names for one image; only /Scan is drawn, and it is wholly under the mark.
     let mut doc = one_page(b"q 80 0 0 10 10 10 cm /Scan Do Q", "/XObject << /Scan 7 0 R /Alias 7 0 R >>", vec![img()]);
     mark(&mut doc, 0, &[[0.0, 0.0, 120.0, 40.0]], "");
     assert_eq!(apply(&mut doc, None).unwrap().images_removed, 1);
     assert!(!leaks(&doc), "an unused alias kept the original image");
-    // One image drawn three times, twice through an alias; the mark clears part of the first
-    // draw. The other draws, outside the mark, use the cleared copy too.
+    // One image drawn three times, once through an alias. The marks clear the left half of the
+    // first draw and the right half of the second; every draw uses one copy with both cleared.
     let mut doc = one_page(
         b"q 80 0 0 10 10 10 cm /Scan Do Q q 80 0 0 10 150 150 cm /Scan Do Q q 80 0 0 10 150 200 cm /Alias Do Q",
         "/XObject << /Scan 7 0 R /Alias 7 0 R >>",
         vec![img()],
     );
-    mark(&mut doc, 0, &[[0.0, 0.0, 50.0, 40.0]], "");
+    mark(&mut doc, 0, &[[0.0, 0.0, 50.0, 40.0], [190.0, 140.0, 240.0, 170.0]], "");
     let r = apply(&mut doc, None).unwrap();
-    assert_eq!((r.images_cleared, r.images_still_drawn), (1, 0), "{r:?}");
+    assert_eq!((r.images_cleared, r.images_removed), (2, 0), "{r:?}");
     let drawn = content(&doc, 0);
     assert!(!drawn.contains("/Scan Do") && !drawn.contains("/Alias Do"), "every draw uses the cleared copy: {drawn}");
-    assert!(!leaks(&doc), "another draw kept the original image");
+    assert_eq!(drawn.matches("/PCRedacted1 Do").count(), 3, "one copy for every draw: {drawn}");
+    assert!(!leaks(&doc), "a draw kept pixels another draw's mark cleared");
+    // Wholly under a mark at one draw, and drawn again elsewhere clipped to a corner: the image
+    // goes from both draws.
+    let mut doc = one_page(
+        b"q 80 0 0 10 10 10 cm /Scan Do Q q 150 150 5 5 re W n 80 0 0 10 150 150 cm /Alias Do Q",
+        "/XObject << /Scan 7 0 R /Alias 7 0 R >>",
+        vec![img()],
+    );
+    mark(&mut doc, 0, &[[0.0, 0.0, 120.0, 40.0]], "");
+    assert_eq!(apply(&mut doc, None).unwrap().images_removed, 2);
+    let drawn = content(&doc, 0);
+    assert!(!drawn.contains(" Do"), "{drawn}");
+    assert!(!leaks(&doc), "a clipped draw kept the original image");
+}
+
+/// A form redacted on its only draw leaves the page's resources, so its original (unredacted)
+/// stream is not kept in the saved file.
+#[test]
+fn a_redacted_form_does_not_keep_its_original() {
+    let form =
+        stream("/Type /XObject /Subtype /Form /BBox [0 0 300 300] /Resources << /Font << /F1 5 0 R >> >>", b"BT /F1 10 Tf 10 100 Td (SECRET) Tj ET");
+    let mut doc = one_page(b"/Fm Do", "/XObject << /Fm 7 0 R >>", vec![form]);
+    mark(&mut doc, 0, &[[0.0, 90.0, 300.0, 120.0]], "");
+    assert_eq!(apply(&mut doc, None).unwrap().forms_rewritten, 1);
+    assert!(!saved_streams_hold(&doc, b"SECRET"), "the original form stayed in the file");
 }
 
 #[test]

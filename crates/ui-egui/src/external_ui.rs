@@ -174,7 +174,8 @@ impl PdfCraftApp {
         };
         let last = if to_end { pages.min(current.saturating_add(READ_PAGES)) } else { current.saturating_add(1).min(pages) };
         match self.session.speech_pages(id, &(current..last).collect::<Vec<_>>()) {
-            Ok(read) => self.speak(&read.text, read.truncated),
+            // Read to end stops short at READ_PAGES pages too.
+            Ok(read) => self.speak(&read.text, read.truncated || (to_end && last < pages)),
             Err(e) => self.notify(e.to_string()),
         }
     }

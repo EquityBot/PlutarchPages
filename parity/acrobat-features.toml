@@ -6839,7 +6839,7 @@ status = "shipped"
 commands = ["file.open"]
 tools = ["doc_create"]
 evidence = ["crates/external/src/lib.rs::browser_arguments_keep_the_target_inert", "crates/external/src/lib.rs::fake_converters_fail_cleanly", "crates/automation/tests/automation.rs::doc_create_through_external_converters"]
-notes = "PlutarchPages (PDF-XChange browser-to-PDF parity): an installed Chrome, Edge or Chromium prints a local HTML file with scripts off and network refused (unknown hosts and a dead proxy), in a fresh profile. Off unless External converters are on; a local file can still include other local files it names. Real-browser isolation is not tested in CI."
+notes = "PlutarchPages (PDF-XChange browser-to-PDF parity): an installed Chrome, Edge or Chromium prints a local HTML file with scripts off and the browser set to refuse network requests (unknown hosts and a dead proxy), in a fresh profile. Off unless External converters are on; a local file can still include other local files it names. Real-browser isolation is not tested in CI."
 
 [[feature]]
 id = "create.from-web-page"
@@ -6863,7 +6863,7 @@ status = "shipped"
 commands = ["file.open"]
 tools = ["doc_create"]
 evidence = ["crates/external/src/lib.rs::extensions_are_allowlisted", "crates/external/src/lib.rs::versions_parse", "crates/engine/src/tests.rs::files_that_cannot_be_converted_are_refused_clearly"]
-notes = "PlutarchPages (PDF-XChange Office2PDF parity): an installed LibreOffice 26.2.5 or later converts doc, docx, odt, rtf, xls, xlsx, ods, ppt, pptx and odp (no macro-enabled formats) in a fresh profile and private folder, with a deadline and process-tree kill. Off unless the user turns on External converters (Preferences, or PDFCRAFT_EXTERNAL_CONVERTERS=1); not an OS sandbox. The end-to-end test uses a fake converter; a real LibreOffice run is not part of CI."
+notes = "PlutarchPages (PDF-XChange Office2PDF parity): an installed LibreOffice 26.2.5 or later converts doc, docx, odt, rtf, xls, xlsx, ods, ppt, pptx and odp (no macro-enabled formats) in a fresh profile and private folder, with a deadline and a best-effort process-tree kill. Off unless the user turns on External converters (Preferences, or PDFCRAFT_EXTERNAL_CONVERTERS=1); not an OS sandbox. The end-to-end test uses a fake converter; a real LibreOffice run is not part of CI."
 
 [[feature]]
 id = "create.create-multiple"

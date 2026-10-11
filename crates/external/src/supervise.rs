@@ -1,5 +1,8 @@
 //! Running an external program under supervision: its own process group, no inherited output, a
-//! deadline and a cancel flag, and the whole process tree ended when the run stops early.
+//! deadline and a cancel flag. When the run ends, its process group (Unix) or process tree
+//! (Windows, while the program runs) is ended too. This is best effort, not operating-system
+//! containment: a descendant that leaves the group, or outlives its Windows parent, can keep
+//! running.
 
 use std::process::{Child, Command, ExitStatus, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -48,15 +51,16 @@ pub(crate) fn spawn_with_stdout(mut cmd: Command, what: &str) -> Result<Child, E
 }
 
 /// Wait for `child` until it exits, `done` returns true, `cancel` is set or `deadline` passes. In
-/// every case but a normal exit the whole process tree is ended and reaped before returning.
+/// every case but a normal exit the process group (Unix) or tree (Windows) is ended and the
+/// child reaped before returning; after a normal exit what is left in its group is ended.
 pub(crate) fn wait(child: &mut Child, deadline: Instant, cancel: &AtomicBool, mut done: impl FnMut() -> bool) -> Ended {
     loop {
-        match child.try_wait() {
-            Ok(Some(status)) => {
+        match exited(child) {
+            Ok(true) => {
                 end_leftovers(child);
-                return Ended::Exited(status);
+                return child.wait().map_or(Ended::Cancelled, Ended::Exited);
             }
-            Ok(None) => {}
+            Ok(false) => {}
             Err(_) => {
                 end_tree(child);
                 return Ended::Cancelled;
@@ -79,10 +83,27 @@ pub(crate) fn wait(child: &mut Child, deadline: Instant, cancel: &AtomicBool, mu
     }
 }
 
-/// After `child` exited: end what it left running in its process group (a launcher's
-/// background helpers). Best effort: a descendant that started its own group or session is out
-/// of reach, and on Windows the tree can only be ended while the parent runs. A group id stays
-/// reserved while any member exists, so this can't reach an unrelated process group.
+/// Whether `child` has exited. On Unix it is left unreaped (a zombie keeps its process id, and
+/// so its group id, reserved) until the caller has run [`end_leftovers`] and then reaps it with
+/// `child.wait()`; elsewhere this reaps it.
+pub(crate) fn exited(child: &mut Child) -> std::io::Result<bool> {
+    #[cfg(unix)]
+    {
+        use rustix::process::{Pid, WaitId, WaitIdOptions, waitid};
+        let pid = i32::try_from(child.id()).ok().and_then(Pid::from_raw).ok_or_else(|| std::io::Error::other("no process id"))?;
+        Ok(waitid(WaitId::Pid(pid), WaitIdOptions::EXITED | WaitIdOptions::NOHANG | WaitIdOptions::NOWAIT)?.is_some())
+    }
+    #[cfg(not(unix))]
+    {
+        child.try_wait().map(|s| s.is_some())
+    }
+}
+
+/// After `child` exited, before it is reaped (see [`exited`]): end what it left running in its
+/// process group (a launcher's background helpers). Best effort: a descendant that started its
+/// own group or session is out of reach, and on Windows the tree can only be ended while the
+/// parent runs. The unreaped child keeps the group id reserved, so this can't reach an
+/// unrelated process group.
 pub(crate) fn end_leftovers(child: &Child) {
     #[cfg(unix)]
     {

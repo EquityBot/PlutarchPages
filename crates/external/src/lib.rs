@@ -6,9 +6,11 @@
 //! or bundles them. Conversion is off unless the user turns it on (the engine enforces that).
 //!
 //! Each run gets a private folder with a fresh browser or Office profile, a fixed input name and
-//! an absolute path, a deadline and a cancel flag; an early stop ends the whole process tree.
-//! Local HTML is opened with scripts off and every network request refused (unknown host names
-//! and a dead proxy). None of this is an operating-system sandbox: convert only files you trust.
+//! an absolute path, a deadline and a cancel flag; when a run ends, its process group (Unix) or
+//! process tree (Windows) is ended, best effort (see `supervise`). Local HTML is opened with
+//! scripts off and the browser told to refuse network requests (unknown host names and a dead
+//! proxy); that rests on the browser's flags, not on an observed block. None of this is an
+//! operating-system sandbox: convert only files you trust.
 
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
 

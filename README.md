@@ -487,8 +487,8 @@ from public specifications like the rest of PdfCraft.
 - **External converters**, off by default (Preferences ▸ External converters, or
   `PDFCRAFT_EXTERNAL_CONVERTERS=1`): Office files through an installed LibreOffice 26.2.5 or later,
   HTML files and web pages (Create PDF from web page) through an installed Chrome or Edge. Each run
-  uses a fresh private profile and folder, a deadline and a process-tree kill; local HTML opens with
-  scripts and network off. Web addresses that name this computer or a private network are refused,
+  uses a fresh private profile and folder, a deadline and a best-effort process-tree kill; local
+  HTML opens with scripts off and the browser set to refuse network requests. Web addresses that name this computer or a private network are refused,
   but a page can still redirect to or load from them. They are not sandboxed: convert only files
   and pages you trust.
 - **Read Out Loud** (View menu, `speech_start`): the current page or the rest of the document through
