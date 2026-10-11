@@ -4053,7 +4053,7 @@ fn read_out_loud_sends_text_only_to_the_speech_program() {
     let mut a = auto(&dir).with_speech_backend(pdfcraft_engine::SpeechBackend::EspeakNg(fake));
     let doc = ok(&mut a, "doc_open", json!({ "path": "a.pdf" }))["doc"].as_u64().unwrap();
     let r = ok(&mut a, "speech_start", json!({ "doc": doc, "pages": [2] }));
-    assert_eq!(r["speaking"], true);
+    assert_eq!((&r["speaking"], &r["truncated"], &r["pages"]), (&json!(true), &json!(false), &json!([2])), "{r}");
     assert!(!r.to_string().contains("Page 2"), "the text is not returned: {r}");
     for _ in 0..100 {
         if ok(&mut a, "speech_status", json!({}))["speaking"] == false {
@@ -4063,6 +4063,8 @@ fn read_out_loud_sends_text_only_to_the_speech_program() {
     }
     assert_eq!(std::fs::read_to_string(&heard).unwrap().trim(), "Page 2");
     assert_eq!(ok(&mut a, "speech_stop", json!({}))["speaking"], false);
+    // At most 50 pages in one go, even when asked for explicitly.
+    assert!(a.call("speech_start", &json!({ "doc": doc, "pages": vec![1; 51] })).is_err());
     let _ = std::fs::remove_dir_all(&dir);
 }
 

@@ -42,7 +42,7 @@ pub use pdfcraft_edit::{
     Added, AddedImage, AddedText, Align as TextAlign, Background, Content as AddedContent, Family as FontFamily, HeaderFooter, MarkKind, Watermark,
 };
 #[cfg(not(target_arch = "wasm32"))]
-pub use pdfcraft_external::{Speech, SpeechBackend};
+pub use pdfcraft_external::{MAX_SPEECH, Speech, SpeechBackend};
 pub use pdfcraft_forms::{
     BorderStyle, CheckStyle, Field as FormField, FieldAction, FieldChange, FieldFont, FieldKind as FormFieldKind, FieldProps, FieldValue,
     Look as FieldLook, LookPatch as FieldLookPatch, NewField, TabOrder, Trigger as FieldTrigger, Widget as FormWidget, af as form_scripts,
@@ -1939,7 +1939,9 @@ fn keys_after(edit: &Edit) -> Option<Keys> {
 /// as its UTF-8 bytes and then in PDFDocEncoding: UTF-8 bytes (as some writers store passwords
 /// PDFDocEncoding can't hold, such as "şifre") stay UTF-8, and other bytes are read as
 /// PDFDocEncoding, so either way the renderer gets back exactly these bytes.
-fn renderer_password(bytes: &[u8]) -> String {
+/// The password string the renderer takes for raw password `bytes` (a user password recovered by
+/// owner authentication): UTF-8, or PDFDocEncoding when the bytes aren't UTF-8.
+pub fn renderer_password(bytes: &[u8]) -> String {
     match std::str::from_utf8(bytes) {
         Ok(text) => text.to_owned(),
         Err(_) => bytes.iter().map(|b| pdfcraft_cos::pdfdoc_char(*b)).collect(),
@@ -3549,6 +3551,12 @@ pub fn conversion_notes_email(r: &pdfcraft_create::EmailReport) -> Vec<String> {
     let mut notes: Vec<String> = conversion_note_replaced(r.replaced_characters).into_iter().collect();
     if !r.attachments.is_empty() && !r.embedded {
         notes.push(format!("{} attachment(s) are listed but not included", r.attachments.len()));
+    }
+    if r.attachments_left_out > 0 {
+        notes.push(format!("{} attachment(s) past the first {} are not listed", r.attachments_left_out, r.attachments.len()));
+    }
+    if r.bodies_left_out > 0 {
+        notes.push(format!("{} text part(s) of the message were left out", r.bodies_left_out));
     }
     notes
 }

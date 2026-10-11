@@ -16,8 +16,9 @@ fn hidden(c: char) -> bool {
 /// A web address safe to hand to the browser: `http` or `https` with a host, no user name or
 /// password, no spaces or invisible characters, and not this computer, a private network or a
 /// local name. Numeric addresses are checked in every spelling the URL standard accepts
-/// (`2130706433`, `0x7f.1`, IPv4-mapped IPv6). A public name that resolves to a private address is
-/// not caught here: the browser resolves names itself.
+/// (`2130706433`, `0x7f.1`, IPv4-mapped IPv6). This checks the address given, not where it leads:
+/// a public name that resolves to a private address, a redirect, or a page that loads from the
+/// local network is not caught (the browser resolves and follows them itself).
 pub fn checked_web_url(input: &str) -> Result<Url, ExternalError> {
     let shown: String = input.chars().filter(|c| !hidden(*c)).take(80).collect();
     let bad = |why: &str| ExternalError::InvalidInput(format!("{why}: {shown}"));

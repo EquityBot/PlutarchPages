@@ -10,8 +10,10 @@ installed separately, used by PlutarchPages for the PDF-XChange features that ne
 - `html_to_pdf`: a local HTML file through Chrome, Edge or Chromium (`--headless=new
   --print-to-pdf`), with scripts off and every network request refused (unknown host names and a
   dead proxy, loopback included).
-- `url_to_pdf`: a public web page (`checked_web_url`: http or https, no user name or password,
-  nothing on this computer or a private network in any numeric spelling), scripts and network on.
+- `url_to_pdf`: a web page (`checked_web_url`: http or https, no user name or password, no
+  address naming this computer or a private network in any numeric spelling), scripts and network
+  on. The check covers the address typed, not where it leads: a public name that resolves to a
+  private address, a redirect, or a page that loads from the local network still reaches it.
 - `Speech`: Read Out Loud through the system's speech program, text on standard input only:
   Windows PowerShell with a fixed encoded System.Speech script, macOS `say -f -` (with `[[` broken
   up), or `espeak-ng --stdin` on Linux. Speech Dispatcher's `spd-say` is not used (its pipe mode
@@ -21,8 +23,11 @@ Each conversion runs in a private `tempfile` folder: a fixed input name (`in/inp
 browser or LibreOffice profile, home, cache and temporary folders inside it, absolute paths only,
 and the target after `--` so it can't be read as a switch. The program runs in its own process
 group with a deadline (120 s) and a cancel flag; an early stop ends the whole tree (`killpg` through
-rustix on Unix, `taskkill /T /F` on Windows). The result must be a regular file under 512 MB that
-starts like a PDF and ends with `%%EOF`; the engine then parses it before showing it.
+rustix on Unix, `taskkill /T /F` on Windows). The program gets an allowlisted environment (system,
+locale and font variables; no credentials, proxies or session addresses). A failed exit is an
+error, a result that grows past 512 MB stops the program, and the result is read once (not
+through a link on Unix) and must start like a PDF and end with `%%EOF`; the engine then parses it
+before showing it.
 
 This is not an operating-system sandbox. A converter that a hostile file compromises runs with the
 user's rights, and a local HTML file can still include other local files it names (as a browser

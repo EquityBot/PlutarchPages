@@ -7,11 +7,9 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{Receiver, TryRecvError};
 
 use pdfcraft_engine::SourceKind;
+use pdfcraft_engine::external::READ_PAGES;
 
 use crate::{PdfCraftApp, theme};
-
-/// The most pages Read to end reads in one go.
-const READ_PAGES: usize = 50;
 
 /// A conversion running on its own thread.
 pub(crate) struct Job {
@@ -52,7 +50,7 @@ pub(crate) fn web_page_body(ui: &mut egui::Ui, app: &mut PdfCraftApp) -> (bool, 
     let on = app.session.external_converters().enabled;
     let note = if on {
         tl!(
-            "The page opens in a fresh, private window of your installed Chrome or Edge and is printed to PDF. Addresses on this computer or a private network are refused."
+            "The page opens in a fresh, private window of your installed Chrome or Edge and is printed to PDF. Open only pages you trust: a public page can still redirect to or load addresses on your own network."
         )
     } else {
         tl!("External converters are off. Turn them on in Preferences to use your installed Chrome or Edge.")
@@ -175,36 +173,29 @@ impl PdfCraftApp {
             _ => return,
         };
         let last = if to_end { pages.min(current.saturating_add(READ_PAGES)) } else { current.saturating_add(1).min(pages) };
-        let mut text = String::new();
-        for p in current..last {
-            match self.session.speech_text(id, p) {
-                Ok(t) => {
-                    text.push_str(&t);
-                    text.push('\n');
-                }
-                Err(e) => {
-                    self.notify(e.to_string());
-                    return;
-                }
-            }
+        match self.session.speech_pages(id, &(current..last).collect::<Vec<_>>()) {
+            Ok(read) => self.speak(&read.text, read.truncated),
+            Err(e) => self.notify(e.to_string()),
         }
-        self.speak(&text);
     }
 
     #[cfg(not(target_arch = "wasm32"))]
-    fn speak(&mut self, text: &str) {
+    fn speak(&mut self, text: &str, truncated: bool) {
         let Some(backend) = pdfcraft_engine::SpeechBackend::detect() else {
             self.notify_tr("No speech program was found (Windows speech, macOS say, or eSpeak NG on Linux)");
             return;
         };
         match self.external.speech.start(&backend, text) {
+            Ok(()) if truncated => {
+                self.notify_tr("Reading aloud the first part only: the text is too long to read in one go. View ▸ Stop reading stops it.")
+            }
             Ok(()) => self.notify_tr("Reading aloud. View ▸ Stop reading stops it."),
             Err(e) => self.notify(e.to_string()),
         }
     }
 
     #[cfg(target_arch = "wasm32")]
-    fn speak(&mut self, _text: &str) {
+    fn speak(&mut self, _text: &str, _truncated: bool) {
         self.notify_tr("Read Out Loud needs the desktop app");
     }
 

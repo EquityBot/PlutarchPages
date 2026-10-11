@@ -290,13 +290,20 @@ fn text(args: &[String]) -> Result<(), CliError> {
     // lifts it; an unencrypted document has no restriction (#568). An encrypted file whose
     // permissions can't be established is refused rather than handed to the renderer, which
     // authenticates on its own (fail closed).
+    // The renderer authenticates on its own and can't use an R2–R4 owner password: give it the
+    // user password that owner authentication recovers, as the engine does.
+    let mut render_password = password.map(str::to_owned);
     match pdfcraft_cos::Document::open_with_password(bytes.clone(), password) {
         Ok(doc) if doc.permissions().is_some_and(|p| !p.copy()) => {
             return Err(
                 "text: this document's security settings don't allow copying or extracting text; open it with --password <owner password>".into()
             );
         }
-        Ok(_) => {}
+        Ok(doc) => {
+            if let Some(user) = doc.security().and_then(|s| s.recovered_user_password()) {
+                render_password = Some(pdfcraft_engine::renderer_password(&user));
+            }
+        }
         Err(pdfcraft_cos::CosError::NeedsPassword) => return Err("text: this document needs a password; pass --password <password>".into()),
         Err(pdfcraft_cos::CosError::WrongPassword) => return Err("text: the password is wrong".into()),
         Err(e) if matches!(e, pdfcraft_cos::CosError::Security(_)) || bytes.windows(8).any(|w| w == b"/Encrypt") => {
@@ -304,12 +311,12 @@ fn text(args: &[String]) -> Result<(), CliError> {
         }
         Err(_) => {}
     }
-    let mut r = PageRenderer::new(bytes.clone(), RenderConfig { password: password.map(Arc::from), ..Default::default() });
+    let mut r = PageRenderer::new(bytes.clone(), RenderConfig { password: render_password.as_deref().map(Arc::from), ..Default::default() });
     // A document the renderer could not open (wrong or missing password, unparseable file) has
     // no pages, and "extract every page" of nothing would print nothing and exit 0 (#132). Ask
     // `inspect` why instead, so a protected file fails the same way `info` does.
     if r.page_count() == 0 {
-        let info = inspect(bytes, password).map_err(|e| format!("text: {e}"))?;
+        let info = inspect(bytes, render_password.as_deref()).map_err(|e| format!("text: {e}"))?;
         if !info.pages.is_empty() {
             return Err("text: the document could not be parsed".into());
         }

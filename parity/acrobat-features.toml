@@ -6851,7 +6851,7 @@ status = "shipped"
 commands = ["create.web_page"]
 tools = ["doc_create"]
 evidence = ["crates/external/src/web.rs::local_private_and_odd_addresses_are_refused", "crates/engine/src/external.rs::converters_are_off_by_default_and_web_addresses_are_checked_first", "crates/automation/tests/automation.rs::doc_create_through_external_converters"]
-notes = "PlutarchPages: Create ▸ From web page prints a public http or https page through an installed Chrome or Edge in a fresh private profile. Addresses on this computer or a private network (any numeric spelling) and addresses with credentials are refused; a public name that resolves to a private address is not caught. Off unless External converters are on."
+notes = "PlutarchPages: Create ▸ From web page prints a public http or https page through an installed Chrome or Edge in a fresh private profile. Addresses naming this computer or a private network (any numeric spelling) and addresses with credentials are refused; a public name that resolves to a private address, a redirect, or a page loading from the local network is not caught. Off unless External converters are on."
 
 [[feature]]
 id = "create.from-office"

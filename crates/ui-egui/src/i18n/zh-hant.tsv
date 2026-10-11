@@ -2105,4 +2105,4 @@ key	Space	空格
 	Remove PDF/A and PDF/X identification	移除 PDF/A 和 PDF/X 識別資訊
 	Uses LibreOffice (26.2.5 or later) for Office files and Chrome or Edge for HTML and web pages, each in a fresh private profile. Local HTML opens with scripts and network off. These programs are not sandboxed by PlutarchPages: convert only files you trust.	Office 檔案使用 LibreOffice（26.2.5 或更新版本），HTML 和網頁使用 Chrome 或 Edge，每次都在全新的私人設定檔中執行。本機 HTML 會在關閉指令碼和網路的情況下開啟。PlutarchPages 不會將這些程式放入沙箱：請只轉換您信任的檔案。
 	Web address (http or https)	網址（http 或 https）
-	The page opens in a fresh, private window of your installed Chrome or Edge and is printed to PDF. Addresses on this computer or a private network are refused.	頁面會在已安裝的 Chrome 或 Edge 的全新私人視窗中開啟並列印為 PDF。本機或私人網路上的位址會被拒絕。
+	The page opens in a fresh, private window of your installed Chrome or Edge and is printed to PDF. Open only pages you trust: a public page can still redirect to or load addresses on your own network.	頁面會在已安裝的 Chrome 或 Edge 的全新私人視窗中開啟並列印為 PDF。請只開啟您信任的頁面：公開頁面仍可能重新導向至或載入您自己網路上的位址。

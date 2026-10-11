@@ -52,7 +52,10 @@ pub(crate) fn spawn_with_stdout(mut cmd: Command, what: &str) -> Result<Child, E
 pub(crate) fn wait(child: &mut Child, deadline: Instant, cancel: &AtomicBool, mut done: impl FnMut() -> bool) -> Ended {
     loop {
         match child.try_wait() {
-            Ok(Some(status)) => return Ended::Exited(status),
+            Ok(Some(status)) => {
+                end_leftovers(child);
+                return Ended::Exited(status);
+            }
             Ok(None) => {}
             Err(_) => {
                 end_tree(child);
@@ -76,8 +79,24 @@ pub(crate) fn wait(child: &mut Child, deadline: Instant, cancel: &AtomicBool, mu
     }
 }
 
-/// End `child` and every process it started, then reap it. Only for a child that is still running:
-/// its process group then still exists, so the group id can't belong to anything else.
+/// After `child` exited: end what it left running in its process group (a launcher's
+/// background helpers). Best effort: a descendant that started its own group or session is out
+/// of reach, and on Windows the tree can only be ended while the parent runs. A group id stays
+/// reserved while any member exists, so this can't reach an unrelated process group.
+pub(crate) fn end_leftovers(child: &Child) {
+    #[cfg(unix)]
+    {
+        if let Some(pid) = i32::try_from(child.id()).ok().and_then(rustix::process::Pid::from_raw) {
+            let _ = rustix::process::kill_process_group(pid, rustix::process::Signal::KILL);
+        }
+    }
+    #[cfg(not(unix))]
+    let _ = child;
+}
+
+/// End `child` and the processes it started, then reap it: its process group on Unix, its process
+/// tree on Windows (`taskkill /T`). Best effort for descendants that left the group (see
+/// [`end_leftovers`]).
 pub(crate) fn end_tree(child: &mut Child) {
     #[cfg(unix)]
     {
@@ -127,6 +146,27 @@ mod tests {
             !alive
         });
         assert!(gone, "grandchild {pid} survived");
+    }
+
+    /// A launcher that starts a helper and exits at once: the helper is ended with it.
+    #[test]
+    fn helpers_left_by_an_exiting_launcher_are_ended() {
+        let dir = tempfile::tempdir().unwrap();
+        let marker = dir.path().join("helper.pid");
+        let mut cmd = Command::new("/bin/sh");
+        cmd.arg("-c").arg(format!("sleep 30 & echo $! > '{}'", marker.display())).stdin(Stdio::null());
+        let mut child = spawn(cmd, "sh").unwrap();
+        let ended = wait(&mut child, Instant::now() + Duration::from_secs(10), &AtomicBool::new(false), || false);
+        assert!(matches!(ended, Ended::Exited(_)), "{ended:?}");
+        let pid: i32 = std::fs::read_to_string(&marker).unwrap().trim().parse().unwrap();
+        let gone = (0..50).any(|_| {
+            let alive = rustix::process::Pid::from_raw(pid).is_some_and(|p| rustix::process::test_kill_process(p).is_ok());
+            if alive {
+                thread::sleep(Duration::from_millis(50));
+            }
+            !alive
+        });
+        assert!(gone, "helper {pid} survived its launcher");
     }
 
     #[test]

@@ -73,6 +73,21 @@ fn failed(e: impl std::fmt::Display) -> ToolError {
     ToolError::Failed(e.to_string())
 }
 
+/// The largest table, Markdown, email, HTML or Office file `doc_create` reads.
+const MAX_SOURCE: u64 = 256 << 20;
+
+/// Read `path`, refusing it once it passes [`MAX_SOURCE`] bytes (never reading more than that).
+fn read_source(path: &Path) -> Result<Vec<u8>> {
+    use std::io::Read;
+    let file = std::fs::File::open(path).map_err(|e| failed(format!("{}: {e}", path.display())))?;
+    let mut bytes = Vec::new();
+    file.take(MAX_SOURCE + 1).read_to_end(&mut bytes).map_err(|e| failed(format!("{}: {e}", path.display())))?;
+    if u64::try_from(bytes.len()).unwrap_or(u64::MAX) > MAX_SOURCE {
+        return Err(failed(format!("{}: larger than {} MB", path.display(), MAX_SOURCE >> 20)));
+    }
+    Ok(bytes)
+}
+
 /// Default and maximum resolution for `page_render`.
 const DEFAULT_DPI: f64 = 96.0;
 const MAX_DPI: f64 = 600.0;
@@ -1152,7 +1167,7 @@ impl Automation {
                     }
                     (None, Some(p)) => {
                         let path = self.resolve(p, false)?;
-                        let t = std::fs::read(&path).map_err(|e| failed(format!("{}: {e}", path.display())))?;
+                        let t = read_source(&path)?;
                         let stem = path.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
                         let file = path.file_name().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
                         (stem, file, pdfcraft_engine::decode_text(&t))
@@ -1176,7 +1191,7 @@ impl Automation {
             }
             "email" => {
                 let path = self.resolve(a.str("path")?, false)?;
-                let raw = std::fs::read(&path).map_err(|e| failed(format!("{}: {e}", path.display())))?;
+                let raw = read_source(&path)?;
                 let stem = path.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
                 let embed = a.opt_bool("embed_attachments")?.unwrap_or(false);
                 let (bytes, report) = pdfcraft_engine::guard(|| self.session.create_from_email(&stem, &raw, embed))
@@ -1187,7 +1202,7 @@ impl Automation {
             }
             kind @ ("html" | "office") => {
                 let path = self.resolve(a.str("path")?, false)?;
-                let raw = std::fs::read(&path).map_err(|e| failed(format!("{}: {e}", path.display())))?;
+                let raw = read_source(&path)?;
                 let file = path.file_name().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
                 let stem = path.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
                 let want = if kind == "html" { pdfcraft_engine::SourceKind::Html } else { pdfcraft_engine::SourceKind::Office };
@@ -1226,22 +1241,22 @@ impl Automation {
         let id = doc.id;
         let pages = match a.opt_ints("pages")? {
             Some(_) => self.pages(a, "pages")?,
-            None => (0..doc.info.pages.len().min(50)).collect(),
+            None => (0..doc.info.pages.len().min(pdfcraft_engine::external::READ_PAGES)).collect(),
         };
-        let mut text = String::new();
-        for p in &pages {
-            text.push_str(&self.session.speech_text(id, *p).map_err(failed)?);
-            text.push('\n');
-        }
+        let read = self.session.speech_pages(id, &pages).map_err(failed)?;
         let backend = self
             .speech_backend
             .clone()
             .or_else(pdfcraft_engine::SpeechBackend::detect)
             .ok_or_else(|| failed("no speech program was found (Windows speech, macOS say, or eSpeak NG on Linux)"))?;
-        self.speech.start(&backend, &text).map_err(failed)?;
-        Ok(
-            json!({ "speaking": true, "program": backend.name(), "pages": pages.iter().map(|p| p + 1).collect::<Vec<_>>(), "characters": text.chars().count() }),
-        )
+        self.speech.start(&backend, &read.text).map_err(failed)?;
+        Ok(json!({
+            "speaking": true,
+            "program": backend.name(),
+            "pages": read.pages.iter().map(|p| p + 1).collect::<Vec<_>>(),
+            "characters": read.text.chars().count(),
+            "truncated": read.truncated,
+        }))
     }
 
     #[cfg(target_arch = "wasm32")]

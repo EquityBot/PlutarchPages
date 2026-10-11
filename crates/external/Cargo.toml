@@ -16,5 +16,6 @@ tempfile = "3.27"
 url = "2.5.8"
 
 [target.'cfg(unix)'.dependencies]
-# Ending a converter's whole process group; std has no killpg and this crate forbids unsafe.
-rustix = { version = "1", features = ["process"] }
+# Ending a converter's whole process group (std has no killpg and this crate forbids unsafe), and
+# opening its result without following a link.
+rustix = { version = "1", features = ["fs", "process"] }

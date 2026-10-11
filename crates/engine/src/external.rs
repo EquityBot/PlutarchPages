@@ -14,12 +14,31 @@ use pdfcraft_render::{PageRenderer, RenderConfig, RenderRequest, RequestKind};
 
 use crate::{DocId, EditError, Session, SourceKind, guard, open_source};
 
+#[cfg(not(target_arch = "wasm32"))]
+use pdfcraft_external::MAX_SPEECH;
+/// The web build speaks nothing; gathering text stays bounded the same way.
+#[cfg(target_arch = "wasm32")]
+const MAX_SPEECH: usize = 1 << 20;
+
 /// Turns the external converters on when set to `1`.
 pub const ENABLE_VAR: &str = "PDFCRAFT_EXTERNAL_CONVERTERS";
 /// The browser to use (an absolute path), instead of looking for one.
 pub const BROWSER_VAR: &str = "PDFCRAFT_CHROME";
 /// The LibreOffice `soffice` program to use (an absolute path), instead of looking for one.
 pub const OFFICE_VAR: &str = "PDFCRAFT_SOFFICE";
+
+/// The most pages Read Out Loud reads in one go.
+pub const READ_PAGES: usize = 50;
+
+/// Text gathered for Read Out Loud.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct SpeechText {
+    pub text: String,
+    /// The pages (0-based) whose text is in `text`; the last may be in part.
+    pub pages: Vec<usize>,
+    /// Text was left out to stay within [`MAX_SPEECH`].
+    pub truncated: bool,
+}
 
 /// Preferences ▸ External converters.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -74,7 +93,8 @@ impl ExternalConverters {
         Err(EditError::Source(format!("{name}: converting Office and HTML files needs the desktop app")))
     }
 
-    /// Print the web page at `url` (http or https, public addresses only) to checked PDF bytes.
+    /// Print the web page at `url` (http or https; see `checked_web_url` for what the address
+    /// check covers) to checked PDF bytes.
     #[cfg(not(target_arch = "wasm32"))]
     pub fn web_page(&self, url: &str, cancel: &AtomicBool) -> Result<Vec<u8>, EditError> {
         use pdfcraft_external as ext;
@@ -132,6 +152,29 @@ impl Session {
     /// Create ▸ From web page: the page at `url` as new, unsaved PDF bytes.
     pub fn create_from_web_page(&self, url: &str) -> Result<Arc<Vec<u8>>, EditError> {
         Ok(Arc::new(self.external.web_page(url, &AtomicBool::new(false))?))
+    }
+
+    /// The text of `pages` (0-based, at most [`READ_PAGES`]) for Read Out Loud, in order, stopping
+    /// at [`MAX_SPEECH`] bytes. See [`Session::speech_text`].
+    pub fn speech_pages(&self, id: DocId, pages: &[usize]) -> Result<SpeechText, EditError> {
+        if pages.len() > READ_PAGES {
+            return Err(EditError::Source(format!("Read Out Loud reads at most {READ_PAGES} pages at a time")));
+        }
+        let mut out = SpeechText::default();
+        for &page in pages {
+            let text = self.speech_text(id, page)?;
+            out.pages.push(page);
+            let room = MAX_SPEECH.saturating_sub(out.text.len());
+            if text.len() >= room {
+                let cut = text.floor_char_boundary(room);
+                out.text.push_str(text.get(..cut).unwrap_or_default());
+                out.truncated = cut < text.len() || out.pages.len() < pages.len();
+                break;
+            }
+            out.text.push_str(&text);
+            out.text.push('\n');
+        }
+        Ok(out)
     }
 
     /// The text of `page` (0-based) for Read Out Loud. Reading aloud is assistive use, which
@@ -194,5 +237,16 @@ mod tests {
         assert!(!s.get(id).unwrap().allows_copy());
         assert_eq!(s.speech_text(id, 0).unwrap().trim(), "Page 1", "assistive reading is allowed");
         assert!(s.speech_text(id, 5).is_err());
+    }
+
+    /// Final-review finding F6: at most 50 pages, gathered in order and reported.
+    #[test]
+    fn speech_pages_are_bounded() {
+        let mut s = Session::new();
+        let id = s.open("three.pdf", None, Arc::new(crate::tests::fixture(3)), None).unwrap();
+        let read = s.speech_pages(id, &[2, 0]).unwrap();
+        assert_eq!((read.pages, read.truncated), (vec![2, 0], false));
+        assert!(read.text.find("Page 3") < read.text.find("Page 1"), "{}", read.text);
+        assert!(s.speech_pages(id, &[0; READ_PAGES + 1]).is_err());
     }
 }

@@ -145,17 +145,17 @@ impl Speech {
         Ok(())
     }
 
-    /// Stop speaking: end the program and everything it started.
+    /// Stop speaking: end the program and what it started. Never waits on the text writer: a
+    /// helper that kept the input pipe open without reading could block it, and Stop must not
+    /// hang the caller. The writer ends when the pipe's readers are gone.
     pub fn stop(&mut self) {
         if let Some(mut child) = self.child.take() {
             match child.try_wait() {
-                Ok(Some(_)) => {}
+                Ok(Some(_)) => supervise::end_leftovers(&child),
                 _ => supervise::end_tree(&mut child),
             }
         }
-        if let Some(w) = self.writer.take() {
-            let _ = w.join();
-        }
+        self.writer = None;
     }
 
     /// Whether something is being spoken now.
@@ -206,6 +206,26 @@ mod tests {
                 assert!(!String::from_utf8_lossy(&input).contains("[["), "say's command marker is broken up");
             }
         }
+    }
+
+    /// Final-review finding F4: a program that exits at once while a helper holds its input pipe
+    /// without reading must not make Stop (or dropping the speech) hang.
+    #[cfg(unix)]
+    #[test]
+    fn stop_does_not_hang_on_a_helper_holding_the_input() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempfile::tempdir().unwrap();
+        let fake = dir.path().join("espeak-ng");
+        std::fs::write(&fake, "#!/bin/sh\nsleep 60 <&0 &\nexit 0\n").unwrap();
+        std::fs::set_permissions(&fake, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let backend = SpeechBackend::EspeakNg(fake);
+        let mut s = Speech::default();
+        s.start(&backend, &"word ".repeat(200_000)).unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(300));
+        let started = std::time::Instant::now();
+        s.stop();
+        drop(s);
+        assert!(started.elapsed() < std::time::Duration::from_secs(5), "stop took {:?}", started.elapsed());
     }
 
     #[cfg(unix)]

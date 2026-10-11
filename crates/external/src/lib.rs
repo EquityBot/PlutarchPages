@@ -25,7 +25,7 @@ mod speech;
 mod supervise;
 mod web;
 
-pub use speech::{Speech, SpeechBackend};
+pub use speech::{MAX_SPEECH, Speech, SpeechBackend};
 pub use web::checked_web_url;
 
 use supervise::Ended;
@@ -206,13 +206,25 @@ impl Stage {
         Ok(path)
     }
 
-    /// Point the program's home, configuration, cache and temporary folders inside the stage.
+    /// Give the program an environment of its own: only the system, locale and font variables it
+    /// needs from ours (no credentials, proxies, session addresses or other private values), and
+    /// home, configuration, cache and temporary folders inside the stage.
     fn isolate(&self, cmd: &mut Command) {
         let scratch = self.path("scratch");
+        let home = self.path("home");
+        cmd.env_clear();
+        for (key, value) in std::env::vars_os() {
+            let Some(k) = key.to_str() else { continue };
+            if KEPT_ENV.iter().any(|kept| kept.eq_ignore_ascii_case(k)) || k.starts_with("LC_") {
+                cmd.env(&key, value);
+            }
+        }
         if cfg!(windows) {
-            cmd.env("TEMP", &scratch).env("TMP", &scratch);
+            let (roaming, local) = (home.join("AppData").join("Roaming"), home.join("AppData").join("Local"));
+            // Best effort: a program that needs them and finds them missing fails visibly.
+            let _ = std::fs::create_dir_all(&roaming).and_then(|()| std::fs::create_dir_all(&local));
+            cmd.env("TEMP", &scratch).env("TMP", &scratch).env("USERPROFILE", &home).env("APPDATA", roaming).env("LOCALAPPDATA", local);
         } else {
-            let home = self.path("home");
             cmd.env("HOME", &home)
                 .env("TMPDIR", &scratch)
                 .env("XDG_CONFIG_HOME", home.join(".config"))
@@ -223,6 +235,32 @@ impl Stage {
         cmd.current_dir(scratch).stdin(Stdio::null());
     }
 }
+
+/// The variables a converter keeps from our environment (plus `LC_*`).
+const KEPT_ENV: &[&str] = &[
+    "PATH",
+    "LANG",
+    "LANGUAGE",
+    "TZ",
+    "FONTCONFIG_FILE",
+    "FONTCONFIG_PATH",
+    "SystemRoot",
+    "SystemDrive",
+    "windir",
+    "PATHEXT",
+    "ProgramFiles",
+    "ProgramFiles(x86)",
+    "ProgramW6432",
+    "CommonProgramFiles",
+    "CommonProgramFiles(x86)",
+    "CommonProgramW6432",
+    "ProgramData",
+    "NUMBER_OF_PROCESSORS",
+    "PROCESSOR_ARCHITECTURE",
+    "OS",
+];
+
+impl Stage {}
 
 /// A `file:` URL for an absolute path (a folder when `dir`). The web build has no file paths.
 #[cfg(not(target_arch = "wasm32"))]
@@ -249,22 +287,48 @@ fn ends_with_eof(path: &Path) -> bool {
     tail(path, 1024).is_some_and(|t| t.windows(5).any(|w| w == b"%%EOF"))
 }
 
-/// Read the program's result: a regular file (not a link) no larger than `max`, that starts like a
-/// PDF and ends with `%%EOF`. The caller still parses it before showing it.
+/// Open the result without following a link (Unix), so a link planted at the name can't point
+/// the read elsewhere.
+fn open_result(path: &Path) -> std::io::Result<std::fs::File> {
+    let mut options = std::fs::OpenOptions::new();
+    options.read(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.custom_flags(rustix::fs::OFlags::NOFOLLOW.bits() as i32);
+    }
+    options.open(path)
+}
+
+/// Read the program's result once: a regular file (not a link) of at most `max` bytes that starts
+/// like a PDF and ends with `%%EOF`, all checked on the bytes read. The caller still parses it
+/// before showing it.
 fn read_output(path: &Path, max: u64) -> Result<Vec<u8>, ExternalError> {
-    let meta = std::fs::symlink_metadata(path).map_err(|_| ExternalError::InvalidOutput("the program wrote no PDF".into()))?;
+    let file = open_result(path).map_err(|_| ExternalError::InvalidOutput("the program wrote no PDF".into()))?;
+    let meta = file.metadata().map_err(io("couldn't read the result"))?;
     if !meta.file_type().is_file() {
         return Err(ExternalError::InvalidOutput("the program's result is not a regular file".into()));
     }
+    let too_large = || ExternalError::InvalidOutput(format!("the result is larger than {} MB", max >> 20));
     if meta.len() > max {
-        return Err(ExternalError::InvalidOutput(format!("the result is larger than {} MB", max >> 20)));
+        return Err(too_large());
     }
-    let bytes = std::fs::read(path).map_err(io("couldn't read the result"))?;
+    let mut bytes = Vec::new();
+    file.take(max.saturating_add(1)).read_to_end(&mut bytes).map_err(io("couldn't read the result"))?;
+    if u64::try_from(bytes.len()).unwrap_or(u64::MAX) > max {
+        return Err(too_large());
+    }
     let head = bytes.get(..bytes.len().min(1024)).unwrap_or_default();
-    if !head.windows(5).any(|w| w == b"%PDF-") || !ends_with_eof(path) {
+    let tail = bytes.get(bytes.len().saturating_sub(1024)..).unwrap_or_default();
+    if !head.windows(5).any(|w| w == b"%PDF-") || !tail.windows(5).any(|w| w == b"%%EOF") {
         return Err(ExternalError::InvalidOutput("the program's result is not a complete PDF".into()));
     }
     Ok(bytes)
+}
+
+/// Whether the file at `path` has grown past `max` bytes (the program is then stopped).
+fn grown_past(path: &Path, max: u64) -> bool {
+    std::fs::metadata(path).is_ok_and(|m| m.len() > max)
 }
 
 fn check_input(bytes: &[u8], limits: &Limits) -> Result<(), ExternalError> {
@@ -324,17 +388,17 @@ fn run_browser(browser: &Path, target: &str, offline: bool, stage: &Stage, limit
     stage.isolate(&mut cmd);
     let mut child = supervise::spawn(cmd, "the browser")?;
     // Some browsers finish writing the PDF and then linger: done once the file is complete and
-    // has stopped growing.
+    // has stopped growing, or once it is too large (stopped at once; the read then refuses it).
     let mut last = None;
     let done = || {
         let len = std::fs::metadata(&out).map(|m| m.len()).ok();
         let stable = len.is_some() && len == last && ends_with_eof(&out);
         last = len;
-        stable
+        stable || len.is_some_and(|l| l > limits.max_output)
     };
     match supervise::wait(&mut child, Instant::now() + limits.timeout, cancel, done) {
-        Ended::Exited(status) if !ends_with_eof(&out) => {
-            Err(ExternalError::ProcessFailed(format!("the browser stopped ({status}) without writing a PDF")))
+        Ended::Exited(status) if !status.success() => {
+            Err(ExternalError::ProcessFailed(format!("the browser stopped ({status}) without finishing the PDF")))
         }
         Ended::Exited(_) | Ended::Done => read_output(&out, limits.max_output),
         Ended::TimedOut => Err(ExternalError::TimedOut("the browser".into(), limits.timeout.as_secs())),
@@ -448,10 +512,15 @@ pub fn office_to_pdf(soffice: &Path, name: &str, bytes: &[u8], limits: &Limits, 
         .arg(stage.path("out"))
         .arg(&input);
     stage.isolate(&mut cmd);
+    let out = stage.path("out").join("input.pdf");
     let result = (|| {
         let mut child = supervise::spawn(cmd, "LibreOffice")?;
-        match supervise::wait(&mut child, Instant::now() + limits.timeout, cancel, || false) {
-            Ended::Exited(_) | Ended::Done => read_output(&stage.path("out").join("input.pdf"), limits.max_output),
+        // Stopped at once when the result grows too large; the read then refuses it.
+        match supervise::wait(&mut child, Instant::now() + limits.timeout, cancel, || grown_past(&out, limits.max_output)) {
+            Ended::Exited(status) if !status.success() => {
+                Err(ExternalError::ProcessFailed(format!("LibreOffice stopped ({status}) without finishing the PDF")))
+            }
+            Ended::Exited(_) | Ended::Done => read_output(&out, limits.max_output),
             Ended::TimedOut => Err(ExternalError::TimedOut("LibreOffice".into(), limits.timeout.as_secs())),
             Ended::Cancelled => Err(ExternalError::Cancelled),
         }
@@ -535,11 +604,67 @@ mod tests {
         assert!(matches!(r, Err(ExternalError::InvalidOutput(_))), "{r:?}");
         let silent = fake("silent", "exit 0");
         let r = html_to_pdf(&silent, "p.html", b"<p>x</p>", &limits, &cancel);
-        assert!(matches!(r, Err(ExternalError::ProcessFailed(_))), "{r:?}");
+        assert!(matches!(r, Err(ExternalError::InvalidOutput(_))), "{r:?}");
         let hang = fake("hang", "sleep 30");
         let started = Instant::now();
         let r = url_to_pdf(&hang, "https://example.org/", &Limits { timeout: Duration::from_secs(1), ..limits }, &cancel);
         assert!(matches!(r, Err(ExternalError::TimedOut(..))) && started.elapsed() < Duration::from_secs(10), "{r:?}");
         assert!(matches!(url_to_pdf(&hang, "file:///etc/passwd", &limits, &cancel), Err(ExternalError::InvalidInput(_))));
+    }
+
+    /// Final-review finding F9: a failed exit, a result that keeps growing and a result planted as
+    /// a link are all refused, and a growing result stops the program at once.
+    #[cfg(unix)]
+    #[test]
+    fn failed_growing_and_linked_results_are_refused() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempfile::tempdir().unwrap();
+        let fake = |name: &str, body: &str| {
+            let p = dir.path().join(name);
+            let script =
+                format!("#!/bin/sh\nfor a in \"$@\"; do case \"$a\" in --print-to-pdf=*) out=\"${{a#--print-to-pdf=}}\";; esac; done\n{body}\n");
+            std::fs::write(&p, script).unwrap();
+            std::fs::set_permissions(&p, std::fs::Permissions::from_mode(0o755)).unwrap();
+            p
+        };
+        let cancel = AtomicBool::new(false);
+        let limits = Limits { timeout: Duration::from_secs(20), max_input: 1 << 20, max_output: 4096 };
+        let pdf = dir.path().join("good.pdf");
+        std::fs::write(&pdf, "%PDF-1.7\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n").unwrap();
+        let failed = fake("failed", &format!("cat '{}' > \"$out\"; exit 3", pdf.display()));
+        let r = html_to_pdf(&failed, "p.html", b"<p>x</p>", &limits, &cancel);
+        assert!(matches!(r, Err(ExternalError::ProcessFailed(_))), "{r:?}");
+        let growing = fake("growing", "head -c 100000 /dev/zero > \"$out\"; sleep 30");
+        let started = Instant::now();
+        let r = html_to_pdf(&growing, "p.html", b"<p>x</p>", &limits, &cancel);
+        assert!(matches!(r, Err(ExternalError::InvalidOutput(_))) && started.elapsed() < Duration::from_secs(10), "{r:?}");
+        let linked = fake("linked", &format!("ln -s '{}' \"$out\"; exit 0", pdf.display()));
+        let r = html_to_pdf(&linked, "p.html", b"<p>x</p>", &limits, &cancel);
+        assert!(matches!(r, Err(ExternalError::InvalidOutput(_))), "{r:?}");
+        let fine = fake("fine", &format!("cat '{}' > \"$out\"; exit 0", pdf.display()));
+        assert!(html_to_pdf(&fine, "p.html", b"<p>x</p>", &limits, &cancel).is_ok());
+    }
+
+    /// Final-review finding F10: a converter sees only the allowlisted variables of our
+    /// environment, with home and temporary folders inside its stage.
+    #[cfg(unix)]
+    #[test]
+    fn converters_get_an_allowlisted_environment() {
+        use std::os::unix::fs::PermissionsExt;
+        // Cargo sets this for test runs; it stands in for any private variable of ours.
+        if std::env::var_os("CARGO_MANIFEST_DIR").is_none() {
+            return;
+        }
+        let dir = tempfile::tempdir().unwrap();
+        let seen = dir.path().join("env.txt");
+        let p = dir.path().join("printenv");
+        std::fs::write(&p, format!("#!/bin/sh\nenv > '{}'\nexit 1\n", seen.display())).unwrap();
+        std::fs::set_permissions(&p, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let _ = html_to_pdf(&p, "p.html", b"<p>x</p>", &Limits::default(), &AtomicBool::new(false));
+        let env = std::fs::read_to_string(&seen).unwrap();
+        assert!(!env.contains("CARGO_MANIFEST_DIR="), "{env}");
+        assert!(env.lines().any(|l| l.starts_with("PATH=")), "{env}");
+        let home = env.lines().find_map(|l| l.strip_prefix("HOME="));
+        assert!(home.is_some_and(|h| h.ends_with("/home")) && home != std::env::var("HOME").ok().as_deref(), "{home:?}");
     }
 }

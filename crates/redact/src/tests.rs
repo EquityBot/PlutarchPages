@@ -251,6 +251,37 @@ fn redacted_image_bytes_are_gone_from_the_saved_file() {
     assert!(!bytes.windows(CANARY.len()).any(|w| w == CANARY), "redacted image bytes left in the saved file (#389)");
 }
 
+/// Final-review finding F1: a second resource name for the same image, and a second draw of a
+/// partly redacted image, must not keep the original image (and its canary) in the saved file.
+#[test]
+fn aliases_and_other_draws_of_a_redacted_image_do_not_keep_the_original() {
+    const CANARY: &[u8] = &[0xCA, 0xFE, 0xBA, 0xBE, 0x11, 0x22, 0x33, 0x44];
+    let img = || stream("/Type /XObject /Subtype /Image /Width 8 /Height 1 /ColorSpace /DeviceGray /BitsPerComponent 8", CANARY);
+    // Whether any stream of the saved file, decoded, still holds the whole canary.
+    let leaks = |doc: &Document| {
+        let saved = Document::open(Arc::new(write_full(doc, &SaveOptions::default()).unwrap())).unwrap();
+        saved.scan_objects().any(|(_, o)| matches!(&*o, Object::Stream(s) if s.decoded().is_ok_and(|d| d.windows(CANARY.len()).any(|w| w == CANARY))))
+    };
+    // Two names for one image; only /Scan is drawn, and it is wholly under the mark.
+    let mut doc = one_page(b"q 80 0 0 10 10 10 cm /Scan Do Q", "/XObject << /Scan 7 0 R /Alias 7 0 R >>", vec![img()]);
+    mark(&mut doc, 0, &[[0.0, 0.0, 120.0, 40.0]], "");
+    assert_eq!(apply(&mut doc, None).unwrap().images_removed, 1);
+    assert!(!leaks(&doc), "an unused alias kept the original image");
+    // One image drawn three times, twice through an alias; the mark clears part of the first
+    // draw. The other draws, outside the mark, use the cleared copy too.
+    let mut doc = one_page(
+        b"q 80 0 0 10 10 10 cm /Scan Do Q q 80 0 0 10 150 150 cm /Scan Do Q q 80 0 0 10 150 200 cm /Alias Do Q",
+        "/XObject << /Scan 7 0 R /Alias 7 0 R >>",
+        vec![img()],
+    );
+    mark(&mut doc, 0, &[[0.0, 0.0, 50.0, 40.0]], "");
+    let r = apply(&mut doc, None).unwrap();
+    assert_eq!((r.images_cleared, r.images_still_drawn), (1, 0), "{r:?}");
+    let drawn = content(&doc, 0);
+    assert!(!drawn.contains("/Scan Do") && !drawn.contains("/Alias Do"), "every draw uses the cleared copy: {drawn}");
+    assert!(!leaks(&doc), "another draw kept the original image");
+}
+
 #[test]
 fn vectors_are_removed_or_clipped_and_inline_images_go() {
     let src = b"0 g 10 10 20 20 re f 0 0 300 300 re f q 10 0 0 10 50 50 cm BI /W 1 /H 1 /CS /G /BPC 8 ID \x80 EI Q 1 0 0 RG 150 150 m 160 160 l S";

@@ -488,8 +488,9 @@ from public specifications like the rest of PdfCraft.
   `PDFCRAFT_EXTERNAL_CONVERTERS=1`): Office files through an installed LibreOffice 26.2.5 or later,
   HTML files and web pages (Create PDF from web page) through an installed Chrome or Edge. Each run
   uses a fresh private profile and folder, a deadline and a process-tree kill; local HTML opens with
-  scripts and network off; private web addresses are refused. They are not sandboxed: convert only
-  files you trust.
+  scripts and network off. Web addresses that name this computer or a private network are refused,
+  but a page can still redirect to or load from them. They are not sandboxed: convert only files
+  and pages you trust.
 - **Read Out Loud** (View menu, `speech_start`): the current page or the rest of the document through
   Windows speech, macOS `say` or eSpeak NG, with the text sent only on standard input.
 - **Bookmarks** (PDF-XChange's Bookmarks plug-in): colour, bold and italic from the bookmark menu or

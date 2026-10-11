@@ -59,6 +59,10 @@ pub(crate) struct Output {
     /// `/Resources /XObject`, so a full save garbage-collects the superseded image stream.
     /// Without this the original (unredacted) image stays in the file and is extractable (#389).
     pub remove_xobjects: Vec<Vec<u8>>,
+    /// Images whose pixels were cleared in a copy: (original resource name, the copy's name).
+    /// Other draws of the same image in this scope are pointed at the copy too, so the pixels
+    /// under the mark don't survive in an unredacted draw elsewhere on the page.
+    pub cleared: Vec<(Vec<u8>, Vec<u8>)>,
     /// Glyphs / inline images still overlapping a region (verify mode).
     pub residue: usize,
 }
@@ -242,9 +246,8 @@ pub(crate) fn process(doc: &mut Document, scope: &mut Scope<'_>, streams: &[Vec<
         }
     }
 
-    // Image XObject names still drawn by a surviving `Do` after rewriting; a redacted image's
-    // original name is dropped from resources only when it is NOT in here (#389).
-    let mut still_drawn: Vec<Vec<u8>> = Vec::new();
+    // Each piece's rewritten operators; serialized after the image references are settled below.
+    let mut rewritten: Vec<(Vec<Op>, bool)> = Vec::new();
     for (piece, mut changed) in pieces.into_iter().zip(rewrite) {
         let mut ops: Vec<Op> = Vec::with_capacity(piece.len());
         for op in piece {
@@ -452,20 +455,40 @@ pub(crate) fn process(doc: &mut Document, scope: &mut Scope<'_>, streams: &[Vec<
         if !path.is_empty() {
             ops.append(&mut path);
         }
-        // Any image XObject a surviving `Do` still draws must stay in resources: an image used
-        // by several draws, only some of them redacted, is kept for the others.
-        for op in &ops {
+        rewritten.push((ops, changed));
+    }
+    // An image whose pixels were cleared for one draw is cleared for every draw in this scope:
+    // the other draws now use the cleared copy, so the redacted pixels can't survive in an
+    // unredacted (or clipped) draw elsewhere. Draws are matched by image object, so a draw
+    // through another resource name for the same image is pointed at the copy as well.
+    let target = |n: &[u8]| xobjects.get(n).and_then(Object::as_ref);
+    let copies: std::collections::HashMap<ObjRef, Vec<u8>> = out.cleared.iter().filter_map(|(old, new)| Some((target(old)?, new.clone()))).collect();
+    for (ops, changed) in &mut rewritten {
+        for op in ops.iter_mut() {
             if op.is("Do")
-                && let Some(n) = op.name(0)
+                && let Some(new) = op.name(0).and_then(target).and_then(|r| copies.get(&r))
             {
-                still_drawn.push(n.to_vec());
+                *op = Op::new("Do", vec![Object::Name(new.clone())]);
+                *changed = true;
             }
         }
-        out.streams.push(changed.then(|| serialize_ops(&ops)));
     }
-    out.remove_xobjects.retain(|n| !still_drawn.contains(n));
+    // The objects surviving `Do`s still draw stay; every resource name (aliases included) of a
+    // superseded original that nothing draws any more is dropped, so a full save drops the
+    // original image stream (#389). An original still drawn here (a draw outside the marks of
+    // an image another draw had removed whole) is counted.
+    let drawn: std::collections::HashSet<ObjRef> =
+        rewritten.iter().flat_map(|(ops, _)| ops.iter()).filter(|op| op.is("Do")).filter_map(|op| op.name(0).and_then(target)).collect();
+    let superseded: std::collections::HashSet<ObjRef> = out.remove_xobjects.iter().filter_map(|n| target(n)).collect();
+    scope.report.images_still_drawn += superseded.intersection(&drawn).count();
+    out.remove_xobjects = xobjects
+        .iter()
+        .filter(|(_, v)| v.as_ref().is_some_and(|r| superseded.contains(&r) && !drawn.contains(&r)))
+        .map(|(n, _)| n.to_vec())
+        .collect();
     out.remove_xobjects.sort();
     out.remove_xobjects.dedup();
+    out.streams = rewritten.into_iter().map(|(ops, changed)| changed.then(|| serialize_ops(&ops))).collect();
     out
 }
 
@@ -586,6 +609,7 @@ fn xobject(
                     out.xobjects.push((n.clone(), nr));
                     scope.report.images_cleared += 1;
                     // The `Do` now points at the cleared copy; drop the original from resources.
+                    out.cleared.push((name.clone(), n.clone()));
                     out.remove_xobjects.push(name);
                     Some(Some(Op::new("Do", vec![Object::Name(n)])))
                 }
