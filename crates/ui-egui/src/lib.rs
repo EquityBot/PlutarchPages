@@ -922,6 +922,16 @@ impl PdfCraftApp {
         self.try_open(name, path, std::sync::Arc::new(bytes), None, activate)
     }
 
+    /// A new view of open document `id`, with the copy permission taken from the engine. Every
+    /// path that shows a document makes its view here, so none can copy from a copy-restricted
+    /// document (#568).
+    pub(crate) fn view_for(&self, id: DocId) -> Option<DocView> {
+        let doc = self.session.get(id)?;
+        let mut view = DocView::new(id, &doc.info, self.view_defaults);
+        view.copy_allowed = doc.allows_copy();
+        Some(view)
+    }
+
     fn try_open(
         &mut self,
         name: &str,
@@ -956,9 +966,7 @@ impl PdfCraftApp {
             };
         }
         let initial = doc.initial_view();
-        let copy_allowed = doc.allows_copy();
-        let mut view = DocView::new(id, &doc.info, self.view_defaults);
-        view.copy_allowed = copy_allowed;
+        let Some(view) = self.view_for(id) else { return Err("the document vanished".into()) };
         self.views.push(view);
         if activate {
             self.active = Some(self.views.len() - 1);

@@ -635,8 +635,8 @@ impl PdfCraftApp {
     pub(crate) fn open_created(&mut self, name: &str, bytes: Arc<Vec<u8>>, message: &str) {
         match self.session.open_new(name, bytes) {
             Ok(id) => {
-                let Some(doc) = self.session.get(id) else { return };
-                self.views.push(crate::DocView::new(id, &doc.info, self.view_defaults));
+                let Some(view) = self.view_for(id) else { return };
+                self.views.push(view);
                 self.active = Some(self.views.len() - 1);
                 self.notify_tr(message);
             }

@@ -287,11 +287,20 @@ fn text(args: &[String]) -> Result<(), CliError> {
     let password = flag(args, "--password");
     let bytes = read(path)?;
     // The document's security may forbid extracting text (Table 22, bit 5). The owner password
-    // lifts it; an unencrypted document has no restriction (#568).
-    if let Ok(doc) = pdfcraft_cos::Document::open_with_password(bytes.clone(), password)
-        && doc.permissions().is_some_and(|p| !p.copy())
-    {
-        return Err("text: this document's security settings don't allow copying or extracting text; open it with --password <owner password>".into());
+    // lifts it; an unencrypted document has no restriction (#568). An encrypted file whose
+    // permissions can't be established is refused rather than handed to the renderer, which
+    // authenticates on its own (fail closed).
+    match pdfcraft_cos::Document::open_with_password(bytes.clone(), password) {
+        Ok(doc) if doc.permissions().is_some_and(|p| !p.copy()) => {
+            return Err("text: this document's security settings don't allow copying or extracting text; open it with --password <owner password>".into());
+        }
+        Ok(_) => {}
+        Err(pdfcraft_cos::CosError::NeedsPassword) => return Err("text: this document needs a password; pass --password <password>".into()),
+        Err(pdfcraft_cos::CosError::WrongPassword) => return Err("text: the password is wrong".into()),
+        Err(e) if matches!(e, pdfcraft_cos::CosError::Security(_)) || bytes.windows(8).any(|w| w == b"/Encrypt") => {
+            return Err(format!("text: can't check this encrypted document's permissions ({e})").into());
+        }
+        Err(_) => {}
     }
     let mut r = PageRenderer::new(bytes.clone(), RenderConfig { password: password.map(Arc::from), ..Default::default() });
     // A document the renderer could not open (wrong or missing password, unparseable file) has

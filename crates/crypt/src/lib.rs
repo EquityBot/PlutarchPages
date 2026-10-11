@@ -184,6 +184,13 @@ impl SecurityHandler {
         self.auth
     }
 
+    /// Treat an owner authentication as a user one, so the document's permissions apply. The file
+    /// key is the same either way; only what the reader allows changes. For a document opened
+    /// without a password whose empty password authenticates as both owner and user.
+    pub fn open_as_user(&mut self) {
+        self.auth = Auth::User;
+    }
+
     /// For R2–R4 documents opened with the owner password: the user password, which owner
     /// authentication recovers (Algorithm 7). Lets components that only accept user passwords
     /// open the document too.

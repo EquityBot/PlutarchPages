@@ -359,7 +359,7 @@ impl Document {
             Some(Object::Array(a)) => a.first().and_then(|s| s.as_string()).map(|s| s.bytes.clone()).unwrap_or_default(),
             _ => Vec::new(),
         };
-        let handler = pdfcraft_crypt::SecurityHandler::open(params, &id0, password).map_err(|e| match e {
+        let mut handler = pdfcraft_crypt::SecurityHandler::open(params, &id0, password).map_err(|e| match e {
             pdfcraft_crypt::CryptError::WrongPassword if password.is_none() => CosError::NeedsPassword,
             pdfcraft_crypt::CryptError::WrongPassword => CosError::WrongPassword,
             other => CosError::Security(other.to_string()),
@@ -368,12 +368,16 @@ impl Document {
         // empty password still authenticates as *owner*. Opening owner-first would then reveal
         // the content with no prompt (#603). When the caller supplied no password and the empty
         // password did not authenticate as the user, the Document Open password is mandatory:
-        // refuse so the caller prompts, exactly as if the empty password were simply wrong.
-        if password.is_none()
-            && handler.auth() == pdfcraft_crypt::Auth::Owner
-            && !handler.authenticates_empty_user(&id0)
-        {
-            return Err(CosError::NeedsPassword);
+        // refuse so the caller prompts, exactly as if the empty password were simply wrong. An
+        // explicit empty password counts as no password. When the empty password is the user
+        // password too, open as the user, so the document's restrictions apply rather than being
+        // lifted silently by an empty owner password.
+        if password.is_none_or(str::is_empty) && handler.auth() == pdfcraft_crypt::Auth::Owner {
+            if handler.authenticates_empty_user(&id0) {
+                handler.open_as_user();
+            } else {
+                return Err(CosError::NeedsPassword);
+            }
         }
         self.security = Some(Arc::new(handler));
         self.encrypt_num = num;

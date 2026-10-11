@@ -263,9 +263,9 @@ pub struct DocView {
     pub zoom: f32,
     pub fit: Fit,
     pub layout: PageLayout,
-    /// The document's security allows copying / extracting text (Table 22, bit 5). Set from the
-    /// engine on open; owner-password and unencrypted documents are `true`. ⌘C and the context
-    /// menu's Copy honour it (#568).
+    /// The document's security allows copying / extracting text (Table 22, bit 5). `false` until
+    /// `PdfCraftApp::view_for` sets it from the engine; owner-password and unencrypted documents
+    /// are `true`. ⌘C and the context menu's Copy honour it (#568).
     pub copy_allowed: bool,
     /// View rotation in degrees clockwise (0, 90, 180, 270); display only, never saved.
     pub rotation: u16,
@@ -501,8 +501,9 @@ impl DocView {
             zoom: defaults.zoom,
             fit: defaults.fit,
             layout: defaults.layout,
-            // Permissive by default; the opener lowers it for a copy-restricted document (#568).
-            copy_allowed: true,
+            // Restricted until the app sets it from the engine (`PdfCraftApp::view_for`), so a view
+            // made by any other path can't copy from a copy-restricted document (#568).
+            copy_allowed: false,
             rotation: 0,
             current: 0,
             organize: false,

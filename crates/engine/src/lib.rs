@@ -2226,7 +2226,7 @@ impl Session {
         // empty password authenticate as *owner*. The COS reader refuses that silent open with
         // NeedsPassword; the renderer (hayro) opens R5/6 owner-first and would not. Honour the
         // COS verdict so the user is always prompted instead of shown the content.
-        if password.is_none() && matches!(&cos, Ok(Err(pdfcraft_cos::CosError::NeedsPassword))) {
+        if password.is_none_or(str::is_empty) && matches!(&cos, Ok(Err(pdfcraft_cos::CosError::NeedsPassword))) {
             return Err(OpenError::NeedsPassword);
         }
         // The renderer authenticates on its own. It cannot use the owner password of R2–R4

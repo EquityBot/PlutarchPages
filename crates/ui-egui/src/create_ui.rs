@@ -99,8 +99,8 @@ impl PdfCraftApp {
     fn open_created_bytes(&mut self, name: &str, created: Result<Arc<Vec<u8>>, String>) -> Result<(), String> {
         let bytes = created?;
         let id = self.session.open_new(name, bytes).map_err(|e| e.to_string())?;
-        let info = &self.session.get(id).ok_or("the new document could not be opened")?.info;
-        self.views.push(crate::DocView::new(id, info, self.view_defaults));
+        let view = self.view_for(id).ok_or("the new document could not be opened")?;
+        self.views.push(view);
         self.active = Some(self.views.len() - 1);
         Ok(())
     }

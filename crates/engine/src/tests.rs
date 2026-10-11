@@ -635,6 +635,40 @@ fn restricted_documents_refuse_changes_unless_opened_by_the_owner() {
     s.apply(oid, Edit::DeletePages { pages: vec![0] }).unwrap();
 }
 
+/// The Document Open password matrix (#603) for every algorithm: no password and an explicit
+/// empty password behave the same, a non-empty user password always prompts even when the owner
+/// password is empty, and an empty password that is both user and owner opens as the user, so
+/// the document's restrictions still apply.
+#[test]
+fn empty_passwords_never_lift_restrictions_or_skip_the_open_prompt() {
+    use pdfcraft_cos::Algorithm::{Aes128, Aes256, Rc4_40, Rc4_128};
+    let make = |algorithm, user, owner| {
+        let mut doc = pdfcraft_cos::Document::open(Arc::new(fixture(1))).unwrap();
+        doc.set_encryption(&pdfcraft_cos::NewEncryption { algorithm, user_password: user, owner_password: owner, permissions: 0b0100, encrypt_metadata: true, seed: [3; 32] })
+            .unwrap();
+        Arc::new(pdfcraft_cos::write_full(&doc, &Default::default()).unwrap())
+    };
+    for alg in [Rc4_40, Rc4_128, Aes128, Aes256] {
+        let mut s = Session::new();
+        // Both empty: opens without a prompt, as the user (print only, no copying).
+        let both = make(alg, "", "");
+        for pw in [None, Some("")] {
+            let id = s.open("both.pdf", None, both.clone(), pw).unwrap_or_else(|e| panic!("{alg:?} {pw:?}: {e}"));
+            let d = s.get(id).unwrap();
+            assert!(!d.allows_copy() && !d.allows_assembly(), "{alg:?} {pw:?}: the empty password must not open as owner");
+        }
+        // A Document Open password with an empty owner password: always prompts.
+        let open_pw = make(alg, "secret", "");
+        for pw in [None, Some("")] {
+            assert!(s.open("open.pdf", None, open_pw.clone(), pw).is_err(), "{alg:?} {pw:?}: must ask for the Document Open password");
+        }
+        assert!(s.open("open.pdf", None, open_pw, Some("secret")).is_ok(), "{alg:?}");
+        // An ordinary restricted file: opens as the user without a prompt.
+        let id = s.open("r.pdf", None, make(alg, "", "owner"), None).unwrap();
+        assert!(!s.get(id).unwrap().allows_copy(), "{alg:?}");
+    }
+}
+
 #[test]
 fn combining_protected_files_is_refused_clearly() {
     let s = Session::new();
