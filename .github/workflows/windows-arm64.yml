@@ -77,7 +77,7 @@ jobs:
           # their handlers machine-wide (#305). This runs on a disposable CI runner.
           $p = Start-Process msiexec.exe -WindowStyle Hidden -ArgumentList '/i', "`"$msi`"", '/qn', 'ALLUSERS=2', 'MSIINSTALLPERUSER=1', '/l*v', 'per-user.log' -Wait -PassThru
           if ($p.ExitCode -ne 1603) { Get-Content per-user.log -Tail 60; throw "per-user install should fail with 1603, got $($p.ExitCode)" }
-          if (-not (Select-String -Path per-user.log -SimpleMatch 'PdfCraft must be installed for all users.')) {
+          if (-not (Select-String -Path per-user.log -SimpleMatch 'PlutarchPages must be installed for all users.')) {
             Get-Content per-user.log -Tail 60; throw 'per-user install did not fail on the scope guard'
           }
           $p = Start-Process msiexec.exe -ArgumentList '/i', "`"$msi`"", '/qn', '/l*v', 'install.log' -Wait -PassThru

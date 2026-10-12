@@ -35,7 +35,7 @@ function Assert-NoRow([string] $Sql, [string] $What) {
 # Test the compiled condition with Windows Installer's evaluator, in a restricted session that
 # cannot change machine state. Normal installs/repairs work, per-user overrides fail, and removal
 # of an older incorrectly scoped installation remains possible (#305).
-$scopeMessage = 'PdfCraft must be installed for all users. Run setup with administrator privileges and ALLUSERS=1; per-user installation is not supported.'
+$scopeMessage = 'PlutarchPages must be installed for all users. Run setup with administrator privileges and ALLUSERS=1; per-user installation is not supported.'
 $scopeCondition = Read-Row ('SELECT `Condition` FROM `LaunchCondition` WHERE `Description` = ''' + $scopeMessage + '''') 1
 $Installer.UILevel = 2
 $session = $null
@@ -68,7 +68,7 @@ foreach ($sequence in @('InstallUISequence', 'InstallExecuteSequence')) {
   }
 }
 $manufacturer = Read-Row 'SELECT `Value` FROM `Property` WHERE `Property` = ''Manufacturer''' 1
-Assert-Equal $manufacturer[0] 'Learning Machines LLC' 'MSI manufacturer'
+Assert-Equal $manufacturer[0] 'PlutarchPages contributors' 'MSI manufacturer'
 $status = Read-Row 'SELECT `Text` FROM `Control` WHERE `Dialog_` = ''InstallProgress'' AND `Control` = ''Status''' 1
 Assert-Equal $status[0] 'Please wait while setup completes.' 'Persistent progress message'
 Assert-NoRow 'SELECT `Event` FROM `EventMapping` WHERE `Dialog_` = ''InstallProgress'' AND `Control_` = ''Status''' 'progress text subscription'

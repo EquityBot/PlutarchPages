@@ -218,6 +218,14 @@ pub fn tools() -> Vec<ToolDef> {
                 }),
                 &["paths"],
             )),
+        t("doc_convert_gray", "Convert colours to grayscale", "Convert pages (1-based; default all) to grayscale, like PDF-XChange's Color Converter and Acrobat's Convert Colors: fill and stroke colours in RGB, CMYK, CalRGB, CalGray and ICC-based spaces become DeviceGray by luminance, in page content and the forms it draws, and RGB images (8-bit Flate or JPEG) become gray images. Separation, DeviceN, Indexed, Lab, patterns, shadings and inline images are left and counted in `left`. Undoable.")
+            .cmd("edit.convert_gray")
+            .with(schema(json!({ "doc": doc(), "pages": { "type": "array", "items": { "type": "integer", "minimum": 1 }, "minItems": 1 } }), &["doc"])),
+        t("speech_start", "Read Out Loud", "Read pages of a document aloud with the system's speech program (Windows speech, macOS say, or eSpeak NG on Linux), replacing anything being read. pages (1-based) defaults to the first 50. Reading aloud is assistive use, allowed whatever the document's copy permission; the text goes only to the speech program and is not returned.")
+            .cmd("view.read_aloud")
+            .with(schema(json!({ "doc": doc(), "pages": { "type": "array", "items": { "type": "integer", "minimum": 1 }, "minItems": 1, "maxItems": 500 } }), &["doc"])),
+        t("speech_stop", "Stop reading", "Stop Read Out Loud.").cmd("view.stop_reading").with(schema(json!({}), &[])),
+        t("speech_status", "Read Out Loud status", "Whether Read Out Loud is speaking now.").ro().with(schema(json!({}), &[])),
         t("doc_create_multiple", "Create PDF from multiple files", "Convert several files (PDFs, PNG/JPEG/JPEG 2000/TIFF/GIF/BMP images, .txt files) to PDF in one run. mode \"combine\" (default) joins them, in order, into one PDF with a bookmark per file; pages optionally chooses each file's pages, in step with paths (a range such as \"1-3, 6\" or null). mode \"separate\" writes one PDF per file into out_dir (files that are already PDFs are skipped; existing files are never overwritten) and reports each file's result.")
             .cmd("create.multiple")
             .with(schema(
@@ -266,6 +274,11 @@ pub fn tools() -> Vec<ToolDef> {
         )),
         t("bookmark_set_page", "Set a bookmark's page", "Point a bookmark at another page. Undoable.")
             .with(schema(json!({ "doc": doc(), "path": path("The bookmark"), "page": { "type": "integer", "minimum": 1 } }), &["doc", "path", "page"])),
+        t("bookmark_set_style", "Set a bookmark's style", "Set a bookmark's text colour (#RRGGBB; omit or \"\" for the default black) and bold and italic (default off). doc_info's outline shows them. Undoable.")
+            .with(schema(
+                json!({ "doc": doc(), "path": path("The bookmark"), "color": { "type": "string", "maxLength": 7 }, "bold": { "type": "boolean" }, "italic": { "type": "boolean" } }),
+                &["doc", "path"],
+            )),
         t(
             "bookmark_from_structure",
             "New bookmarks from structure",
@@ -408,7 +421,7 @@ pub fn tools() -> Vec<ToolDef> {
         t(
             "redact_apply",
             "Apply redactions",
-            "Apply the redaction marks (all, or those on pages): text, images, vectors, comments and form fields under them are removed for good and boxes are drawn in their place. A verification pass fails the operation if anything readable remains. Undoable until saved; the saved file no longer contains the content.",
+            "Apply the redaction marks (all, or those on pages): text, images, vectors, comments and form fields under them are removed for good and boxes are drawn in their place. A verification pass fails the operation if anything readable remains. It also refuses, changing nothing, when content under the marks is drawn somewhere no mark covers (the error names the pages to mark too). An image or form marked in more than one place loses every place's marked parts in each; shared_redacted counts those draws. Undoable until saved; the saved file no longer contains the content.",
         )
         .destructive()
         .with(schema(json!({ "doc": doc(), "pages": pages("whose marks to apply (default: all)") }), &["doc"])),
@@ -789,7 +802,7 @@ pub fn tools() -> Vec<ToolDef> {
                 json!({ "doc": doc(), "pages": pages("to fill (default: all)"), "color": { "type": "string" }, "file": { "type": "string" }, "file_page": { "type": "integer", "minimum": 1 }, "scale": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 }, "opacity": { "type": "number", "minimum": 0, "maximum": 1 }, "replace": { "type": "boolean" } }),
                 &["doc"],
             )),
-        t("doc_remove_marks", "Remove header & footer, watermark or background", "Remove every header and footer, watermark or background PdfCraft (or a compatible tool) added. Undoable.")
+        t("doc_remove_marks", "Remove header & footer, watermark or background", "Remove every header and footer, watermark or background PlutarchPages (or a compatible tool) added. Undoable.")
             .destructive()
             .with(schema(json!({ "doc": doc(), "kind": { "type": "string", "enum": ["header_footer", "watermark", "background"] } }), &["doc", "kind"])),
         t("doc_export_images", "Export pages as images", "Write pages as PNG, JPEG or TIFF files (`<name>_page_<n>.png|jpg|tif`) into a folder, at a resolution (default 150 dpi). JPEG and TIFF are flattened onto white paper. A page too large for the renderer at that resolution is drawn at the most it allows, listed in `lower_dpi` ({page, dpi}). Includes unsaved edits.")
@@ -863,7 +876,7 @@ pub fn tools() -> Vec<ToolDef> {
                 json!({ "doc": doc(), "field": { "type": "string" }, "event": { "type": "string", "enum": ["keystroke", "format", "validate", "calculate", "mouse_up"] }, "script": { "type": "string" } }),
                 &["doc", "field", "event"],
             )),
-        t("doc_export_office", "Export to Word, HTML or RTF", "Export a PDF ▸ Word (.docx), HTML (.html, one file with images inline) or RTF (.rtf), chosen by path's extension: paragraphs in reading order, headings from larger text, bold and italic, images where they fall, a page break between pages.")
+        t("doc_export_office", "Export to Word, Excel, HTML or RTF", "Export a PDF ▸ Word (.docx), Excel (.xlsx: one worksheet per page, detected tables as rows and columns, other paragraphs one row each, plain numbers as numbers), HTML (.html, one file with images inline) or RTF (.rtf), chosen by path's extension: paragraphs in reading order, headings from larger text, bold and italic, images where they fall, a page break between pages.")
             .cmd("export.docx")
             .with(schema(json!({ "doc": doc(), "path": { "type": "string" } }), &["doc", "path"])),
         t("pdfa_verify", "Verify PDF/A", "Standards ▸ Verify PDF/A compliance: the PDF/A-2b or 3b rules the document breaks (ISO 19005 clause, message, page, whether Save as PDF/A can fix it), plus what it declares.")
@@ -983,15 +996,17 @@ pub fn tools() -> Vec<ToolDef> {
         t(
             "doc_create",
             "Create a PDF",
-            "Create a new, unsaved document and return it like doc_open: `blank` (pages, width, height in points; default 1 US Letter page), `images` (paths of PNG, JPEG, TIFF (every page), GIF or BMP files, one page each at the image's resolution) or `text` (a .txt path, or `text` directly). Save it with doc_save and a path.",
+            "Create a new, unsaved document and return it like doc_open: `blank` (pages, width, height in points; default 1 US Letter page), `images` (paths of PNG, JPEG, TIFF (every page), GIF or BMP files, one page each at the image's resolution) `text` (a .txt path, or `text` directly), `csv` (a .csv or .tsv path, or `text`: a table with a repeated header row; wide tables on landscape pages), `markdown` (a .md path, or `text`) or `email` (an .eml path: headers and text; attachments are listed, and embedded only with `embed_attachments`). The result's `notes` say what the conversion couldn't keep (characters the built-in fonts can't show are written as ?). With the external converters turned on (PDFCRAFT_EXTERNAL_CONVERTERS=1 when the CLI or MCP server starts; off by default), also `office` (a .doc, .docx, .odt, .rtf, .xls, .xlsx, .ods, .ppt, .pptx or .odp path, through an installed LibreOffice 26.2.5 or later), `html` (an .html path, through an installed Chrome or Edge with scripts off and set to refuse network requests) and `web_page` (an http or https `url`, printed by Chrome or Edge in a fresh private profile; addresses naming this computer or a private network are refused, but the page itself can still redirect to or load from them, so use only pages you trust). Save it with doc_save and a path.",
         )
         .with(schema(
             json!({
-                "from": { "type": "string", "enum": ["blank", "images", "text"] },
+                "from": { "type": "string", "enum": ["blank", "images", "text", "csv", "markdown", "email", "office", "html", "web_page"] },
+                "url": { "type": "string", "maxLength": 2048, "description": "For web_page: the page's http or https address." },
                 "paths": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
                 "dpi": { "type": "number", "minimum": 1, "maximum": 1200, "description": "For images: override the embedded resolution without resampling. 72 gives one point per pixel; omit to use each image's resolution (72 when absent)." },
                 "text": { "type": "string" },
                 "path": { "type": "string" },
+                "embed_attachments": { "type": "boolean", "description": "For email: also embed the attachments as PDF file attachments (default false: listed only)." },
                 "pages": { "type": "integer", "minimum": 1, "maximum": 10000 },
                 "width": { "type": "number", "minimum": 3 },
                 "height": { "type": "number", "minimum": 3 },
@@ -1080,7 +1095,7 @@ pub fn tools() -> Vec<ToolDef> {
             .with(schema(json!({ "doc": doc() }), &["doc"])),
         t("doc_open_revision", "Open a revision", "Open saved revision `revision` (1 = the oldest) of a document as a new, unsaved document, to see the file as it was then.")
             .with(schema(json!({ "doc": doc(), "revision": { "type": "integer", "minimum": 1 } }), &["doc", "revision"])),
-        t("doc_optimize", "Optimize PDF", "Write an optimized copy to `path` (Acrobat's PDF Optimizer). color / gray: { downsample, ppi, above_ppi, compression: jpeg|zip|retain, quality 1–100 } (defaults: downsample to 150 ppi above 225, JPEG 60). Images are measured where pages draw them and replaced only when smaller. discard_*: thumbnails (default true), alternate_images (true), tags, print_settings; flate_unencoded (true); remove_invalid_links and remove_unreferenced_dests (true); images and forms the pages list but never draw are always dropped (unused_xobjects). discard: Remove Hidden Information categories (metadata, attachments, comments, form-fields, hidden-text, hidden-layers, bookmarks, links-actions-scripts, private-data). Signed documents are refused. The open document is unchanged.")
+        t("doc_optimize", "Optimize PDF", "Write an optimized copy to `path` (Acrobat's PDF Optimizer). color / gray: { downsample, ppi, above_ppi, compression: jpeg|zip|retain, quality 1–100 } (defaults: downsample to 150 ppi above 225, JPEG 60). Images are measured where pages draw them and replaced only when smaller. discard_*: thumbnails (default true), alternate_images (true), tags, print_settings, form_actions (submit, import and reset), external_refs (links to other files and launch actions; web links stay); remove_standards_id (PDF/A and PDF/X identification); flate_unencoded (true); remove_invalid_links and remove_unreferenced_dests (true); images and forms the pages list but never draw are always dropped (unused_xobjects). discard: Remove Hidden Information categories (metadata, attachments, comments, form-fields, hidden-text, hidden-layers, bookmarks, links-actions-scripts, private-data). Signed documents are refused. The open document is unchanged.")
             .cmd("optimize.advanced")
             .with(schema(
                 json!({
@@ -1092,6 +1107,9 @@ pub fn tools() -> Vec<ToolDef> {
                     "discard_alternate_images": { "type": "boolean" },
                     "discard_tags": { "type": "boolean" },
                     "discard_print_settings": { "type": "boolean" },
+                    "discard_form_actions": { "type": "boolean" },
+                    "discard_external_refs": { "type": "boolean" },
+                    "remove_standards_id": { "type": "boolean" },
                     "flate_unencoded": { "type": "boolean" },
                     "remove_invalid_links": { "type": "boolean" },
                     "remove_unreferenced_dests": { "type": "boolean" },
@@ -1104,7 +1122,7 @@ pub fn tools() -> Vec<ToolDef> {
             .with(schema(json!({ "doc": doc(), "comments": { "type": "boolean", "description": "Default true." }, "fields": { "type": "boolean", "description": "Default true." } }), &["doc"])),
         t("edit_undo", "Undo", "Undo the last edit of a document.").cmd("edit.undo").with(schema(json!({ "doc": doc() }), &["doc"])),
         t("edit_redo", "Redo", "Redo the last undone edit of a document.").cmd("edit.redo").with(schema(json!({ "doc": doc() }), &["doc"])),
-        t("command_list", "List commands", "Every registered PdfCraft command with its menu, shortcut, whether it is enabled now, and the tool that automates it.")
+        t("command_list", "List commands", "Every registered PlutarchPages command with its menu, shortcut, whether it is enabled now, and the tool that automates it.")
             .ro()
             .with(schema(json!({ "doc": doc(), "filter":{"type":"string"}, "enabled_only":{"type":"boolean"} }), &[])),
         t("command_run", "Run a command", "Run a registry command through its headless tool. Pass that tool's arguments in params (see command_list). Unknown params are ignored with warnings; path confinement still applies.")

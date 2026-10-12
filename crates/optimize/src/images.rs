@@ -111,7 +111,7 @@ pub fn effective_resolutions(doc: &Document, pages: &[ObjRef]) -> HashMap<ObjRef
 }
 
 /// Colour components of a colour space PdfCraft resamples: gray (1) or RGB (3).
-fn components(doc: &Document, cs: &Object) -> Option<usize> {
+pub(crate) fn components(doc: &Document, cs: &Object) -> Option<usize> {
     let cs = doc.resolve(cs);
     match &*cs {
         Object::Name(n) => match n.as_slice() {
@@ -179,7 +179,7 @@ fn is_dct(s: &Stream) -> Option<bool> {
 }
 
 /// 8-bit samples of an image (`n` components), decoded.
-fn pixels(s: &Stream, n: usize) -> Option<Vec<u8>> {
+pub(crate) fn pixels(s: &Stream, n: usize) -> Option<Vec<u8>> {
     let (w, h) = (s.dict.int(b"Width")? as usize, s.dict.int(b"Height")? as usize);
     if is_dct(s)? {
         let img = image::load_from_memory_with_format(&s.raw, image::ImageFormat::Jpeg).ok()?;
@@ -210,7 +210,7 @@ fn jpeg(px: &[u8], n: usize, w: u32, h: u32, quality: u8) -> Option<Vec<u8>> {
 
 /// Whether `decode` is the default decode array for `n` components ([0 1] each), which changes
 /// nothing. Scanners write it on page images (#490).
-fn is_identity_decode(doc: &Document, decode: &Object, n: usize) -> bool {
+pub(crate) fn is_identity_decode(doc: &Document, decode: &Object, n: usize) -> bool {
     let decode = doc.resolve(decode);
     let Some(a) = decode.as_array() else { return false };
     a.len() == 2 * n && a.chunks(2).all(|p| matches!(p, [lo, hi] if doc.resolve(lo).as_f64() == Some(0.0) && doc.resolve(hi).as_f64() == Some(1.0)))

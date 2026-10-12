@@ -57,6 +57,7 @@ pub fn show(app: &mut PdfCraftApp, ctx: &egui::Context) {
     let mut ocr_now = false;
     let mut compare_now = false;
     let mut images_now = false;
+    let mut web_now = false;
     let mut stamp_now = false;
     let mut alt_now = false;
     let t = Tokens::get(ctx);
@@ -82,6 +83,12 @@ pub fn show(app: &mut PdfCraftApp, ctx: &egui::Context) {
             Dialog::CreateImages => {
                 let (go, cancel) = crate::create_ui::image_import_body(ui, app);
                 images_now = go;
+                close = go || cancel;
+                return;
+            }
+            Dialog::WebPage => {
+                let (go, cancel) = crate::external_ui::web_page_body(ui, app);
+                web_now = go;
                 close = go || cancel;
                 return;
             }
@@ -1011,7 +1018,7 @@ pub fn show(app: &mut PdfCraftApp, ctx: &egui::Context) {
                     ui.label(egui::RichText::new(tl!("Recover unsaved documents?")).font(theme::semibold(18.0)));
                 });
                 ui.add_space(6.0);
-                ui.label(tl!("PdfCraft didn't shut down normally. These documents had changes that were autosaved:"));
+                ui.label(tl!("PlutarchPages didn't shut down normally. These documents had changes that were autosaved:"));
                 ui.add_space(8.0);
                 let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
                 egui::Grid::new("recoverable").num_columns(2).spacing([18.0, 6.0]).show(ui, |ui| {
@@ -1099,13 +1106,8 @@ pub fn show(app: &mut PdfCraftApp, ctx: &egui::Context) {
                     1 => crate::credits::contributors_ui(ui),
                     2 => crate::credits::models_ui(ui),
                     _ => {
-                        ui.horizontal(|ui| {
-                            widgets::artcraft_mark(ui, 40.0);
-                            ui.vertical(|ui| {
-                                ui.label(egui::RichText::new("PdfCraft").font(theme::semibold(20.0)));
-                                ui.label(crate::i18n::fmt(tl!("Version {v}"), &[("v", env!("CARGO_PKG_VERSION"))]));
-                            });
-                        });
+                        ui.label(egui::RichText::new("PlutarchPages").font(theme::semibold(20.0)));
+                        ui.label(crate::i18n::fmt(tl!("Version {v}"), &[("v", env!("CARGO_PKG_VERSION"))]));
                         ui.add_space(6.0);
                         ui.label(tl!("A clean-room, open-source PDF application written in Rust. MIT OR Apache-2.0."));
                         ui.label(
@@ -1116,10 +1118,10 @@ pub fn show(app: &mut PdfCraftApp, ctx: &egui::Context) {
                             .small(),
                         );
                         ui.add_space(12.0);
-                        ui.horizontal(|ui| {
-                            ui.label(egui::RichText::new(tl!("Part of")).color(t.text_muted));
-                            widgets::artcraft_logo(ui, 16.0);
-                        });
+                        ui.label(
+                            egui::RichText::new(tl!("A fork of PdfCraft by the ArtCraft team. PlutarchPages is not an ArtCraft product."))
+                                .color(t.text_muted),
+                        );
                         ui.add_space(6.0);
                         if let Some(cmd) = widgets::community_links(ui) {
                             link_command = Some(cmd);
@@ -1243,7 +1245,13 @@ pub fn show(app: &mut PdfCraftApp, ctx: &egui::Context) {
         Some(Dialog::RedactApply) => {
             let marks = app.active_ids().and_then(|(_, id)| app.session.get(id)).map_or(0, |d| d.redaction_marks());
             if app.apply_edit(Edit::ApplyRedactions { pages: None }) {
-                if marks == 1 {
+                let shared = app.session.last_redaction_report().map_or(0, |r| r.shared_redacted);
+                if shared > 0 {
+                    app.notify_fmt(
+                        "Applied {n} redaction marks. {shared} appearances of images or forms used in more than one place were redacted with the marks from all of them. Save to remove the content from the file.",
+                        &[("n", &marks.to_string()), ("shared", &shared.to_string())],
+                    );
+                } else if marks == 1 {
                     app.notify_tr("Applied 1 redaction mark. Save to remove the content from the file.");
                 } else {
                     app.notify_fmt("Applied {n} redaction marks. Save to remove the content from the file.", &[("n", &marks.to_string())]);
@@ -1325,6 +1333,9 @@ pub fn show(app: &mut PdfCraftApp, ctx: &egui::Context) {
     }
     if stamp_now {
         app.save_custom_stamp();
+    }
+    if web_now {
+        app.start_web_page();
     }
     if images_now {
         app.finish_image_import();

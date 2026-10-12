@@ -433,8 +433,8 @@ impl PdfCraftApp {
         let Some((_, id)) = self.active_ids() else { return };
         match self.session.open_revision(id, n) {
             Ok(new) => {
-                let Some(doc) = self.session.get(new) else { return };
-                self.views.push(DocView::new(new, &doc.info, self.view_defaults));
+                let Some(view) = self.view_for(new) else { return };
+                self.views.push(view);
                 self.active = Some(self.views.len() - 1);
             }
             Err(e) => self.notify_fmt("Couldn't open revision {n}: {e}", &[("n", &n.to_string()), ("e", &e.to_string())]),
@@ -449,8 +449,8 @@ impl PdfCraftApp {
         let name = format!("{} (signed version)", doc.name.trim_end_matches(".pdf"));
         match self.session.open(format!("{name}.pdf"), None, std::sync::Arc::new(bytes), doc.password.clone().as_deref()) {
             Ok(new) => {
-                let Some(doc) = self.session.get(new) else { return };
-                self.views.push(DocView::new(new, &doc.info, self.view_defaults));
+                let Some(view) = self.view_for(new) else { return };
+                self.views.push(view);
                 self.active = Some(self.views.len() - 1);
             }
             Err(e) => self.notify_fmt("Couldn't open the signed version: {e}", &[("e", &e.to_string())]),
@@ -771,9 +771,9 @@ fn sign_as(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens) -> bool {
             ui.label("");
             ui.label(
                 egui::RichText::new(if entry.path.starts_with("windows:") {
-                    tl!("The key is in the Windows certificate store, which may ask to allow PdfCraft to use it.")
+                    tl!("The key is in the Windows certificate store, which may ask to allow PlutarchPages to use it.")
                 } else {
-                    tl!("The key is in the macOS Keychain, which may ask to allow PdfCraft to use it.")
+                    tl!("The key is in the macOS Keychain, which may ask to allow PlutarchPages to use it.")
                 })
                 .small()
                 .color(t.text_muted),

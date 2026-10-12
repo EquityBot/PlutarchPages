@@ -110,7 +110,7 @@ fn view_history_select_all_and_find_options() {
     h.state_mut().views[0].rerun_find();
     // Find runs in the background: wait for it by a deadline, not a frame count, which a loaded
     // machine (the whole workspace testing at once) can use up before the last page is searched.
-    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(20);
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(60);
     while std::time::Instant::now() < deadline && h.state().views[0].find.as_ref().unwrap().matches.len() < 15 {
         h.run_steps(2);
         std::thread::sleep(std::time::Duration::from_millis(5));
@@ -356,7 +356,7 @@ fn tab_and_window_show_the_document_title_when_asked() {
     use pdfcraft_engine::Edit;
     let mut h = harness();
     h.run_steps(2);
-    assert_eq!(h.state().window_title, "b.pdf — PdfCraft");
+    assert_eq!(h.state().window_title, "b.pdf — PlutarchPages");
     {
         let s = h.state_mut();
         let id = s.views[s.active.unwrap()].id;
@@ -366,7 +366,7 @@ fn tab_and_window_show_the_document_title_when_asked() {
         s.session.apply(id, Edit::SetInitialView(Box::new(v))).unwrap();
     }
     h.run_steps(2);
-    assert_eq!(h.state().window_title, "Quarterly report — PdfCraft");
+    assert_eq!(h.state().window_title, "Quarterly report — PlutarchPages");
     h.get_by_label_contains("Quarterly report");
 }
 
@@ -385,7 +385,7 @@ fn a_placeholder_title_leaves_the_file_name_on_the_tab_and_window() {
         s.session.apply(id, Edit::SetInitialView(Box::new(v))).unwrap();
     }
     h.run_steps(2);
-    assert_eq!(h.state().window_title, "b.pdf — PdfCraft");
+    assert_eq!(h.state().window_title, "b.pdf — PlutarchPages");
     assert!(h.query_by_label_contains("about:blank").is_none());
 }
 

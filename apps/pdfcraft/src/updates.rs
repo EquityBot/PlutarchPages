@@ -17,7 +17,7 @@ pub fn latest_release() -> Result<Release, String> {
     let mut response = agent
         .get(LATEST)
         .header("Accept", "application/vnd.github+json")
-        .header("User-Agent", concat!("PdfCraft/", env!("CARGO_PKG_VERSION")))
+        .header("User-Agent", concat!("PlutarchPages/", env!("CARGO_PKG_VERSION")))
         // Read error statuses ourselves: a 403 from GitHub usually means its anonymous
         // rate limit ran out, and the retry time rides along in a response header.
         .config()

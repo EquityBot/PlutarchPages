@@ -263,6 +263,10 @@ pub struct DocView {
     pub zoom: f32,
     pub fit: Fit,
     pub layout: PageLayout,
+    /// The document's security allows copying / extracting text (Table 22, bit 5). `false` until
+    /// `PdfCraftApp::view_for` sets it from the engine; owner-password and unencrypted documents
+    /// are `true`. ⌘C and the context menu's Copy honour it (#568).
+    pub copy_allowed: bool,
     /// View rotation in degrees clockwise (0, 90, 180, 270); display only, never saved.
     pub rotation: u16,
     pub current: usize,
@@ -497,6 +501,9 @@ impl DocView {
             zoom: defaults.zoom,
             fit: defaults.fit,
             layout: defaults.layout,
+            // Restricted until the app sets it from the engine (`PdfCraftApp::view_for`), so a view
+            // made by any other path can't copy from a copy-restricted document (#568).
+            copy_allowed: false,
             rotation: 0,
             current: 0,
             organize: false,
@@ -828,8 +835,12 @@ impl DocView {
         Some(xf.view_rect(g.rect).center())
     }
 
-    /// Selected text, if any (⌘C).
+    /// Selected text, if any (⌘C). Yields nothing when the document's security forbids copying,
+    /// so neither ⌘C nor the Copy menu can extract text from a restricted document (#568).
     pub fn selected_text(&self) -> Option<String> {
+        if !self.copy_allowed {
+            return None;
+        }
         let s = self.selection?;
         let t = self.texts.get(&s.page)?;
         Some(s.text(t)).filter(|x| !x.is_empty())
@@ -2880,7 +2891,7 @@ fn run_button(app: &mut PdfCraftApp, index: usize, name: &str, action: pdfcraft_
         }
         B::Alert(m) => app.notify(m),
         B::Submit(url) => app.notify_fmt(
-            "{name} submits the form to {url}; PdfCraft doesn't send form data. Save the document to keep your entries.",
+            "{name} submits the form to {url}; PlutarchPages doesn't send form data. Save the document to keep your entries.",
             &[("name", name), ("url", &url)],
         ),
         B::ImportIcon => app.choose_field_image(name),
@@ -3056,7 +3067,7 @@ fn notices(
     } else if info.xfa == Some(pdfcraft_render::Xfa::Dynamic) {
         Some((
             "triangle-alert",
-            tl!("This is a dynamic XFA form, which PdfCraft can't display yet. What you see is the file's placeholder page.").to_string(),
+            tl!("This is a dynamic XFA form, which PlutarchPages can't display yet. What you see is the file's placeholder page.").to_string(),
             false,
         ))
     } else if info.xfa == Some(pdfcraft_render::Xfa::Static) {

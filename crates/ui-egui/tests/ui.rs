@@ -32,7 +32,7 @@ fn harness(setup: impl FnOnce(&mut PdfCraftApp) + 'static) -> Harness<'static, P
 #[test]
 fn home_shows_welcome_and_tools() {
     let h = harness(|_| {});
-    h.get_by_label_contains("Welcome to PdfCraft");
+    h.get_by_label_contains("Welcome to PlutarchPages");
     assert!(h.query_all_by_label("Organize pages").count() >= 2, "tool list + home card");
     h.get_by_label("Open file");
 }
@@ -89,7 +89,7 @@ fn home_removes_one_recent_file_or_clears_them_all() {
     h.get_by_label("Clear Recent Files").click();
     h.run_steps(2);
     assert!(h.state().recent.is_empty(), "Clear empties the list");
-    h.get_by_label_contains("Files you open in PdfCraft appear here");
+    h.get_by_label_contains("Files you open in PlutarchPages appear here");
     assert!(h.query_by_label("Clear Recent Files").is_none(), "and goes away with nothing left to clear");
 }
 
@@ -189,8 +189,9 @@ fn tabs_shrink_to_fit_then_arrows_step_through_them_and_open_stays_in_sight() {
         }
     });
     let open = h.get_by_label("Open").rect();
-    let discord = h.get_by_label("Discord").rect();
-    assert!(open.right() <= discord.left(), "Open {open:?} must not run under Discord {discord:?}");
+    // The leftmost of the buttons on the right (PlutarchPages has no Discord button).
+    let shortcuts = h.get_by_label("Keyboard shortcuts").rect();
+    assert!(open.right() <= shortcuts.left(), "Open {open:?} must not run under the buttons {shortcuts:?}");
     let mut previous_right = f32::MIN;
     for i in 0..5 {
         let tab = h.get_by_label(&name(i)).rect();
@@ -214,15 +215,15 @@ fn tabs_shrink_to_fit_then_arrows_step_through_them_and_open_stays_in_sight() {
     assert_eq!(enabled(&h, "Scroll tabs right"), Some(true), "and then there is more to the right");
     let open = h.get_by_label("Open").rect();
     let right = h.get_by_label("Scroll tabs right").rect();
-    assert!(right.right() <= open.left() + 0.5 && open.right() <= h.get_by_label("Discord").rect().left());
-    // Twenty: Open stays in sight left of Discord.
+    assert!(right.right() <= open.left() + 0.5 && open.right() <= h.get_by_label("Keyboard shortcuts").rect().left());
+    // Twenty: Open stays in sight left of the buttons on the right.
     for i in 0..13 {
         h.state_mut().open_bytes(&format!("more-{i:02}.pdf"), None, FIXTURE.to_vec()).unwrap();
     }
     h.run_steps(4);
     let open = h.get_by_label("Open").rect();
-    let discord = h.get_by_label("Discord").rect();
-    assert!(open.left() > 0.0 && open.right() <= discord.left(), "Open {open:?} stays in sight left of Discord {discord:?}");
+    let shortcuts = h.get_by_label("Keyboard shortcuts").rect();
+    assert!(open.left() > 0.0 && open.right() <= shortcuts.left(), "Open {open:?} stays in sight left of the buttons {shortcuts:?}");
 }
 
 #[test]
@@ -754,7 +755,7 @@ fn closing_the_last_active_tab_selects_the_previous_one_then_home() {
         assert!(app.session.get(ids[removed]).is_none());
     }
     assert_eq!(h.state().active, None);
-    h.get_by_label_contains("Welcome to PdfCraft");
+    h.get_by_label_contains("Welcome to PlutarchPages");
 }
 
 #[test]

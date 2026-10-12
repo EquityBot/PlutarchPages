@@ -146,6 +146,8 @@ impl Automation {
         let after = self.doc(a)?.redaction_marks();
         out["applied"] = json!(before - after);
         out["marks_pending"] = json!(after);
+        // Images or forms marked in more than one place lose every place's marked parts in each.
+        out["shared_redacted"] = json!(self.session.last_redaction_report().map_or(0, |r| r.shared_redacted));
         Ok(out)
     }
 

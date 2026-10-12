@@ -1,6 +1,6 @@
 [package]
 name = "pdfcraft-create"
-description = "Create PDFs: blank documents, from images (PNG, JPEG) and from plain text"
+description = "Create PDFs: blank documents, from images (PNG, JPEG), plain text, Markdown, CSV tables and email messages"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -18,6 +18,10 @@ image = { version = "0.25", default-features = false, features = ["bmp", "gif", 
 thiserror = { workspace = true }
 # Already in the graph through lopdf; used only to read plain-text files (decode_text).
 encoding_rs = "0.8"
+# Markdown (CommonMark) to PDF; no HTML renderer, no default features.
+pulldown-cmark = { version = "0.13.4", default-features = false }
+# Email (.eml, RFC 5322 / MIME) to PDF; charsets through encoding_rs.
+mail-parser = { version = "0.11.9", features = ["full_encoding"] }
 
 [dev-dependencies]
 image = { version = "0.25", default-features = false, features = ["bmp", "gif", "jpeg"] }

@@ -2204,7 +2204,7 @@ fn printing_through_tools() {
     let mut a = auto(&dir);
     let doc = ok(&mut a, "doc_open", json!({ "path": "a.pdf" }))["doc"].as_u64().unwrap();
     assert!(ok(&mut a, "printers", json!({}))["printers"].is_array());
-    let none = ok(&mut a, "printer_options", json!({ "printer": "No_Such_Queue_PdfCraft" }));
+    let none = ok(&mut a, "printer_options", json!({ "printer": "No_Such_Queue_PlutarchPages" }));
     assert_eq!((none["count"].as_u64(), none["options"].as_array().map(Vec::len)), (Some(0), Some(0)));
     assert!(matches!(a.call("printer_options", &json!({})), Err(ToolError::InvalidArgs(_))));
     assert!(matches!(
@@ -3186,10 +3186,15 @@ fn exporting_to_word_html_and_rtf() {
     let dir = workdir("office");
     let mut a = auto(&dir);
     let doc = ok(&mut a, "doc_open", json!({ "path": "a.pdf" }))["doc"].as_u64().unwrap();
-    for ext in ["docx", "html", "rtf"] {
+    for ext in ["docx", "xlsx", "html", "rtf"] {
         let r = ok(&mut a, "doc_export_office", json!({ "doc": doc, "path": format!("a.{ext}") }));
         assert_eq!(r["format"], ext);
     }
+    // Excel: a zip with a workbook and one worksheet per page holding that page's text.
+    let xlsx = std::fs::read(dir.join("a.xlsx")).unwrap();
+    let has = |name: &[u8]| xlsx.windows(name.len()).any(|w| w == name);
+    assert!(xlsx.starts_with(b"PK") && has(b"xl/workbook.xml"));
+    assert!(has(b"xl/worksheets/sheet3.xml") && !has(b"xl/worksheets/sheet4.xml"), "a worksheet per page");
     let html = std::fs::read_to_string(dir.join("a.html")).unwrap();
     assert!(html.contains("Page 1") && html.contains("Page 3") && html.matches("<hr>").count() == 2, "{html}");
     assert!(std::fs::read(dir.join("a.docx")).unwrap().starts_with(b"PK"));
@@ -3916,4 +3921,270 @@ fn text_extract_with_a_rect_takes_one_column() {
         let e = a.call("text_extract", &json!({ "doc": doc, "rect": bad })).unwrap_err();
         assert!(matches!(e, ToolError::InvalidArgs(_)), "{bad}: {e}");
     }
+}
+
+/// #568: a document whose security forbids copying (extract bit clear, empty user password)
+/// must refuse text extraction in automation; the owner password lifts the restriction.
+#[test]
+fn copy_restricted_documents_refuse_text_extraction() {
+    use std::sync::Arc;
+    let dir = workdir("copy-restricted");
+    // Print-only permissions (bit 3), copy/extract bit 5 clear, no user password to open.
+    let mut doc = pdfcraft_cos::Document::open(Arc::new(fixture(1))).unwrap();
+    doc.set_encryption(&pdfcraft_cos::NewEncryption {
+        algorithm: pdfcraft_cos::Algorithm::Aes256,
+        user_password: "",
+        owner_password: "owner",
+        permissions: 0b0100,
+        encrypt_metadata: true,
+        seed: [7; 32],
+    })
+    .unwrap();
+    let bytes = pdfcraft_cos::write_full(&doc, &pdfcraft_cos::SaveOptions::default()).unwrap();
+    std::fs::write(dir.join("locked.pdf"), &bytes).unwrap();
+    let mut a = auto(&dir);
+
+    // Opens without a password (empty user password), but text extraction is refused.
+    let id = ok(&mut a, "doc_open", json!({ "path": "locked.pdf" }))["doc"].as_u64().unwrap();
+    let refused = |e: &ToolError| matches!(e, ToolError::Failed(m) if m.contains("don't allow copying"));
+    assert!(refused(&a.call("text_extract", &json!({ "doc": id })).unwrap_err()), "text_extract must be blocked");
+    assert!(refused(&a.call("text_find", &json!({ "doc": id, "query": "Page" })).unwrap_err()), "text_find must be blocked");
+    assert!(refused(&a.call("doc_export_text", &json!({ "doc": id, "path": "out.txt" })).unwrap_err()), "doc_export_text must be blocked");
+    assert!(!dir.join("out.txt").exists(), "no text file was written for a blocked export");
+
+    // The owner password lifts the restriction.
+    let oid = ok(&mut a, "doc_open", json!({ "path": "locked.pdf", "password": "owner" }))["doc"].as_u64().unwrap();
+    assert_eq!(page_text(&mut a, oid), vec!["Page 1"], "the owner may extract text");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// doc_create lays out CSV tables, Markdown and email messages (PDF-XChange's CSV, Markdown and
+/// EML converters); email attachments are listed unless embedding is asked for, and characters
+/// the built-in fonts can't show are reported, never dropped silently.
+#[test]
+fn doc_create_lays_out_csv_markdown_and_email() {
+    let dir = workdir("create-structured");
+    std::fs::write(dir.join("ledger.csv"), "Name,Amount\nAda,3.50\n\"Babbage, C\",4\n").unwrap();
+    std::fs::write(dir.join("notes.md"), "# Notes\n\nSome **bold** text and a [link](https://example.org).\n\n- one\n- two\n").unwrap();
+    std::fs::write(
+        dir.join("mail.eml"),
+        "From: Ada <ada@example.org>\r\nTo: cb@example.org\r\nSubject: Engines\r\nMIME-Version: 1.0\r\nContent-Type: multipart/mixed; boundary=\"b\"\r\n\r\n--b\r\nContent-Type: text/plain\r\n\r\nThe analytical engine.\r\n--b\r\nContent-Type: text/csv; name=\"t.csv\"\r\nContent-Disposition: attachment; filename=\"t.csv\"\r\n\r\na,b\r\n--b--\r\n",
+    )
+    .unwrap();
+    let mut a = auto(&dir);
+
+    let csv = ok(&mut a, "doc_create", json!({ "from": "csv", "path": "ledger.csv" }));
+    let text = page_text(&mut a, csv["doc"].as_u64().unwrap()).join("\n");
+    assert!(text.contains("Babbage, C") && text.contains("Amount") && text.contains("3.50"), "{text}");
+    assert!(csv.get("notes").is_none(), "nothing was lost: {csv}");
+
+    let md = ok(&mut a, "doc_create", json!({ "from": "markdown", "path": "notes.md" }));
+    // Runs in different faces sit side by side; compare words, not exact spacing.
+    let text = page_text(&mut a, md["doc"].as_u64().unwrap()).join(" ").split_whitespace().collect::<Vec<_>>().join(" ");
+    assert!(text.contains("Notes") && text.contains("Some bold text and a link.") && text.contains("two"), "{text}");
+
+    let mail = ok(&mut a, "doc_create", json!({ "from": "email", "path": "mail.eml" }));
+    let id = mail["doc"].as_u64().unwrap();
+    let text = page_text(&mut a, id).join("\n");
+    assert!(text.contains("Engines") && text.contains("The analytical engine.") && text.contains("t.csv"), "{text}");
+    assert!(mail["notes"].to_string().contains("listed but not included"), "{mail}");
+    assert_eq!(ok(&mut a, "doc_info", json!({ "doc": id }))["attachments"].as_array().map(Vec::len), Some(0));
+    let embedded = ok(&mut a, "doc_create", json!({ "from": "email", "path": "mail.eml", "embed_attachments": true }));
+    let info = ok(&mut a, "doc_info", json!({ "doc": embedded["doc"] }));
+    assert_eq!(info["attachments"][0]["name"], "t.csv", "{info}");
+
+    let greek = ok(&mut a, "doc_create", json!({ "from": "markdown", "text": "Ω and ✓" }));
+    assert!(greek["notes"].to_string().contains("written as ?"), "{greek}");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[cfg(unix)]
+fn executable(path: &Path, script: &str) {
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::write(path, script).unwrap();
+    std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o755)).unwrap();
+}
+
+/// External converters (PDF-XChange's Office2PDF and browser-to-PDF): off by default; when turned
+/// on, the configured program converts and the result opens. A fake browser stands in for Chrome
+/// and "prints" a prepared PDF to its --print-to-pdf target.
+#[cfg(unix)]
+#[test]
+fn doc_create_through_external_converters() {
+    let dir = workdir("external");
+    std::fs::write(dir.join("page.html"), "<h1>Hi</h1>").unwrap();
+    std::fs::write(dir.join("report.docx"), b"PK\x03\x04").unwrap();
+    let mut off = auto(&dir).with_external_converters(pdfcraft_engine::ExternalConverters::default());
+    let err = off.call("doc_create", &json!({ "from": "html", "path": "page.html" })).unwrap_err();
+    assert!(err.to_string().contains("External converters are off"), "{err}");
+
+    let prepared = dir.join("prepared.pdf");
+    std::fs::write(&prepared, fixture(2)).unwrap();
+    let fake = dir.join("fake-chrome");
+    executable(
+        &fake,
+        &format!(
+            "#!/bin/sh\nfor a in \"$@\"; do case \"$a\" in --print-to-pdf=*) cp '{}' \"${{a#--print-to-pdf=}}\";; esac; done\n",
+            prepared.display()
+        ),
+    );
+    let on = pdfcraft_engine::ExternalConverters { enabled: true, browser: Some(fake), office: None };
+    let mut a = auto(&dir).with_external_converters(on);
+    let made = ok(&mut a, "doc_create", json!({ "from": "html", "path": "page.html" }));
+    assert_eq!((made["pages"].as_u64(), made["name"].as_str()), (Some(2), Some("page.pdf")), "{made}");
+    // Private addresses are refused before any program runs; public pages print.
+    let err = a.call("doc_create", &json!({ "from": "web_page", "url": "http://192.168.1.1/" })).unwrap_err();
+    assert!(err.to_string().contains("private network"), "{err}");
+    let web = ok(&mut a, "doc_create", json!({ "from": "web_page", "url": "https://example.org/" }));
+    assert_eq!(web["name"], "example.org.pdf");
+    // A file that doesn't match the converter asked for is refused.
+    assert!(matches!(a.call("doc_create", &json!({ "from": "html", "path": "report.docx" })), Err(ToolError::InvalidArgs(_))));
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// Read Out Loud sends the page text to the speech program's standard input and never returns it.
+#[cfg(unix)]
+#[test]
+fn read_out_loud_sends_text_only_to_the_speech_program() {
+    let dir = workdir("speech");
+    let heard = dir.join("heard.txt");
+    let fake = dir.join("espeak-ng");
+    executable(&fake, &format!("#!/bin/sh\ncat > '{}'\n", heard.display()));
+    let mut a = auto(&dir).with_speech_backend(pdfcraft_engine::SpeechBackend::EspeakNg(fake));
+    let doc = ok(&mut a, "doc_open", json!({ "path": "a.pdf" }))["doc"].as_u64().unwrap();
+    let r = ok(&mut a, "speech_start", json!({ "doc": doc, "pages": [2] }));
+    assert_eq!((&r["speaking"], &r["truncated"], &r["pages"]), (&json!(true), &json!(false), &json!([2])), "{r}");
+    assert!(!r.to_string().contains("Page 2"), "the text is not returned: {r}");
+    for _ in 0..100 {
+        if ok(&mut a, "speech_status", json!({}))["speaking"] == false {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+    assert_eq!(std::fs::read_to_string(&heard).unwrap().trim(), "Page 2");
+    assert_eq!(ok(&mut a, "speech_stop", json!({}))["speaking"], false);
+    // At most 50 pages in one go, even when asked for explicitly.
+    assert!(a.call("speech_start", &json!({ "doc": doc, "pages": vec![1; 51] })).is_err());
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// Bookmark style (PDF-XChange Bookmarks plug-in, Acrobat bookmark Properties): colour, bold and
+/// italic are written as /C and /F, read back after saving, undoable, and cleared by the default.
+#[test]
+fn bookmark_style_sets_colour_bold_and_italic() {
+    let dir = workdir("bookmark-style");
+    let mut a = auto(&dir);
+    let doc = ok(&mut a, "doc_open", json!({ "path": "a.pdf" }))["doc"].as_u64().unwrap();
+    ok(&mut a, "bookmark_add", json!({ "doc": doc, "title": "Intro", "page": 1 }));
+    let first = |a: &mut Automation, doc: u64| ok(a, "doc_info", json!({ "doc": doc }))["outline"][0].clone();
+    ok(&mut a, "bookmark_set_style", json!({ "doc": doc, "path": [1], "color": "#CC1A1A", "bold": true }));
+    let o = first(&mut a, doc);
+    assert_eq!((o["color"].as_str(), o["bold"].as_bool(), o.get("italic")), (Some("#CC1A1A"), Some(true), None), "{o}");
+    ok(&mut a, "doc_save", json!({ "doc": doc, "path": "styled.pdf" }));
+    let mut b = auto(&dir);
+    let re = ok(&mut b, "doc_open", json!({ "path": "styled.pdf" }))["doc"].as_u64().unwrap();
+    assert_eq!(first(&mut b, re)["color"], "#CC1A1A", "the style survives saving");
+    ok(&mut a, "bookmark_set_style", json!({ "doc": doc, "path": [1], "italic": true }));
+    let o = first(&mut a, doc);
+    assert!(o.get("color").is_none() && o.get("bold").is_none() && o["italic"] == true, "{o}");
+    ok(&mut a, "edit_undo", json!({ "doc": doc }));
+    assert_eq!(first(&mut a, doc)["color"], "#CC1A1A");
+    assert!(matches!(a.call("bookmark_set_style", &json!({ "doc": doc, "path": [1], "color": "red" })), Err(ToolError::InvalidArgs(_))));
+    assert!(matches!(a.call("bookmark_set_style", &json!({ "doc": doc, "path": [7] })), Err(ToolError::Failed(_))));
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// PDF Optimizer ▸ Discard Objects additions (PDF-XChange Optimizer parity): form submit, import
+/// and reset actions, external cross-references and PDF/A identification, each only when asked.
+#[test]
+fn optimize_discards_form_actions_external_refs_and_standards_id() {
+    use pdfcraft_cos::{Dict, Object, PdfString};
+    use std::sync::Arc;
+    let dir = workdir("optimize-actions");
+    let mut doc = pdfcraft_cos::Document::open(Arc::new(fixture(1))).unwrap();
+    let action = |kind: &str| {
+        let mut a = Dict::new();
+        a.set(b"S".to_vec(), Object::name(kind));
+        a
+    };
+    let annot = |doc: &mut pdfcraft_cos::Document, subtype: &str, a: Dict| {
+        let mut d = Dict::new();
+        d.set(b"Type".to_vec(), Object::name("Annot"));
+        d.set(b"Subtype".to_vec(), Object::name(subtype));
+        d.set(b"Rect".to_vec(), Object::Array(vec![10.into(), 10.into(), 50.into(), 30.into()]));
+        d.set(b"A".to_vec(), Object::Dict(a));
+        doc.add(d)
+    };
+    let mut gotor = action("GoToR");
+    gotor.set(b"F".to_vec(), PdfString::literal(b"other.pdf".to_vec()));
+    let mut uri = action("URI");
+    uri.set(b"URI".to_vec(), PdfString::literal(b"https://example.org/".to_vec()));
+    let refs = [annot(&mut doc, "Widget", action("SubmitForm")), annot(&mut doc, "Link", gotor), annot(&mut doc, "Link", uri)];
+    let page = pdfcraft_model::pages(&doc).swap_remove(0).obj;
+    doc.update_dict(page, |p| p.set(b"Annots".to_vec(), Object::Array(refs.iter().map(|r| Object::Ref(*r)).collect()))).unwrap();
+    let mut sd = Dict::new();
+    sd.set(b"Type".to_vec(), Object::name("Metadata"));
+    sd.set(b"Subtype".to_vec(), Object::name("XML"));
+    let xmp = br#"<x:xmpmeta><rdf:RDF><rdf:Description rdf:about="" pdfaid:part="2" pdfaid:conformance="B"/></rdf:RDF></x:xmpmeta>"#;
+    let meta = doc.add(Object::Stream(pdfcraft_cos::Stream::from_raw(sd, xmp.to_vec())));
+    let root = doc.root().unwrap();
+    doc.update_dict(root, |c| c.set(b"Metadata".to_vec(), Object::Ref(meta))).unwrap();
+    std::fs::write(dir.join("forms.pdf"), pdfcraft_cos::write_full(&doc, &Default::default()).unwrap()).unwrap();
+
+    let mut a = auto(&dir);
+    let id = ok(&mut a, "doc_open", json!({ "path": "forms.pdf" }))["doc"].as_u64().unwrap();
+    let kept = ok(&mut a, "doc_optimize", json!({ "doc": id, "path": "kept.pdf" }));
+    assert_eq!(
+        (kept["form_actions"].as_u64(), kept["external_refs"].as_u64(), kept["standards_ids"].as_u64()),
+        (Some(0), Some(0), Some(0)),
+        "off by default"
+    );
+    let r = ok(
+        &mut a,
+        "doc_optimize",
+        json!({ "doc": id, "path": "clean.pdf", "discard_form_actions": true, "discard_external_refs": true, "remove_standards_id": true }),
+    );
+    assert_eq!((r["form_actions"].as_u64(), r["external_refs"].as_u64(), r["standards_ids"].as_u64()), (Some(1), Some(1), Some(2)), "{r}");
+    let out = pdfcraft_cos::Document::open(Arc::new(std::fs::read(dir.join("clean.pdf")).unwrap())).unwrap();
+    let kinds: Vec<String> = out
+        .object_numbers()
+        .into_iter()
+        .filter_map(|n| out.get(pdfcraft_cos::ObjRef::new(n, out.generation(n))).as_dict().cloned())
+        .filter_map(|d| {
+            d.get(b"A").map(|a| out.resolve(a)).and_then(|a| a.as_dict().and_then(|a| a.name(b"S")).map(|s| String::from_utf8_lossy(s).into_owned()))
+        })
+        .collect();
+    assert_eq!(kinds, vec!["URI".to_string()], "only the web link keeps its action");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// Convert colours to grayscale (PDF-XChange Color Converter): RGB fills and strokes become gray,
+/// the change is undoable, and a page with nothing to convert says so.
+#[test]
+fn doc_convert_gray_rewrites_colours() {
+    use std::sync::Arc;
+    let dir = workdir("gray");
+    let mut doc = pdfcraft_cos::Document::open(Arc::new(fixture(2))).unwrap();
+    let page = pdfcraft_model::pages(&doc).swap_remove(0).obj;
+    let content = doc.add(pdfcraft_cos::Object::Stream(pdfcraft_cos::Stream::flate(
+        pdfcraft_cos::Dict::new(),
+        b"1 0 0 rg 0 0 50 50 re f 0 0 1 RG 0 0 m 50 50 l S BT /F1 12 Tf 0 1 0 rg 10 10 Td (Hi) Tj ET",
+    )));
+    doc.update_dict(page, |p| p.set(b"Contents".to_vec(), pdfcraft_cos::Object::Ref(content))).unwrap();
+    std::fs::write(dir.join("colour.pdf"), pdfcraft_cos::write_full(&doc, &Default::default()).unwrap()).unwrap();
+    let mut a = auto(&dir);
+    let id = ok(&mut a, "doc_open", json!({ "path": "colour.pdf" }))["doc"].as_u64().unwrap();
+    let r = ok(&mut a, "doc_convert_gray", json!({ "doc": id }));
+    assert_eq!((r["colours"].as_u64(), r["left"].as_u64()), (Some(3), Some(0)), "{r}");
+    ok(&mut a, "doc_save", json!({ "doc": id, "path": "gray.pdf" }));
+    let out = pdfcraft_cos::Document::open(Arc::new(std::fs::read(dir.join("gray.pdf")).unwrap())).unwrap();
+    let p = pdfcraft_model::pages(&out).swap_remove(0);
+    let data = match &*out.resolve(p.dict.get(b"Contents").unwrap()) {
+        pdfcraft_cos::Object::Stream(s) => String::from_utf8_lossy(&s.decoded().unwrap()).into_owned(),
+        other => panic!("{other:?}"),
+    };
+    assert!(!data.contains("rg") && !data.contains("RG") && data.contains("0.3 g") && data.contains("0.11 G"), "{data}");
+    ok(&mut a, "edit_undo", json!({ "doc": id }));
+    assert!(matches!(a.call("doc_convert_gray", &json!({ "doc": id, "pages": [2] })), Err(ToolError::Failed(m)) if m.contains("no colours")));
+    let _ = std::fs::remove_dir_all(&dir);
 }

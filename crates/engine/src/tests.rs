@@ -567,8 +567,19 @@ fn a_page_with_a_form_field_shown_twice_keeps_one_field() {
 #[test]
 fn files_that_cannot_be_converted_are_refused_clearly() {
     let s = Session::new();
-    let err = s.convert_to_pdf("report.docx", &Arc::new(b"PK\x03\x04".to_vec())).unwrap_err();
-    assert_eq!(err, EditError::Source("report.docx: this file type can't be converted; use a PDF, an image or a .txt file".into()));
+    let err = s.convert_to_pdf("report.zip", &Arc::new(b"PK\x03\x04".to_vec())).unwrap_err();
+    assert_eq!(
+        err,
+        EditError::Source("report.zip: this file type can't be converted; use a PDF, an image, or a .txt, .csv, .md or .eml file".into())
+    );
+    // Office and HTML files need the external converters, which are off unless the user turns them on.
+    for name in ["report.docx", "page.html"] {
+        let err = s.convert_to_pdf(name, &Arc::new(b"PK\x03\x04".to_vec())).unwrap_err();
+        assert!(
+            matches!(&err, EditError::Source(m) if m.starts_with(name) && m.contains("can't be converted") && m.contains("External converters")),
+            "{err}"
+        );
+    }
     assert!(matches!(s.convert_to_pdf("empty", &Arc::new(Vec::new())), Err(EditError::Source(_))));
     // Damaged inputs of a known type fail with an error, not a panic.
     assert!(s.convert_to_pdf("bad.png", &Arc::new(b"\x89PNG\r\n\x1a\nnope".to_vec())).is_err());
@@ -617,6 +628,8 @@ fn restricted_documents_refuse_changes_unless_opened_by_the_owner() {
     let id = s.open("r.pdf", None, bytes.clone(), None).unwrap();
     let d = s.get(id).unwrap();
     assert!(!d.allows_assembly() && !d.allows_modification());
+    // Print-only permissions clear the copy/extract bit (#568): copying text is refused.
+    assert!(!d.allows_copy(), "copy must be blocked when the extract bit is clear");
     let summary = d.security_summary().unwrap();
     assert!(!summary.owner && summary.permissions.print() && !summary.permissions.copy());
     assert_eq!(s.apply(id, Edit::DeletePages { pages: vec![0] }), Err(EditError::NotPermitted("page changes")));
@@ -626,7 +639,52 @@ fn restricted_documents_refuse_changes_unless_opened_by_the_owner() {
     // The owner password lifts the restrictions.
     let oid = s.open("r.pdf", None, bytes, Some("owner")).unwrap();
     assert!(s.get(oid).unwrap().allows_assembly());
+    assert!(s.get(oid).unwrap().allows_copy(), "the owner password lifts the copy restriction");
+    // An unencrypted document imposes no copy restriction.
+    let plain = s.open("plain.pdf", None, Arc::new(fixture(1)), None).unwrap();
+    assert!(s.get(plain).unwrap().allows_copy());
     s.apply(oid, Edit::DeletePages { pages: vec![0] }).unwrap();
+}
+
+/// The Document Open password matrix (#603) for every algorithm: no password and an explicit
+/// empty password behave the same, a non-empty user password always prompts even when the owner
+/// password is empty, and an empty password that is both user and owner opens as the user, so
+/// the document's restrictions still apply.
+#[test]
+fn empty_passwords_never_lift_restrictions_or_skip_the_open_prompt() {
+    use pdfcraft_cos::Algorithm::{Aes128, Aes256, Rc4_40, Rc4_128};
+    let make = |algorithm, user, owner| {
+        let mut doc = pdfcraft_cos::Document::open(Arc::new(fixture(1))).unwrap();
+        doc.set_encryption(&pdfcraft_cos::NewEncryption {
+            algorithm,
+            user_password: user,
+            owner_password: owner,
+            permissions: 0b0100,
+            encrypt_metadata: true,
+            seed: [3; 32],
+        })
+        .unwrap();
+        Arc::new(pdfcraft_cos::write_full(&doc, &Default::default()).unwrap())
+    };
+    for alg in [Rc4_40, Rc4_128, Aes128, Aes256] {
+        let mut s = Session::new();
+        // Both empty: opens without a prompt, as the user (print only, no copying).
+        let both = make(alg, "", "");
+        for pw in [None, Some("")] {
+            let id = s.open("both.pdf", None, both.clone(), pw).unwrap_or_else(|e| panic!("{alg:?} {pw:?}: {e}"));
+            let d = s.get(id).unwrap();
+            assert!(!d.allows_copy() && !d.allows_assembly(), "{alg:?} {pw:?}: the empty password must not open as owner");
+        }
+        // A Document Open password with an empty owner password: always prompts.
+        let open_pw = make(alg, "secret", "");
+        for pw in [None, Some("")] {
+            assert!(s.open("open.pdf", None, open_pw.clone(), pw).is_err(), "{alg:?} {pw:?}: must ask for the Document Open password");
+        }
+        assert!(s.open("open.pdf", None, open_pw, Some("secret")).is_ok(), "{alg:?}");
+        // An ordinary restricted file: opens as the user without a prompt.
+        let id = s.open("r.pdf", None, make(alg, "", "owner"), None).unwrap();
+        assert!(!s.get(id).unwrap().allows_copy(), "{alg:?}");
+    }
 }
 
 #[test]

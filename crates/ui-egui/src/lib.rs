@@ -43,6 +43,7 @@ mod credits;
 mod crop;
 mod drag_pointer;
 mod export_ui;
+mod external_ui;
 mod js_ui;
 mod marks_ui;
 mod measure_ui;
@@ -226,6 +227,8 @@ struct GridDrop {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Dialog {
     CreateImages,
+    /// Create ▸ From web page (external converters).
+    WebPage,
     Properties(PropsTab),
     About,
     Shortcuts,
@@ -430,6 +433,8 @@ pub struct PdfCraftApp {
     /// How to ask for the latest release (the desktop app sets it; see `updates`).
     pub update_source: Option<updates::UpdateSource>,
     pub(crate) updates: updates::Updates,
+    /// External converters running and Read Out Loud (PlutarchPages).
+    pub(crate) external: external_ui::External,
     /// Lists the Print dialog's printers in the background (the desktop app sets it; see
     /// [`PrinterSource`]).
     pub printer_source: Option<PrinterSource>,
@@ -707,7 +712,13 @@ fn rgb_triple(v: &serde_json::Value) -> Option<[f64; 3]> {
 impl PdfCraftApp {
     pub fn new() -> Self {
         Self {
-            session: Session::new(),
+            session: {
+                // External converters: off unless the user turns them on (Preferences, restored later,
+                // or the environment of the user who started the app).
+                let mut s = Session::new();
+                s.set_external_converters(pdfcraft_engine::ExternalConverters::from_env());
+                s
+            },
             views: Vec::new(),
             active: None,
             mode: Mode::AllTools,
@@ -736,6 +747,7 @@ impl PdfCraftApp {
             dialog: None,
             update_source: None,
             updates: updates::Updates::default(),
+            external: external_ui::External::default(),
             printer_source: None,
             print_tasks: print_ui::PrintTasks::default(),
             palette_open: false,
@@ -922,6 +934,16 @@ impl PdfCraftApp {
         self.try_open(name, path, std::sync::Arc::new(bytes), None, activate)
     }
 
+    /// A new view of open document `id`, with the copy permission taken from the engine. Every
+    /// path that shows a document makes its view here, so none can copy from a copy-restricted
+    /// document (#568).
+    pub(crate) fn view_for(&self, id: DocId) -> Option<DocView> {
+        let doc = self.session.get(id)?;
+        let mut view = DocView::new(id, &doc.info, self.view_defaults);
+        view.copy_allowed = doc.allows_copy();
+        Some(view)
+    }
+
     fn try_open(
         &mut self,
         name: &str,
@@ -956,7 +978,8 @@ impl PdfCraftApp {
             };
         }
         let initial = doc.initial_view();
-        self.views.push(DocView::new(id, &doc.info, self.view_defaults));
+        let Some(view) = self.view_for(id) else { return Err("the document vanished".into()) };
+        self.views.push(view);
         if activate {
             self.active = Some(self.views.len() - 1);
         }
@@ -1256,9 +1279,9 @@ impl PdfCraftApp {
             Err(e) => {
                 use pdfcraft_engine::links::BlockedLink;
                 let template = if matches!(e, BlockedLink::MailFile | BlockedLink::MailEncodedWord) {
-                    "{who} in this document tried to open an address PdfCraft won't open: {e}."
+                    "{who} in this document tried to open an address PlutarchPages won't open: {e}."
                 } else {
-                    "{who} in this document tried to open an address PdfCraft won't open: {e}. Only web (http, https) and email (mailto) links open from documents."
+                    "{who} in this document tried to open an address PlutarchPages won't open: {e}. Only web (http, https) and email (mailto) links open from documents."
                 };
                 self.notify_fmt(template, &[("who", tl!(origin.noun())), ("e", &e.to_string())]);
             }
@@ -1427,6 +1450,7 @@ impl PdfCraftApp {
             "trusted": trusted,
             "custom_stamps": stamps_ui::encode(&self.custom_stamps),
             "javascript": self.session.javascript(),
+            "external_converters": self.session.external_converters().enabled,
             "actions": actions_ui::encode(&self.custom_actions),
             "combine_columns": self.combine_columns.to_json(),
             "combine_view": self.combine_view.as_str(),
@@ -1551,6 +1575,11 @@ impl PdfCraftApp {
         }
         self.custom_stamps = stamps_ui::decode(&v["custom_stamps"]);
         self.custom_actions = actions_ui::decode(&v["actions"]);
+        if let Some(on) = v["external_converters"].as_bool() {
+            let mut c = self.session.external_converters().clone();
+            c.enabled = on;
+            self.session.set_external_converters(c);
+        }
         if let Some(on) = v["javascript"].as_bool() {
             self.session.set_javascript(on);
         }
@@ -2021,6 +2050,7 @@ impl eframe::App for PdfCraftApp {
             }
         }
         self.poll_updates();
+        self.poll_external();
         self.poll_print();
         // Shortcuts deferred last frame: the text field has taken that frame's typing since.
         let deferred = std::mem::take(&mut self.deferred_commands);
@@ -2070,7 +2100,7 @@ impl eframe::App for PdfCraftApp {
             .and_then(|i| self.session.get(self.views[i].id))
             .map(|d| d.display_name())
             .or_else(|| self.combine_showing().then(|| tl!("Combine files").to_owned()))
-            .map_or_else(|| "PdfCraft".to_owned(), |name| format!("{name} — PdfCraft"));
+            .map_or_else(|| "PlutarchPages".to_owned(), |name| format!("{name} — PlutarchPages"));
         if title != self.window_title {
             ctx.send_viewport_cmd(egui::ViewportCommand::Title(title.clone()));
             self.window_title = title;

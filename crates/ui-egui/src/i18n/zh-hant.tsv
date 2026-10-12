@@ -5,7 +5,7 @@
 # Clean-room: every entry was written from the plain meaning of the English label using ordinary
 # Traditional Chinese computing vocabulary. No proprietary localisation resource, string table or
 # product UI (Acrobat's included) was consulted or copied; add entries the same way.
-# Product and technology names (PdfCraft, PDF, Acrobat JavaScript ...) stay in Latin letters;
+# Product and technology names (PlutarchPages, PDF, Acrobat JavaScript ...) stay in Latin letters;
 # the trailing "…" of dialog commands is kept.
 
 	Menu	選單
@@ -392,9 +392,9 @@
 	Check for updates	檢驗更新
 	No check has run yet.	尚未執行檢驗。
 	Checking for a newer version…	正在檢驗新版本…
-	PdfCraft {v} is available.	PdfCraft {v} 可用。
+	PlutarchPages {v} is available.	PlutarchPages {v} 可用。
 	You have version {c}. Download the new version from its release page.	當前版本為 {c}。請從其釋出頁面下載新版本。
-	PdfCraft {c} is up to date.	PdfCraft {c} 已是最新。
+	PlutarchPages {c} is up to date.	PlutarchPages {c} 已是最新。
 	Couldn't check for updates: {e}	無法檢驗更新：{e}
 	You have version {c}. All releases are listed at {page}.	當前版本為 {c}。所有版本列在 {page}。
 	Asks GitHub for the latest release. Nothing is downloaded or installed automatically.	向 GitHub 搜尋最新版本。不會自動下載或安裝任何內容。
@@ -501,8 +501,8 @@
 	No changes allowed	不允許任何更改
 	Annotations, form fill-in, and digital signatures	註解、填寫表單和數位簽章
 	Form fill-in and digital signatures	填寫表單和數位簽章
-	The key is in the macOS Keychain, which may ask to allow PdfCraft to use it.	金鑰位於 macOS 鑰匙串中，系統可能會詢問是否允許 PdfCraft 使用它。
-	The key is in the Windows certificate store, which may ask to allow PdfCraft to use it.	金鑰位於 Windows 憑證存放區中，系統可能會詢問是否允許 PdfCraft 使用它。
+	The key is in the macOS Keychain, which may ask to allow PlutarchPages to use it.	金鑰位於 macOS 鑰匙串中，系統可能會詢問是否允許 PlutarchPages 使用它。
+	The key is in the Windows certificate store, which may ask to allow PlutarchPages to use it.	金鑰位於 Windows 憑證存放區中，系統可能會詢問是否允許 PlutarchPages 使用它。
 	Digital ID password	數位 ID 密碼
 	Back	返回
 	Validate all	全部驗證
@@ -872,7 +872,7 @@
 	Searchable Image (Exact)	可搜尋圖片（精確）
 	Adds invisible text over each word; the page image is not changed	在每個詞上新增不可見文字；頁面圖片保持不變
 	Downsample to	降取樣至
-	Text recognition isn't installed: its model files are missing. Reinstall PdfCraft, or set PDFCRAFT_MODELS to the folder that holds them.	未安裝文字辨識：缺少模型檔案。請重新安裝 PdfCraft，或將 PDFCRAFT_MODELS 設定為包含這些檔案的資料夾。
+	Text recognition isn't installed: its model files are missing. Reinstall PlutarchPages, or set PDFCRAFT_MODELS to the folder that holds them.	未安裝文字辨識：缺少模型檔案。請重新安裝 PlutarchPages，或將 PDFCRAFT_MODELS 設定為包含這些檔案的資料夾。
 	Settings	設定
 	Protect	保護
 	Advanced options	進階選項
@@ -1253,7 +1253,7 @@
 	Anyone opening the document will need this password. It's applied when you save.	開啟文件的任何人都需要此密碼。儲存時應用。
 	The document opens without a password; this password is needed to change the restrictions. It's applied when you save.	開啟文件無需密碼；更改限制需要此密碼。儲存時應用。
 	Recover unsaved documents?	要恢復未儲存的文件嗎？
-	PdfCraft didn't shut down normally. These documents had changes that were autosaved:	PdfCraft 未正常關閉。以下文件的更改已自動儲存：
+	PlutarchPages didn't shut down normally. These documents had changes that were autosaved:	PlutarchPages 未正常關閉。以下文件的更改已自動儲存：
 	just now	剛剛
 	{n} min ago	{n} 分鐘前
 	{n} h ago	{n} 小時前
@@ -1421,10 +1421,10 @@
 	On the web, open or drop an image to convert it	在 Web 端，開啟或拖入圖片進行轉換
 	Couldn't optimize the file: {e}	無法最佳化檔案：{e}
 	Couldn't write {path}: {e}	無法寫入{path}：{e}
-	The form asks to be submitted to {u}; PdfCraft doesn't send form data. Save the document to keep your entries.	該表單請求提交到{u}；PdfCraft 不傳送表單資料。請儲存文件以保留填寫內容。
+	The form asks to be submitted to {u}; PlutarchPages doesn't send form data. Save the document to keep your entries.	該表單請求提交到{u}；PlutarchPages 不傳送表單資料。請儲存文件以保留填寫內容。
 	{s} actions run in the JavaScript engine (M6)	{s} 動作在 JavaScript 引擎中執行 (M6)
 	{name}: the {other} action isn't supported yet	{name}：{other} 動作暫不受支援
-	{name} submits the form to {url}; PdfCraft doesn't send form data. Save the document to keep your entries.	{name} 將表單提交到{url}；PdfCraft 不傳送表單資料。請儲存文件以保留填寫內容。
+	{name} submits the form to {url}; PlutarchPages doesn't send form data. Save the document to keep your entries.	{name} 將表單提交到{url}；PlutarchPages 不傳送表單資料。請儲存文件以保留填寫內容。
 	Export stopped: {e}	匯出中止：{e}
 	Exported 1 image	已匯出 1 張圖片
 	Exported {n} images	已匯出{n}張圖片
@@ -1649,8 +1649,8 @@
 	Signed and all signatures are valid.	已簽名，所有簽名均有效。
 	At least one signature has problems.	至少一個簽名存在問題。
 	This document is secured. Some changes are restricted by its security settings.	本文件已加密。其安全設定限制了部分更改。
-	This is a dynamic XFA form, which PdfCraft can't display yet. What you see is the file's placeholder page.	這是動態 XFA 表單，PdfCraft 暫無法顯示。您看到的是檔案的佔位頁面。
-	This form also contains XFA data, which PdfCraft doesn't read yet. You can fill its fields, but Acrobat may show the XFA values instead.	此表單還包含 XFA 資料，PdfCraft 暫不讀取。您可以填寫欄位，但 Acrobat 可能顯示 XFA 值。
+	This is a dynamic XFA form, which PlutarchPages can't display yet. What you see is the file's placeholder page.	這是動態 XFA 表單，PlutarchPages 暫無法顯示。您看到的是檔案的佔位頁面。
+	This form also contains XFA data, which PlutarchPages doesn't read yet. You can fill its fields, but Acrobat may show the XFA values instead.	此表單還包含 XFA 資料，PlutarchPages 暫不讀取。您可以填寫欄位，但 Acrobat 可能顯示 XFA 值。
 	This document contains {n} interactive form fields.	本文件包含 {n} 個互動式表單欄位。
 	This file was damaged and has been repaired. Saving keeps the repaired version.	此檔案已損壞並已修復。儲存將保留修復後的版本。
 	Dismiss	關閉
@@ -1689,7 +1689,7 @@
 	Read	閱讀
 	Convert	轉換
 	E-Sign	電子簽署
-	Welcome to PdfCraft	歡迎使用 PdfCraft
+	Welcome to PlutarchPages	歡迎使用 PlutarchPages
 	An open-source PDF workbench — local, private, and scriptable.	開源 PDF 工作台，在本機處理、保護隱私，並支援指令碼。
 	Recommended tools	推薦工具
 	Use now	立即使用
@@ -1727,11 +1727,11 @@
 	Join the ArtCraft community	加入 ArtCraft 社群
 	Get help, share feedback and follow development on Discord.	在 Discord 取得協助、提供意見並追蹤開發進度。
 	Join our Discord	加入 Discord 社群
-	PdfCraft web page	PdfCraft 網頁
-	PdfCraft on GitHub	GitHub 上的 PdfCraft
+	PlutarchPages web page	PlutarchPages 網頁
+	PlutarchPages on GitHub	GitHub 上的 PlutarchPages
 	ArtCraft website	ArtCraft 網站
 	Check for updates…	尋找更新…
-	About PdfCraft	關於 PdfCraft
+	About PlutarchPages	關於 PlutarchPages
 	JavaScript console…	JavaScript 主控台…
 	Document JavaScripts…	文件 JavaScript…
 	Recognize text…	辨識文字…
@@ -1741,8 +1741,8 @@
 	Add background…	新增背景…
 	Prepare a form	準備表單
 	Digitally sign	數位簽署
-	Files you open in PdfCraft appear here. Drop a PDF anywhere to open it.	在 PdfCraft 開啟過的檔案會顯示在這裡。將 PDF 拖曳至視窗即可開啟。
-	PdfCraft works offline. No telemetry, no account, and no cloud processing unless you add a provider.	PdfCraft 可離線使用，不收集遙測資料，也不需要帳號。只有在您新增服務供應商後，才會使用雲端處理。
+	Files you open in PlutarchPages appear here. Drop a PDF anywhere to open it.	在 PlutarchPages 開啟過的檔案會顯示在這裡。將 PDF 拖曳至視窗即可開啟。
+	PlutarchPages works offline. No telemetry, no account, and no cloud processing unless you add a provider.	PlutarchPages 可離線使用，不收集遙測資料，也不需要帳號。只有在您新增服務供應商後，才會使用雲端處理。
 	Double-click	滑鼠按兩下
 	PDF/A…	PDF/A…
 	Microsoft Word (.docx)	Microsoft Word（.docx）
@@ -1784,7 +1784,7 @@
 	there are no pages to print	沒有可列印的頁面
 	the document has no tags	此文件沒有標籤
 	{0}: {1}	{0}：{1}
-	the text recognition models are not installed (reinstall PdfCraft, or set PDFCRAFT_MODELS to the folder that holds them)	尚未安裝文字辨識模型（請重新安裝 PdfCraft，或將 PDFCRAFT_MODELS 設定為包含這些模型的資料夾）
+	the text recognition models are not installed (reinstall PlutarchPages, or set PDFCRAFT_MODELS to the folder that holds them)	尚未安裝文字辨識模型（請重新安裝 PlutarchPages，或將 PDFCRAFT_MODELS 設定為包含這些模型的資料夾）
 	the image is empty	圖片是空的
 	this file isn't XFDF, FDF, XML or text form data	此檔案不是 XFDF、FDF、XML 或純文字表單資料
 	nothing in the file matches this document	檔案中沒有與此文件相符的資料
@@ -1988,7 +1988,7 @@
 	Choose a PNG or JPEG image (up to 4 MiB). Transparency is preserved.	選擇 PNG 或 JPEG 圖像（最大 4 MiB）。透明度會保留。
 	Couldn't import the signature image: {e}	無法匯入簽名圖像：{e}
 	Go to page…	轉到頁面…
-	Reopen the files that were open when PdfCraft last closed	重新開啟上次關閉 PdfCraft 時開啟的檔案
+	Reopen the files that were open when PlutarchPages last closed	重新開啟上次關閉 PlutarchPages 時開啟的檔案
 	The standard fonts can't draw “{c}” ({code}). Only Western European characters can be added as text for now.	標準字型無法顯示「{c}」（{code}）。目前只能新增西歐字元作為文字。
 	Open arrow	開口箭頭
 	Closed arrow	閉合箭頭
@@ -2012,7 +2012,7 @@
 	Printer properties	印表機內容
 	Reset to printer defaults	還原印表機預設值
 	This printer offers no settings of its own.	此印表機沒有專屬設定。
-	PdfCraft is drawing without a graphics processor, so it may be slow. Updating the graphics driver may help.	PdfCraft 正在不使用圖形處理器的情況下繪製，因此可能較慢。更新顯示卡驅動程式可能會有幫助。
+	PlutarchPages is drawing without a graphics processor, so it may be slow. Updating the graphics driver may help.	PlutarchPages 正在不使用圖形處理器的情況下繪製，因此可能較慢。更新顯示卡驅動程式可能會有幫助。
 	Scroll tabs left	向左捲動索引標籤
 	Scroll tabs right	向右捲動索引標籤
 
@@ -2082,3 +2082,27 @@ key	Space	空格
 	Resize panel window	調整面板視窗大小
 	Tools	工具
 	Inspector	檢查器
+# PlutarchPages: external converters, Read Out Loud, grayscale, Excel export, links.
+	Create PDF from web page…	從網頁建立 PDF…
+	Read this page aloud	朗讀此頁
+	Read to end of document	朗讀到文件結尾
+	Stop reading	停止朗讀
+	Convert colours to grayscale	將色彩轉換為灰階
+	Export to Excel…	匯出至 Excel…
+	Report a problem	回報問題
+	Upstream PdfCraft	上游 PdfCraft
+	Web page	網頁
+	A fork of PdfCraft by the ArtCraft team. PlutarchPages is not an ArtCraft product.	ArtCraft 團隊的 PdfCraft 的分支。PlutarchPages 不是 ArtCraft 產品。
+	Based on PdfCraft by the ArtCraft team. Report problems with PlutarchPages on GitHub.	以 ArtCraft 團隊的 PdfCraft 為基礎。請在 GitHub 上回報 PlutarchPages 的問題。
+	Convert Office files, HTML files and web pages with installed programs	使用已安裝的程式轉換 Office 檔案、HTML 檔案和網頁
+	Converted to grayscale: {ops} colours, {images} images, {forms} forms; {left} left as they were	已轉換為灰階：{ops} 種色彩、{images} 張影像、{forms} 個表單；{left} 項維持不變
+	Create PDF from web page	從網頁建立 PDF
+	Discard external cross-references	捨棄外部交互參照
+	Discard form submission, import and reset actions	捨棄表單的提交、匯入和重設動作
+	External converters	外部轉換器
+	External converters are off. Turn them on in Preferences to use your installed Chrome or Edge.	外部轉換器已關閉。請在偏好設定中開啟，以使用已安裝的 Chrome 或 Edge。
+	PlutarchPages is a fork of PdfCraft	PlutarchPages 是 PdfCraft 的分支
+	Remove PDF/A and PDF/X identification	移除 PDF/A 和 PDF/X 識別資訊
+	Uses LibreOffice (26.2.5 or later) for Office files and Chrome or Edge for HTML and web pages, each in a fresh private profile. Local HTML opens with scripts and network off. These programs are not sandboxed by PlutarchPages: convert only files you trust.	Office 檔案使用 LibreOffice（26.2.5 或更新版本），HTML 和網頁使用 Chrome 或 Edge，每次都在全新的私人設定檔中執行。本機 HTML 會在關閉指令碼和網路的情況下開啟。PlutarchPages 不會將這些程式放入沙箱：請只轉換您信任的檔案。
+	Web address (http or https)	網址（http 或 https）
+	The page opens in a fresh, private window of your installed Chrome or Edge and is printed to PDF. Open only pages you trust: a public page can still redirect to or load addresses on your own network.	頁面會在已安裝的 Chrome 或 Edge 的全新私人視窗中開啟並列印為 PDF。請只開啟您信任的頁面：公開頁面仍可能重新導向至或載入您自己網路上的位址。

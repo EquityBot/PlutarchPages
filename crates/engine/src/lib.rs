@@ -18,6 +18,7 @@ pub mod commands;
 pub mod compare;
 pub mod dates;
 pub mod export;
+pub mod external;
 pub mod js;
 pub mod links;
 pub mod ocr;
@@ -34,11 +35,14 @@ pub use pdfcraft_organize::{BoxSpec, PageBox, SplitBy, split_ranges};
 pub use pdfcraft_organize::LabelStyle;
 pub use pdfcraft_organize::view::{InitialView, Layout as InitialLayout, Magnification, Navigation};
 
+pub use external::ExternalConverters;
 pub use pdfcraft_cos::Algorithm;
 pub use pdfcraft_create::{CONVERTIBLE, ImageResolution, SourceKind, decode_text, source_kind};
 pub use pdfcraft_edit::{
     Added, AddedImage, AddedText, Align as TextAlign, Background, Content as AddedContent, Family as FontFamily, HeaderFooter, MarkKind, Watermark,
 };
+#[cfg(not(target_arch = "wasm32"))]
+pub use pdfcraft_external::{MAX_SPEECH, Speech, SpeechBackend};
 pub use pdfcraft_forms::{
     BorderStyle, CheckStyle, Field as FormField, FieldAction, FieldChange, FieldFont, FieldKind as FormFieldKind, FieldProps, FieldValue,
     Look as FieldLook, LookPatch as FieldLookPatch, NewField, TabOrder, Trigger as FieldTrigger, Widget as FormWidget, af as form_scripts,
@@ -416,6 +420,14 @@ impl Document {
     /// Printing is allowed (Table 22, bit 3).
     pub fn allows_printing(&self) -> bool {
         self.permissions().is_none_or(|p| p.print())
+    }
+
+    /// Copying / extracting text and graphics is allowed (Table 22, bit 5). An unencrypted
+    /// document, or one opened with the owner password, always allows it. Enforced by every
+    /// text-extraction path (UI copy, CLI/automation text export) so a Document Open–only
+    /// password's copy restriction is honoured (#568).
+    pub fn allows_copy(&self) -> bool {
+        self.permissions().is_none_or(|p| p.copy())
     }
 
     /// Page changes (insert, delete, rotate, move, extract) are allowed.
@@ -849,6 +861,18 @@ pub enum Edit {
         path: Vec<usize>,
         page: usize,
     },
+    /// Convert colours to grayscale (Print Production ▸ Convert Colors): `pages` 0-based, empty
+    /// for all. [`Session::last_color_report`] then says what changed and what was left.
+    ConvertToGray {
+        pages: Vec<usize>,
+    },
+    /// A bookmark's text colour (RGB 0–1; `None` is the default black) and bold and italic.
+    SetBookmarkStyle {
+        path: Vec<usize>,
+        color: Option<[f64; 3]>,
+        bold: bool,
+        italic: bool,
+    },
     /// Bookmarks for the tagged headings (H, H1–H6), nested by level under a new first
     /// "Untitled" bookmark (New Bookmarks from Structure).
     BookmarksFromStructure,
@@ -1225,6 +1249,8 @@ impl Edit {
             Edit::DeleteBookmark { .. } => "Delete bookmark".into(),
             Edit::MoveBookmark { .. } => "Move bookmark".into(),
             Edit::SetBookmarkPage { .. } => "Set bookmark destination".into(),
+            Edit::SetBookmarkStyle { .. } => "Bookmark style".into(),
+            Edit::ConvertToGray { .. } => "Convert colours to grayscale".into(),
             Edit::BookmarksFromStructure => "New bookmarks from structure".into(),
             Edit::NumberPages { .. } => "Number pages".into(),
             Edit::AddMeasurement(m) => format!("Measure {}", m.kind.name()),
@@ -1361,6 +1387,7 @@ fn check_permission(edit: &Edit, p: &pdfcraft_cos::Permissions) -> Result<(), Ed
         | Edit::DeleteBookmark { .. }
         | Edit::MoveBookmark { .. }
         | Edit::SetBookmarkPage { .. }
+        | Edit::SetBookmarkStyle { .. }
         | Edit::BookmarksFromStructure
         | Edit::NumberPages { .. } => {
             if p.assemble() {
@@ -1407,6 +1434,7 @@ fn check_permission(edit: &Edit, p: &pdfcraft_cos::Permissions) -> Result<(), Ed
             }
         }
         Edit::SetInfo { .. }
+        | Edit::ConvertToGray { .. }
         | Edit::AddHeaderFooter { .. }
         | Edit::AddWatermark { .. }
         | Edit::AddBackground { .. }
@@ -1467,6 +1495,10 @@ struct EditCtx {
     xfa_datasets: Option<pdfcraft_cos::ObjRef>,
     /// A form script ran too long and was abandoned: the document's scripts go off.
     xfa_ran_away: bool,
+    /// What Convert colours to grayscale did.
+    colors: Option<pdfcraft_optimize::ColorReport>,
+    /// What Apply redactions did.
+    redaction: Option<pdfcraft_redact::Report>,
     /// Pages in the document, for `xfa.layout.pageCount()`.
     pages: usize,
     date: Option<String>,
@@ -1493,6 +1525,8 @@ impl EditCtx {
             xfa_out: Default::default(),
             xfa_datasets: None,
             xfa_ran_away: false,
+            colors: None,
+            redaction: None,
             pages: 0,
             date: now.map(pdfcraft_cos::pdf_date),
             today: (1970, 1, 1),
@@ -1571,6 +1605,7 @@ fn run_edit(doc: &mut pdfcraft_cos::Document, edit: &Edit, cx: &mut EditCtx) -> 
             pdfcraft_organize::move_bookmark(doc, from, to_parent, *index)?;
         }
         Edit::SetBookmarkPage { path, page } => pdfcraft_organize::set_bookmark_page(doc, path, *page)?,
+        Edit::SetBookmarkStyle { path, color, bold, italic } => pdfcraft_organize::set_bookmark_style(doc, path, *color, *bold, *italic)?,
         Edit::BookmarksFromStructure => {
             let entries: Vec<_> = pdfcraft_a11y::headings(doc)
                 .into_iter()
@@ -1777,7 +1812,15 @@ fn run_edit(doc: &mut pdfcraft_cos::Document, edit: &Edit, cx: &mut EditCtx) -> 
             pdfcraft_edit::update_content(doc, *page, *index, &AddedContent::Image(pdfcraft_edit::AddedImage { image, ..old }))?;
         }
         Edit::ApplyRedactions { pages } => {
-            pdfcraft_redact::apply(doc, pages.as_deref())?;
+            cx.redaction = Some(pdfcraft_redact::apply(doc, pages.as_deref())?);
+        }
+        Edit::ConvertToGray { pages } => {
+            let report = pdfcraft_optimize::convert_to_gray(doc, (!pages.is_empty()).then_some(pages.as_slice()))
+                .map_err(|e| EditError::Edit(pdfcraft_edit::EditError::Invalid(e.to_string())))?;
+            if report.operators + report.images + report.forms == 0 {
+                return Err(EditError::Edit(pdfcraft_edit::EditError::Invalid("there are no colours to convert on those pages".into())));
+            }
+            cx.colors = Some(report);
         }
         Edit::ClearRedactions => {
             pdfcraft_redact::clear_marks(doc, None)?;
@@ -1899,7 +1942,9 @@ fn keys_after(edit: &Edit) -> Option<Keys> {
 /// as its UTF-8 bytes and then in PDFDocEncoding: UTF-8 bytes (as some writers store passwords
 /// PDFDocEncoding can't hold, such as "şifre") stay UTF-8, and other bytes are read as
 /// PDFDocEncoding, so either way the renderer gets back exactly these bytes.
-fn renderer_password(bytes: &[u8]) -> String {
+/// The password string the renderer takes for raw password `bytes` (a user password recovered by
+/// owner authentication): UTF-8, or PDFDocEncoding when the bytes aren't UTF-8.
+pub fn renderer_password(bytes: &[u8]) -> String {
     match std::str::from_utf8(bytes) {
         Ok(text) => text.to_owned(),
         Err(_) => bytes.iter().map(|b| pdfcraft_cos::pdfdoc_char(*b)).collect(),
@@ -2046,6 +2091,12 @@ pub struct Session {
     date_format: Option<String>,
     /// Preferences ▸ Date format ▸ Language, when not following the interface language.
     date_language: Option<String>,
+    /// Preferences ▸ External converters (off by default).
+    external: external::ExternalConverters,
+    /// What the last Convert colours to grayscale did.
+    last_color_report: Option<pdfcraft_optimize::ColorReport>,
+    /// What the last Apply redactions did.
+    last_redaction_report: Option<pdfcraft_redact::Report>,
 }
 
 /// Lay a dynamic XFA form out (pages and fields) and give its widgets appearances.
@@ -2214,6 +2265,13 @@ impl Session {
 
     fn open_unguarded(&mut self, name: String, path: Option<String>, bytes: Arc<Vec<u8>>, password: Option<&str>) -> Result<DocId, OpenError> {
         let cos = std::panic::catch_unwind(|| pdfcraft_cos::Document::open_with_password(bytes.clone(), password));
+        // §7.6.4.4 (#603): a document may carry a non-empty Document Open password yet have the
+        // empty password authenticate as *owner*. The COS reader refuses that silent open with
+        // NeedsPassword; the renderer (hayro) opens R5/6 owner-first and would not. Honour the
+        // COS verdict so the user is always prompted instead of shown the content.
+        if password.is_none_or(str::is_empty) && matches!(&cos, Ok(Err(pdfcraft_cos::CosError::NeedsPassword))) {
+            return Err(OpenError::NeedsPassword);
+        }
         // The renderer authenticates on its own. It cannot use the owner password of R2–R4
         // files, so give it the user password that owner authentication recovers.
         let (info, render_password) = match inspect(bytes.clone(), password) {
@@ -2440,6 +2498,8 @@ impl Session {
 
     /// Apply an edit. On success the previous state is undoable and the view data is refreshed.
     pub fn apply(&mut self, id: DocId, edit: Edit) -> Result<(), EditError> {
+        self.last_color_report = None;
+        self.last_redaction_report = None;
         let now = self.now();
         let today = self.today();
         let js_off = self.js_off;
@@ -2554,7 +2614,19 @@ impl Session {
             doc.xfa_template = None;
             doc.js_output.errors.push(XFA_SCRIPTS_OFF.into());
         }
+        self.last_color_report = cx.colors.take();
+        self.last_redaction_report = cx.redaction.take();
         Ok(())
+    }
+
+    /// What the last Apply redactions did (`None` after any other edit).
+    pub fn last_redaction_report(&self) -> Option<&pdfcraft_redact::Report> {
+        self.last_redaction_report.as_ref()
+    }
+
+    /// What the last Convert colours to grayscale did (`None` after any other edit).
+    pub fn last_color_report(&self) -> Option<&pdfcraft_optimize::ColorReport> {
+        self.last_color_report.as_ref()
     }
 
     pub fn undo(&mut self, id: DocId) -> Result<String, EditError> {
@@ -2786,21 +2858,64 @@ impl Session {
         self.write_new(&pdfcraft_create::from_text(title, text, pdfcraft_create::LETTER, 11.0)?)
     }
 
-    /// Convert a file Create understands (an image or plain text) to PDF bytes; a PDF is checked
-    /// (it must open and allow copying pages) and returned as it is.
+    /// A new document from CSV or tab-separated text: one table, its first row a header repeated
+    /// on every page (wide tables on landscape pages).
+    pub fn create_from_csv(&self, title: &str, name: &str, text: &str) -> Result<(Arc<Vec<u8>>, pdfcraft_create::CsvReport), EditError> {
+        let (doc, report) = pdfcraft_create::from_csv(title, name, text, pdfcraft_create::LETTER)?;
+        Ok((self.write_new(&doc)?, report))
+    }
+
+    /// A new document from Markdown, with how many characters the built-in fonts couldn't show.
+    pub fn create_from_markdown(&self, title: &str, text: &str) -> Result<(Arc<Vec<u8>>, usize), EditError> {
+        let (doc, replaced) = pdfcraft_create::from_markdown(title, text, pdfcraft_create::LETTER)?;
+        Ok((self.write_new(&doc)?, replaced))
+    }
+
+    /// A new document from an email message (`.eml`): its headers and text. Attachments are listed,
+    /// and embedded as file attachments only when `embed_attachments` asks for it.
+    pub fn create_from_email(
+        &self,
+        title: &str,
+        bytes: &[u8],
+        embed_attachments: bool,
+    ) -> Result<(Arc<Vec<u8>>, pdfcraft_create::EmailReport), EditError> {
+        let (doc, report) = pdfcraft_create::from_email(title, bytes, pdfcraft_create::LETTER, embed_attachments)?;
+        Ok((self.write_new(&doc)?, report))
+    }
+
+    /// Convert a file Create understands (an image, plain text, CSV, Markdown or an email message)
+    /// to PDF bytes; a PDF is checked (it must open and allow copying pages) and returned as it is.
     pub fn convert_to_pdf(&self, name: &str, bytes: &Arc<Vec<u8>>) -> Result<(SourceKind, Arc<Vec<u8>>), EditError> {
+        self.convert_to_pdf_noted(name, bytes).map(|(kind, pdf, _)| (kind, pdf))
+    }
+
+    /// [`Self::convert_to_pdf`], with notes for the user about what the conversion couldn't keep
+    /// (characters the built-in fonts can't show, rows or columns cut from a table, attachments
+    /// listed but not embedded).
+    pub fn convert_to_pdf_noted(&self, name: &str, bytes: &Arc<Vec<u8>>) -> Result<Converted, EditError> {
         let Some(kind) = source_kind(name, bytes) else {
-            return Err(EditError::Source(format!("{name}: this file type can't be converted; use a PDF, an image or a .txt file")));
+            return Err(EditError::Source(format!(
+                "{name}: this file type can't be converted; use a PDF, an image, or a .txt, .csv, .md or .eml file"
+            )));
         };
         let title = name.rsplit_once('.').map_or(name, |(s, _)| s);
-        // Image decoders read untrusted bytes: a panic in one must not take the app down.
+        // Decoders and parsers read untrusted bytes: a panic in one must not take the app down.
         let created = guard(|| match kind {
-            SourceKind::Pdf => open_source(name, bytes).map(|_| bytes.clone()),
-            SourceKind::Image => self.create_from_images(&[(name.to_string(), bytes.to_vec())]),
-            SourceKind::Text => self.create_from_text(title, &decode_text(bytes)),
+            SourceKind::Pdf => open_source(name, bytes).map(|_| (bytes.clone(), Vec::new())),
+            SourceKind::Image => self.create_from_images(&[(name.to_string(), bytes.to_vec())]).map(|b| (b, Vec::new())),
+            SourceKind::Text => self.create_from_text(title, &decode_text(bytes)).map(|b| (b, Vec::new())),
+            SourceKind::Csv => self.create_from_csv(title, name, &decode_text(bytes)).map(|(b, r)| (b, conversion_notes_csv(&r))),
+            SourceKind::Markdown => {
+                self.create_from_markdown(title, &decode_text(bytes)).map(|(b, n)| (b, conversion_note_replaced(n).into_iter().collect()))
+            }
+            SourceKind::Email => self.create_from_email(title, bytes, false).map(|(b, r)| (b, conversion_notes_email(&r))),
+            SourceKind::Html | SourceKind::Office => {
+                self.external.convert(kind, name, bytes, &std::sync::atomic::AtomicBool::new(false)).map(|b| (Arc::new(b), Vec::new()))
+            }
         })
         .map_err(|_| EditError::Source(format!("{name}: the file could not be read")))?;
-        Ok((kind, created?))
+        let (pdf, notes) = created?;
+        Ok((kind, pdf, notes))
     }
 
     /// Reduce File Size: Acrobat's defaults (images above 225 ppi to 150 ppi, JPEG medium
@@ -3423,6 +3538,39 @@ pub fn comment_summary(name: &str, all: &[pdfcraft_render::Annotation], sort: Su
         out.push('\n');
     }
     out
+}
+
+/// A file converted to PDF: what it was, the PDF bytes, and notes on what the conversion couldn't keep.
+pub type Converted = (SourceKind, Arc<Vec<u8>>, Vec<String>);
+
+/// The note for `n` characters written as `?` because the built-in fonts can't show them.
+pub fn conversion_note_replaced(n: usize) -> Option<String> {
+    (n > 0).then(|| format!("{n} character(s) the built-in fonts can't show were written as ?"))
+}
+
+pub fn conversion_notes_csv(r: &pdfcraft_create::CsvReport) -> Vec<String> {
+    let mut notes: Vec<String> = conversion_note_replaced(r.replaced_characters).into_iter().collect();
+    if r.rows_dropped > 0 {
+        notes.push(format!("{} row(s) past the first {} were left out", r.rows_dropped, r.rows));
+    }
+    if r.columns_dropped > 0 {
+        notes.push(format!("{} column(s) past the first {} were left out", r.columns_dropped, r.columns));
+    }
+    notes
+}
+
+pub fn conversion_notes_email(r: &pdfcraft_create::EmailReport) -> Vec<String> {
+    let mut notes: Vec<String> = conversion_note_replaced(r.replaced_characters).into_iter().collect();
+    if !r.attachments.is_empty() && !r.embedded {
+        notes.push(format!("{} attachment(s) are listed but not included", r.attachments.len()));
+    }
+    if r.attachments_left_out > 0 {
+        notes.push(format!("{} attachment(s) past the first {} are not listed", r.attachments_left_out, r.attachments.len()));
+    }
+    if r.bodies_left_out > 0 {
+        notes.push(format!("{} text part(s) of the message were left out", r.bodies_left_out));
+    }
+    notes
 }
 
 #[cfg(test)]

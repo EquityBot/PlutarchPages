@@ -205,10 +205,12 @@ fn rotated_text_and_composite_fonts() {
 
 #[test]
 fn images_are_removed_or_have_their_pixels_cleared() {
-    // Image 1 is fully covered; image 2 (4×1 gray, all white) is half covered.
-    let img = stream("/Type /XObject /Subtype /Image /Width 4 /Height 1 /ColorSpace /DeviceGray /BitsPerComponent 8", &[255, 255, 255, 255]);
+    // Image 1 is fully covered; image 2 (4×1 gray, all white) is half covered. They are two
+    // objects: one image drawn at both places would go from both (see
+    // `aliases_and_other_draws_of_a_redacted_image_do_not_keep_the_original`).
+    let img = || stream("/Type /XObject /Subtype /Image /Width 4 /Height 1 /ColorSpace /DeviceGray /BitsPerComponent 8", &[255, 255, 255, 255]);
     let src = b"q 10 0 0 10 10 10 cm /Im1 Do Q q 40 0 0 10 100 100 cm /Im2 Do Q";
-    let mut doc = one_page(src, "/XObject << /Im1 7 0 R /Im2 7 0 R >>", vec![img]);
+    let mut doc = one_page(src, "/XObject << /Im1 8 0 R /Im2 7 0 R >>", vec![img(), img()]);
     mark(&mut doc, 0, &[[5.0, 5.0, 25.0, 25.0], [95.0, 95.0, 120.0, 115.0]], "");
     let r = apply(&mut doc, None).unwrap();
     assert_eq!((r.images_removed, r.images_cleared), (1, 1), "{r:?}");
@@ -222,6 +224,94 @@ fn images_are_removed_or_have_their_pixels_cleared() {
     assert_eq!(s.decoded().unwrap(), [0, 0, 255, 255], "pixels 1–2 (x 100–120) cleared");
     let Object::Stream(orig) = &*doc.get(ObjRef::new(7, 0)) else { panic!() };
     assert_eq!(orig.decoded().unwrap(), [255; 4], "the shared original is untouched");
+    // The originals are no longer referenced from the page: both /Im1 and /Im2 are gone, so a
+    // full save garbage-collects the superseded image (#389).
+    assert!(!xo.contains(b"Im1") && !xo.contains(b"Im2"), "redacted-image resource entries left behind: {:?}", xo);
+}
+
+#[test]
+fn redacted_image_bytes_are_gone_from_the_saved_file() {
+    // Regression for #389: a scanned-page image under a mark must not survive in the saved file.
+    // The image carries a canary byte run; after a full-rewrite save it must be absent, because
+    // the page no longer references the original image XObject.
+    const CANARY: &[u8] = &[0xCA, 0xFE, 0xBA, 0xBE, 0x11, 0x22, 0x33, 0x44];
+    // 8×1 DeviceGray/8bpc image whose pixel bytes are the canary; a Flate scan stand-in.
+    let img = stream("/Type /XObject /Subtype /Image /Width 8 /Height 1 /ColorSpace /DeviceGray /BitsPerComponent 8", CANARY);
+    // Fully cover the single image so its `Do` is dropped and the resource entry removed.
+    let src = b"q 80 0 0 10 10 10 cm /Scan Do Q";
+    let mut doc = one_page(src, "/XObject << /Scan 7 0 R >>", vec![img]);
+    mark(&mut doc, 0, &[[0.0, 0.0, 120.0, 40.0]], "GONE");
+    let r = apply(&mut doc, None).unwrap();
+    assert_eq!(r.images_removed, 1, "{r:?}");
+    assert!(doc.full_save_required(), "redaction forces a full save");
+    let p = pdfcraft_model::pages(&doc).swap_remove(0);
+    let res = doc.resolve(p.dict.get(b"Resources").unwrap()).as_dict().cloned().unwrap();
+    let xo = res.get(b"XObject").and_then(|x| doc.resolve(x).as_dict().cloned()).unwrap_or_default();
+    assert!(!xo.contains(b"Scan"), "the original image is still referenced by the page: {:?}", xo);
+    // A full rewrite only writes reachable objects: the canary must be gone.
+    let bytes = write_full(&doc, &SaveOptions::default()).unwrap();
+    assert!(!bytes.windows(CANARY.len()).any(|w| w == CANARY), "redacted image bytes left in the saved file (#389)");
+}
+
+/// Whether any stream of `doc`, saved and decoded, still holds `secret`.
+fn saved_streams_hold(doc: &Document, secret: &[u8]) -> bool {
+    let saved = Document::open(Arc::new(write_full(doc, &SaveOptions::default()).unwrap())).unwrap();
+    saved.scan_objects().any(|(_, o)| matches!(&*o, Object::Stream(s) if s.decoded().is_ok_and(|d| d.windows(secret.len()).any(|w| w == secret))))
+}
+
+/// Final-review finding F1: no draw of a redacted image, through any resource name, visible or
+/// clipped, may keep pixels that were under a mark in the saved file.
+#[test]
+fn aliases_and_other_draws_of_a_redacted_image_do_not_keep_the_original() {
+    // An 8×1 image: the left half under one mark at its first draw, the right half under
+    // another at its second.
+    const LEFT: &[u8] = &[0xCA, 0xFE, 0xBA, 0xBE];
+    const RIGHT: &[u8] = &[0x11, 0x22, 0x33, 0x44];
+    let img = || stream("/Type /XObject /Subtype /Image /Width 8 /Height 1 /ColorSpace /DeviceGray /BitsPerComponent 8", &[LEFT, RIGHT].concat());
+    let leaks = |doc: &Document| saved_streams_hold(doc, LEFT) || saved_streams_hold(doc, RIGHT);
+    // Two names for one image; only /Scan is drawn, and it is wholly under the mark.
+    let mut doc = one_page(b"q 80 0 0 10 10 10 cm /Scan Do Q", "/XObject << /Scan 7 0 R /Alias 7 0 R >>", vec![img()]);
+    mark(&mut doc, 0, &[[0.0, 0.0, 120.0, 40.0]], "");
+    assert_eq!(apply(&mut doc, None).unwrap().images_removed, 1);
+    assert!(!leaks(&doc), "an unused alias kept the original image");
+    // One image drawn three times, once through an alias. The marks clear the left half of the
+    // first draw and the right half of the second; every draw uses one copy with both cleared.
+    let mut doc = one_page(
+        b"q 80 0 0 10 10 10 cm /Scan Do Q q 80 0 0 10 150 150 cm /Scan Do Q q 80 0 0 10 150 200 cm /Alias Do Q",
+        "/XObject << /Scan 7 0 R /Alias 7 0 R >>",
+        vec![img()],
+    );
+    mark(&mut doc, 0, &[[0.0, 0.0, 50.0, 40.0], [190.0, 140.0, 240.0, 170.0]], "");
+    let r = apply(&mut doc, None).unwrap();
+    assert_eq!((r.images_cleared, r.images_removed), (2, 0), "{r:?}");
+    let drawn = content(&doc, 0);
+    assert!(!drawn.contains("/Scan Do") && !drawn.contains("/Alias Do"), "every draw uses the cleared copy: {drawn}");
+    assert_eq!(drawn.matches("/PCRedacted1 Do").count(), 3, "one copy for every draw: {drawn}");
+    assert!(!leaks(&doc), "a draw kept pixels another draw's mark cleared");
+    // Wholly under a mark at one draw, and drawn again elsewhere clipped to a corner: the image
+    // goes from both draws.
+    let mut doc = one_page(
+        b"q 80 0 0 10 10 10 cm /Scan Do Q q 150 150 5 5 re W n 80 0 0 10 150 150 cm /Alias Do Q",
+        "/XObject << /Scan 7 0 R /Alias 7 0 R >>",
+        vec![img()],
+    );
+    mark(&mut doc, 0, &[[0.0, 0.0, 120.0, 40.0]], "");
+    assert_eq!(apply(&mut doc, None).unwrap().images_removed, 2);
+    let drawn = content(&doc, 0);
+    assert!(!drawn.contains(" Do"), "{drawn}");
+    assert!(!leaks(&doc), "a clipped draw kept the original image");
+}
+
+/// A form redacted on its only draw leaves the page's resources, so its original (unredacted)
+/// stream is not kept in the saved file.
+#[test]
+fn a_redacted_form_does_not_keep_its_original() {
+    let form =
+        stream("/Type /XObject /Subtype /Form /BBox [0 0 300 300] /Resources << /Font << /F1 5 0 R >> >>", b"BT /F1 10 Tf 10 100 Td (SECRET) Tj ET");
+    let mut doc = one_page(b"/Fm Do", "/XObject << /Fm 7 0 R >>", vec![form]);
+    mark(&mut doc, 0, &[[0.0, 90.0, 300.0, 120.0]], "");
+    assert_eq!(apply(&mut doc, None).unwrap().forms_rewritten, 1);
+    assert!(!saved_streams_hold(&doc, b"SECRET"), "the original form stayed in the file");
 }
 
 #[test]
@@ -239,27 +329,180 @@ fn vectors_are_removed_or_clipped_and_inline_images_go() {
 }
 
 #[test]
-fn shared_form_xobjects_are_copied_not_changed() {
+fn shared_form_xobjects_are_redacted_on_every_page_or_refused() {
     let form =
         stream("/Type /XObject /Subtype /Form /BBox [0 0 300 300] /Resources << /Font << /F1 5 0 R >> >>", b"BT /F1 10 Tf 10 100 Td (SECRET) Tj ET");
-    let mut objs: Vec<Vec<u8>> = vec![
-        b"<< /Type /Catalog /Pages 2 0 R >>".to_vec(),
-        b"<< /Type /Pages /Kids [3 0 R 8 0 R] /Count 2 /MediaBox [0 0 300 300] /Resources << /XObject << /Fm 7 0 R >> >> >>".to_vec(),
-        b"<< /Type /Page /Parent 2 0 R /Contents 4 0 R >>".to_vec(),
-        stream("", b"/Fm Do"),
-        FONT.replace("95 0 R", "6 0 R").into_bytes(),
-        widths(),
-        form,
-    ];
-    objs.push(b"<< /Type /Page /Parent 2 0 R /Contents 4 0 R >>".to_vec());
-    let mut doc = pdf(objs);
+    let shared = || {
+        let mut objs: Vec<Vec<u8>> = vec![
+            b"<< /Type /Catalog /Pages 2 0 R >>".to_vec(),
+            b"<< /Type /Pages /Kids [3 0 R 8 0 R] /Count 2 /MediaBox [0 0 300 300] /Resources << /XObject << /Fm 7 0 R >> >> >>".to_vec(),
+            b"<< /Type /Page /Parent 2 0 R /Contents 4 0 R >>".to_vec(),
+            stream("", b"/Fm Do"),
+            FONT.replace("95 0 R", "6 0 R").into_bytes(),
+            widths(),
+            form.clone(),
+        ];
+        objs.push(b"<< /Type /Page /Parent 2 0 R /Contents 4 0 R >>".to_vec());
+        pdf(objs)
+    };
+    // Page 2 draws the same form (and content stream) outside the marks: refused, page named.
+    let mut doc = shared();
     mark(&mut doc, 0, &[[0.0, 90.0, 300.0, 120.0]], "");
+    let err = apply(&mut doc, None).unwrap_err();
+    assert!(matches!(&err, RedactError::StillUsed(p) if p == &[1]), "{err:?}");
+    assert!(err.to_string().contains("on page 2"), "{err}");
+    // Marked on both pages, both are redacted and the original form is gone from the file.
+    let mut doc = shared();
+    mark(&mut doc, 0, &[[0.0, 90.0, 300.0, 120.0]], "");
+    mark(&mut doc, 1, &[[0.0, 90.0, 300.0, 120.0]], "");
     let r = apply(&mut doc, None).unwrap();
-    assert_eq!((r.glyphs, r.forms_rewritten), (6, 1), "{r:?}");
-    assert!(content(&doc, 0).contains("/PCRedacted1 Do"));
-    assert_eq!(content(&doc, 1), "/Fm Do", "page 2 shares the stream and the form: untouched");
-    assert_eq!(under(&mut doc, 1, &[[0.0, 90.0, 300.0, 120.0]]), 6);
+    assert_eq!((r.glyphs, r.forms_rewritten), (12, 2), "{r:?}");
+    assert_eq!(under(&mut doc, 1, &[[0.0, 90.0, 300.0, 120.0]]), 0);
     assert_eq!(under(&mut doc, 0, &[[0.0, 90.0, 300.0, 120.0]]), 0);
+    assert!(!saved_streams_hold(&doc, b"SECRET"));
+}
+
+/// An image shared with another page that draws it outside the marks (clipped or not) can't be
+/// redacted on one page alone; an entry nothing draws, inherited from the page tree, is dropped.
+#[test]
+fn images_used_elsewhere_are_refused_and_unused_entries_dropped() {
+    const SECRET: &[u8] = &[0xCA, 0xFE, 0xBA, 0xBE, 0x11, 0x22, 0x33, 0x44];
+    let img = || stream("/Type /XObject /Subtype /Image /Width 8 /Height 1 /ColorSpace /DeviceGray /BitsPerComponent 8", SECRET);
+    let two_pages = |second: &[u8]| {
+        pdf(vec![
+            b"<< /Type /Catalog /Pages 2 0 R >>".to_vec(),
+            b"<< /Type /Pages /Kids [3 0 R 6 0 R] /Count 2 /MediaBox [0 0 300 300] /Resources << /XObject << /Scan 5 0 R >> >> >>".to_vec(),
+            b"<< /Type /Page /Parent 2 0 R /Contents 4 0 R >>".to_vec(),
+            stream("", b"q 80 0 0 10 10 10 cm /Scan Do Q"),
+            img(),
+            b"<< /Type /Page /Parent 2 0 R /Contents 7 0 R >>".to_vec(),
+            stream("", second),
+        ])
+    };
+    // Page 2 draws it clipped to a corner: refused.
+    let mut doc = two_pages(b"q 10 10 2 2 re W n 80 0 0 10 10 10 cm /Scan Do Q");
+    mark(&mut doc, 0, &[[0.0, 0.0, 120.0, 40.0]], "");
+    assert!(matches!(apply(&mut doc, None), Err(RedactError::StillUsed(p)) if p == [1]));
+    // Page 2 inherits the entry but draws nothing: the entry is dropped and the image is gone.
+    let mut doc = two_pages(b"");
+    mark(&mut doc, 0, &[[0.0, 0.0, 120.0, 40.0]], "");
+    assert_eq!(apply(&mut doc, None).unwrap().images_removed, 1);
+    assert!(!saved_streams_hold(&doc, SECRET), "the inherited entry kept the original image");
+}
+
+/// Final-review findings on 78b92a5: a form that draws from the resources it inherits counts as
+/// drawing those names (so its image is not pruned from under it), and one image or form drawn
+/// on several pages is redacted with every page's marks.
+#[test]
+fn shared_images_and_forms_are_redacted_with_every_pages_marks() {
+    const LEFT: &[u8] = &[0xCA, 0xFE, 0xBA, 0xBE];
+    const RIGHT: &[u8] = &[0x11, 0x22, 0x33, 0x44];
+    let img = || stream("/Type /XObject /Subtype /Image /Width 8 /Height 1 /ColorSpace /DeviceGray /BitsPerComponent 8", &[LEFT, RIGHT].concat());
+    let leaks = |doc: &Document| saved_streams_hold(doc, LEFT) || saved_streams_hold(doc, RIGHT);
+    // Objects: 1 catalog, 2 pages (shared resources), 3 and 6 pages, 4 and 7 contents, 5 the
+    // image, 8 a form, 9 the font, 10 its widths.
+    let two_pages = |first: &[u8], second: &[u8], form: &[u8]| {
+        pdf(vec![
+            b"<< /Type /Catalog /Pages 2 0 R >>".to_vec(),
+            b"<< /Type /Pages /Kids [3 0 R 6 0 R] /Count 2 /MediaBox [0 0 300 300] /Resources << /XObject << /Scan 5 0 R /Fm 8 0 R >> /Font << /F1 9 0 R >> >> >>".to_vec(),
+            b"<< /Type /Page /Parent 2 0 R /Contents 4 0 R >>".to_vec(),
+            stream("", first),
+            img(),
+            b"<< /Type /Page /Parent 2 0 R /Contents 7 0 R >>".to_vec(),
+            stream("", second),
+            stream("/Type /XObject /Subtype /Form /BBox [0 0 300 300]", form),
+            FONT.replace("95 0 R", "10 0 R").into_bytes(),
+            widths(),
+        ])
+    };
+    let scan = b"q 80 0 0 10 10 10 cm /Scan Do Q";
+    // Page 2 draws a form without resources of its own, which draws /Scan from page 2's.
+    let mut doc = two_pages(scan, b"/Fm Do", scan);
+    mark(&mut doc, 0, &[[0.0, 0.0, 120.0, 40.0]], "");
+    assert!(matches!(apply(&mut doc, None), Err(RedactError::StillUsed(p)) if p == [1]), "the form's image must not be pruned");
+    // The image on both pages: page 1 marks its left half, page 2 its right half. One copy,
+    // with both halves cleared, is drawn on both pages.
+    let mut doc = two_pages(scan, scan, b"");
+    mark(&mut doc, 0, &[[0.0, 0.0, 50.0, 40.0]], "");
+    mark(&mut doc, 1, &[[50.0, 0.0, 120.0, 40.0]], "");
+    let r = apply(&mut doc, None).unwrap();
+    assert_eq!((r.images_cleared, r.shared_redacted), (2, 2), "{r:?}");
+    {
+        let copy = |i: usize| {
+            let p = pdfcraft_model::pages(&doc).swap_remove(i);
+            let res = doc.resolve(p.dict.get(b"Resources").unwrap()).as_dict().cloned().unwrap();
+            doc.resolve(res.get(b"XObject").unwrap()).as_dict().and_then(|x| x.get(b"PCRedacted1").and_then(Object::as_ref))
+        };
+        assert!(copy(0).is_some() && copy(0) == copy(1), "both pages draw the same copy");
+    }
+    assert!(!leaks(&doc), "a page's copy kept pixels the other page's mark cleared");
+    // Partly marked on page 1, wholly on page 2: page 2 drops it and page 1's copy is blank.
+    let mut doc = two_pages(scan, scan, b"");
+    mark(&mut doc, 0, &[[0.0, 0.0, 50.0, 40.0]], "");
+    mark(&mut doc, 1, &[[0.0, 0.0, 120.0, 40.0]], "");
+    assert_eq!(apply(&mut doc, None).unwrap().shared_redacted, 1, "page 1's draw is blanked by page 2's mark");
+    let second = content(&doc, 1);
+    assert!(!second.contains("/Scan Do") && !second.contains("/PCRedacted1 Do"), "{second}");
+    assert!(!leaks(&doc), "page 1's copy kept pixels page 2's mark covered");
+    // A form on both pages: page 1 marks its left word, page 2 its right word. Both copies
+    // lose both words.
+    let words = b"BT /F1 10 Tf 10 100 Td (LEFTSECRET) Tj 190 0 Td (RIGHTSECRET) Tj ET";
+    let mut doc = two_pages(b"/Fm Do", b"/Fm Do", words);
+    mark(&mut doc, 0, &[[0.0, 90.0, 120.0, 120.0]], "");
+    mark(&mut doc, 1, &[[190.0, 90.0, 300.0, 120.0]], "");
+    let r = apply(&mut doc, None).unwrap();
+    assert_eq!((r.forms_rewritten, r.shared_redacted), (2, 2), "{r:?}");
+    assert!(
+        !saved_streams_hold(&doc, b"LEFTSECRET") && !saved_streams_hold(&doc, b"RIGHTSECRET"),
+        "a copy kept a word the other page's mark removed"
+    );
+}
+
+/// Final-review findings on ac75a54: an unmarked draw split across a page's content streams, or
+/// made by a form with unusual keys, still counts as a draw (redaction refuses instead of pruning
+/// the image from under it), and a form whose marks can't be carried between its draws (a
+/// singular matrix, or too many draws) makes redaction refuse.
+#[test]
+fn unusual_draws_make_redaction_refuse_rather_than_break_content() {
+    let img = stream("/Type /XObject /Subtype /Image /Width 8 /Height 1 /ColorSpace /DeviceGray /BitsPerComponent 8", &[7; 8]);
+    let words = b"BT /F1 10 Tf 10 100 Td (LEFTSECRET) Tj 190 0 Td (RIGHTSECRET) Tj ET";
+    // Objects: 1 catalog, 2 pages (shared resources), 3 and 6 pages, 4 and 7 contents, 5 the
+    // image, 8 a form, 9 the font, 10 its widths, 11 a second content stream for page 2.
+    let doc_with = |second_contents: &str, second: &[u8], form_dict: &str, form: &[u8], first: &[u8]| {
+        pdf(vec![
+            b"<< /Type /Catalog /Pages 2 0 R >>".to_vec(),
+            b"<< /Type /Pages /Kids [3 0 R 6 0 R] /Count 2 /MediaBox [0 0 300 300] /Resources << /XObject << /Scan 5 0 R /Fm 8 0 R >> /Font << /F1 9 0 R >> >> >>".to_vec(),
+            b"<< /Type /Page /Parent 2 0 R /Contents 4 0 R >>".to_vec(),
+            stream("", first),
+            img.clone(),
+            format!("<< /Type /Page /Parent 2 0 R /Contents {second_contents} >>").into_bytes(),
+            stream("", second),
+            stream(form_dict, form),
+            FONT.replace("95 0 R", "10 0 R").into_bytes(),
+            widths(),
+            stream("", b" Do Q"),
+        ])
+    };
+    let scan = b"q 80 0 0 10 10 10 cm /Scan Do Q";
+    let still_used_on_page_2 = |doc: &mut Document| matches!(apply(doc, None), Err(RedactError::StillUsed(p)) if p == [1]);
+    // Page 2 draws the image with `/Scan` ending one content stream and `Do` starting the next.
+    let mut doc = doc_with("[7 0 R 11 0 R]", b"q 80 0 0 10 10 10 cm /Scan", "/Type /XObject /Subtype /Form /BBox [0 0 300 300]", b"", scan);
+    mark(&mut doc, 0, &[[0.0, 0.0, 120.0, 40.0]], "");
+    assert!(still_used_on_page_2(&mut doc), "a draw split across content streams was missed");
+    // Page 2 draws a form that has a stray /N, and the form draws the inherited image.
+    let mut doc = doc_with("7 0 R", b"/Fm Do", "/Type /XObject /Subtype /Form /BBox [0 0 300 300] /N 1", scan, scan);
+    mark(&mut doc, 0, &[[0.0, 0.0, 120.0, 40.0]], "");
+    assert!(still_used_on_page_2(&mut doc), "a form with a stray /N was not read");
+    // A form drawn normally on page 1 and through a singular matrix on page 2, both marked.
+    let mut doc = doc_with("7 0 R", b"q 1 1 1 1 0 0 cm /Fm Do Q", "/Type /XObject /Subtype /Form /BBox [0 0 300 300]", words, b"/Fm Do");
+    mark(&mut doc, 0, &[[0.0, 90.0, 120.0, 120.0]], "");
+    mark(&mut doc, 1, &[[0.0, 0.0, 300.0, 300.0]], "");
+    assert!(matches!(apply(&mut doc, None), Err(RedactError::SharedForm(_))), "a singular draw's marks were dropped");
+    // One form drawn more often than its marks can be carried between.
+    let many: Vec<u8> = (0..300).flat_map(|i| format!("q 1 0 0 1 0 {} cm /Fm Do Q ", i % 300).into_bytes()).collect();
+    let mut doc = doc_with("7 0 R", b"", "/Type /XObject /Subtype /Form /BBox [0 0 300 300]", words, &many);
+    mark(&mut doc, 0, &[[0.0, 0.0, 300.0, 300.0]], "");
+    assert!(matches!(apply(&mut doc, None), Err(RedactError::SharedForm(p)) if p == [0]));
 }
 
 #[test]

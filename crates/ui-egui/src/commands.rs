@@ -421,6 +421,22 @@ impl PdfCraftApp {
                 self.dialog = Some(Dialog::RedactSearch);
             }
             "redact.properties" => self.dialog = Some(Dialog::RedactProps),
+            "edit.convert_gray" => {
+                if self.apply_edit(Edit::ConvertToGray { pages: Vec::new() })
+                    && let Some(r) = self.session.last_color_report()
+                {
+                    let note = crate::i18n::fmt(
+                        tl!("Converted to grayscale: {ops} colours, {images} images, {forms} forms; {left} left as they were"),
+                        &[
+                            ("ops", &r.operators.to_string()),
+                            ("images", &r.images.to_string()),
+                            ("forms", &r.forms.to_string()),
+                            ("left", &r.left.to_string()),
+                        ],
+                    );
+                    self.notify(note);
+                }
+            }
             "redact.apply" => {
                 let marks = active.and_then(|i| self.session.get(self.views[i].id)).map_or(0, |d| d.redaction_marks());
                 if marks == 0 {
@@ -495,6 +511,7 @@ impl PdfCraftApp {
             "form.export_data" => self.export_data_dialog(false, true),
             "form.merge_data" => self.merge_data_dialog(),
             "export.docx" => self.export_office_dialog(pdfcraft_engine::compare::OfficeFormat::Docx),
+            "export.xlsx" => self.export_office_dialog(pdfcraft_engine::compare::OfficeFormat::Xlsx),
             "export.html" => self.export_office_dialog(pdfcraft_engine::compare::OfficeFormat::Html),
             "export.rtf" => self.export_office_dialog(pdfcraft_engine::compare::OfficeFormat::Rtf),
             "form.prepare" => {
@@ -566,6 +583,10 @@ impl PdfCraftApp {
             "create.multiple" => self.create_multiple_dialog(),
             "create.images" => self.create_from_images_dialog(),
             "create.clipboard" => self.create_from_clipboard(),
+            "create.web_page" => self.dialog = Some(Dialog::WebPage),
+            "view.read_aloud" => self.read_aloud(false),
+            "view.read_aloud_to_end" => self.read_aloud(true),
+            "view.stop_reading" => self.stop_reading(),
             "optimize.reduce" => self.reduce_file_size(),
             "page.duplicate" => {
                 self.apply_edit(Edit::DuplicatePages { pages: targets });

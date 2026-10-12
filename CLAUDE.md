@@ -17,7 +17,7 @@ PdfCraft is a clean-room, open-source, Rust-native PDF application targeting Ado
 - **Clean-room.**
   - Never read, disassemble or copy anything inside the Acrobat bundle (names and listings only). **Never open `Contents/Resources/JavaScripts/`.**
   - Behaviour comes from public docs, specs (ISO 32000-2, the Arlington model) and black-box observation (`plan/acrobat/`).
-  - Never copy GPL/AGPL code. MuPDF, Ghostscript, Poppler, veraPDF and DSS run only as external oracle processes.
+  - Never copy GPL/AGPL code. MuPDF, Ghostscript, Poppler, veraPDF and DSS run only as external oracle processes. The one product exception is `crates/external` (AGENTS.md §2): separately installed LibreOffice, Chrome or Edge and eSpeak NG as optional, off-by-default backends, never linked or bundled.
   - See `plan/README.md` §Clean-room and `plan/adr/0001`.
 - **Privacy.** When observing Acrobat, use synthetic fixtures only. Never capture the Home view, recent files or account info. Capture by window id (`plan/acrobat/tools/`). Never commit Acrobat outputs, corpus files or personal data.
 - **Layering.** Nothing below L7 depends on egui/winit/eframe/rfd (`plan/architecture.md` §3). `cos`/`filters`/`crypt`/`arlington` stay standalone.

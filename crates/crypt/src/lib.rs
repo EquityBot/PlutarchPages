@@ -184,6 +184,13 @@ impl SecurityHandler {
         self.auth
     }
 
+    /// Treat an owner authentication as a user one, so the document's permissions apply. The file
+    /// key is the same either way; only what the reader allows changes. For a document opened
+    /// without a password whose empty password authenticates as both owner and user.
+    pub fn open_as_user(&mut self) {
+        self.auth = Auth::User;
+    }
+
     /// For R2–R4 documents opened with the owner password: the user password, which owner
     /// authentication recovers (Algorithm 7). Lets components that only accept user passwords
     /// open the document too.
@@ -193,6 +200,23 @@ impl SecurityHandler {
 
     pub fn permissions(&self) -> Permissions {
         Permissions { bits: self.dict.p, owner: self.auth == Auth::Owner }
+    }
+
+    /// Does the EMPTY password authenticate as the *user* (Document Open) password? `id0` is the
+    /// first element of the trailer `/ID`, as [`SecurityHandler::open`] takes it.
+    ///
+    /// A document can have a non-empty Document Open password yet an owner password the empty
+    /// string authenticates (for R2–R4 any viewer that only checks the user password still
+    /// prompts, but owner-first handlers like ours would open it silently). Callers use this to
+    /// enforce §7.6.4.4: when the empty password opened the file *as owner* and this returns
+    /// `false`, a non-empty user password exists and the viewer must still prompt for it rather
+    /// than show the content (#603).
+    pub fn authenticates_empty_user(&self, id0: &[u8]) -> bool {
+        match self.dict.r {
+            2..=4 => user_key_r4(&self.dict, id0, &legacy_password("")).is_some(),
+            5 | 6 => key_r6(&self.dict, &sasl_password(""), false).ok().flatten().is_some(),
+            _ => false,
+        }
     }
 
     pub fn dict(&self) -> &EncryptDict {

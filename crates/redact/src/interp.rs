@@ -17,7 +17,8 @@
 //! In verify mode nothing changes; glyphs and inline images that still overlap a region are
 //! counted.
 
-use std::collections::HashMap;
+use std::borrow::Cow;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 use pdfcraft_content::{Matrix, Op, Pieces, contains, num, overlaps, serialize_ops, string};
@@ -27,6 +28,8 @@ use crate::{Report, image};
 use pdfcraft_fonts::pdf::Metrics;
 
 const MAX_DEPTH: usize = 12;
+/// The most distinct draws of one form over the marks that redaction carries marks between.
+const MAX_FORM_DRAWS: usize = 256;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Mode {
@@ -54,12 +57,68 @@ pub(crate) struct Output {
     pub streams: Vec<Option<Vec<u8>>>,
     /// New XObjects the rewritten content refers to: (resource name, object).
     pub xobjects: Vec<(Vec<u8>, ObjRef)>,
+    /// Resource names (aliases included) of redacted image and form XObjects that no surviving
+    /// `Do` still draws: the caller drops them from the scope's `/Resources /XObject`, so a full
+    /// save garbage-collects the superseded stream. Without this the original (unredacted)
+    /// image stays in the file and is extractable (#389).
+    pub remove_xobjects: Vec<Vec<u8>>,
+    /// Images partly under the marks: the resource name this scope gives the document's cleared
+    /// copy of each ([`Shared::images`]), used by every draw of that image in this scope.
+    cleared: Vec<Cleared>,
+    /// Images wholly under a mark (or that can't be cleared): every draw of them in this scope
+    /// is removed.
+    gone: HashSet<ObjRef>,
+    /// Form XObjects rewritten for a draw under the marks.
+    forms: HashSet<ObjRef>,
+    /// Every original this scope (and the forms it draws) redacted away: images removed or
+    /// replaced by a cleared copy, and forms rewritten or removed. `apply` refuses to finish
+    /// while any of them is still reachable in the document.
+    pub retired: HashSet<ObjRef>,
     /// Glyphs / inline images still overlapping a region (verify mode).
     pub residue: usize,
 }
 
+/// An image's cleared copy in one scope: the original object and the copy's resource name.
+struct Cleared {
+    original: ObjRef,
+    name: Vec<u8>,
+}
+
+/// What redaction shares across pages and nested forms, so every draw of one image or form
+/// object is redacted with the marks that fall on any of its draws.
+#[derive(Default)]
+pub(crate) struct Shared {
+    /// Images partly under the marks: the document's one cleared copy of each, cleared again
+    /// for every such draw, so it holds the union of the cleared pixels. `apply` writes it.
+    pub images: HashMap<ObjRef, SharedImage>,
+    /// Images wholly under a mark at some draw, or that can't be cleared.
+    pub gone: HashSet<ObjRef>,
+    /// Where each form XObject is drawn over the marks: the page, the form-to-page matrix of
+    /// each draw and that page's marks (collected by a first pass, see `apply`).
+    pub forms: HashMap<ObjRef, Vec<FormDraw>>,
+    /// Forms whose marks can't be carried between their draws (a matrix with no inverse, a
+    /// result that isn't finite, or more than [`MAX_FORM_DRAWS`] draws): `apply` refuses.
+    pub unmapped: HashSet<ObjRef>,
+    /// The first pass: record form draws, change nothing.
+    pub collect: bool,
+}
+
+/// A form XObject's draw over the marks: the page, its form-to-page matrix and that page's marks.
+type FormDraw = (usize, Matrix, Vec<[f64; 4]>);
+
+pub(crate) struct SharedImage {
+    /// Reserved when first needed; `apply` writes the final stream into it.
+    pub copy: ObjRef,
+    pub stream: Stream,
+    /// The draws that use it.
+    pub draws: usize,
+}
+
 pub(crate) struct Scope<'a> {
-    pub rects: &'a [[f64; 4]],
+    pub rects: Cow<'a, [[f64; 4]]>,
+    pub shared: Shared,
+    /// The page being processed (0-based).
+    pub page: usize,
     pub mode: Mode,
     pub report: &'a mut Report,
     /// Sanitize: remove hidden text (invisible render modes, or wholly outside this page box).
@@ -77,7 +136,9 @@ pub(crate) struct Scope<'a> {
 impl<'a> Scope<'a> {
     pub fn new(rects: &'a [[f64; 4]], mode: Mode, report: &'a mut Report) -> Self {
         Scope {
-            rects,
+            rects: Cow::Borrowed(rects),
+            shared: Shared::default(),
+            page: 0,
             mode,
             report,
             hidden_text: None,
@@ -237,6 +298,8 @@ pub(crate) fn process(doc: &mut Document, scope: &mut Scope<'_>, streams: &[Vec<
         }
     }
 
+    // Each piece's rewritten operators; serialized after the image references are settled below.
+    let mut rewritten: Vec<(Vec<Op>, bool)> = Vec::new();
     for (piece, mut changed) in pieces.into_iter().zip(rewrite) {
         let mut ops: Vec<Op> = Vec::with_capacity(piece.len());
         for op in piece {
@@ -282,7 +345,7 @@ pub(crate) fn process(doc: &mut Document, scope: &mut Scope<'_>, streams: &[Vec<
                     // A clip-and-paint path can't be wrapped in q/Q without losing its clip:
                     // paint it clipped, then set its clip with a no-op path.
                     scope.report.paths_clipped += 1;
-                    if let Some(c) = clip_out(scope.rects, &gs.ctm, b) {
+                    if let Some(c) = clip_out(&scope.rects, &gs.ctm, b) {
                         let plain: Vec<Op> = body.iter().filter(|p| !p.is("W") && !p.is("W*")).cloned().collect();
                         ops.push(Op::new("q", vec![]));
                         ops.extend(c);
@@ -294,7 +357,7 @@ pub(crate) fn process(doc: &mut Document, scope: &mut Scope<'_>, streams: &[Vec<
                     ops.push(Op::new("n", vec![]));
                 } else {
                     scope.report.paths_clipped += 1;
-                    if let Some(c) = clip_out(scope.rects, &gs.ctm, b) {
+                    if let Some(c) = clip_out(&scope.rects, &gs.ctm, b) {
                         ops.push(Op::new("q", vec![]));
                         ops.extend(c);
                         ops.extend(body);
@@ -419,7 +482,7 @@ pub(crate) fn process(doc: &mut Document, scope: &mut Scope<'_>, streams: &[Vec<
                 }
                 b"sh" if scope.mode == Mode::Apply => {
                     // A shading fills the current clip: clip the regions out.
-                    if let Some(c) = clip_out(scope.rects, &gs.ctm, [-1e6, -1e6, 1e6, 1e6]) {
+                    if let Some(c) = clip_out(&scope.rects, &gs.ctm, [-1e6, -1e6, 1e6, 1e6]) {
                         changed = true;
                         ops.push(Op::new("q", vec![]));
                         ops.extend(c);
@@ -444,8 +507,53 @@ pub(crate) fn process(doc: &mut Document, scope: &mut Scope<'_>, streams: &[Vec<
         if !path.is_empty() {
             ops.append(&mut path);
         }
-        out.streams.push(changed.then(|| serialize_ops(&ops)));
+        rewritten.push((ops, changed));
     }
+    // A redacted image is redacted in every draw of it in this scope, matched by object (so
+    // through any resource name): an image wholly under a mark (or that can't be cleared)
+    // leaves every draw, and a partly covered one is drawn from the document's single cleared
+    // copy. Its redacted pixels then survive in no other draw, visible or clipped.
+    let target = |n: &[u8]| xobjects.get(n).and_then(Object::as_ref);
+    let copy_names: HashMap<Vec<u8>, ObjRef> = out.cleared.iter().map(|c| (c.name.clone(), c.original)).collect();
+    let mut copy_of: HashMap<ObjRef, Vec<u8>> = HashMap::new();
+    for c in std::mem::take(&mut out.cleared) {
+        if let Some(shared) = scope.shared.images.get(&c.original)
+            && !out.gone.contains(&c.original)
+        {
+            out.xobjects.push((c.name.clone(), shared.copy));
+            copy_of.insert(c.original, c.name);
+        }
+    }
+    for (ops, changed) in &mut rewritten {
+        let before = ops.len();
+        ops.retain_mut(|op| {
+            let Some(name) = op.name(0).filter(|_| op.is("Do")) else { return true };
+            let Some(original) = copy_names.get(name).copied().or_else(|| target(name)) else { return true };
+            if out.gone.contains(&original) {
+                scope.report.images_removed += 1;
+                return false;
+            }
+            if let Some(copy) = copy_of.get(&original)
+                && copy.as_slice() != name
+            {
+                *op = Op::new("Do", vec![Object::Name(copy.clone())]);
+                *changed = true;
+            }
+            true
+        });
+        *changed |= ops.len() != before;
+    }
+    // Every resource name of a superseded original that nothing draws any more is dropped, so a
+    // full save drops the original stream (#389). A form drawn again outside the marks keeps its
+    // original for that draw.
+    let drawn: HashSet<ObjRef> =
+        rewritten.iter().flat_map(|(ops, _)| ops.iter()).filter(|op| op.is("Do")).filter_map(|op| op.name(0).and_then(target)).collect();
+    let superseded = |r: &ObjRef| out.gone.contains(r) || copy_of.contains_key(r) || out.forms.contains(r);
+    out.remove_xobjects =
+        xobjects.iter().filter(|(_, v)| v.as_ref().is_some_and(|r| superseded(&r) && !drawn.contains(&r))).map(|(n, _)| n.to_vec()).collect();
+    out.remove_xobjects.sort();
+    out.retired.extend(out.gone.iter().chain(copy_of.keys()).chain(&out.forms).copied());
+    out.streams = rewritten.into_iter().map(|(ops, changed)| changed.then(|| serialize_ops(&ops))).collect();
     out
 }
 
@@ -550,22 +658,43 @@ fn xobject(
             if !scope.hits(b) || scope.mode == Mode::Verify {
                 return None;
             }
-            if scope.covered(b) {
-                scope.report.images_removed += 1;
-                return Some(None);
-            }
-            match image::clear(doc, s, &gs.ctm, scope.rects) {
+            // Partly covered: clear this draw's pixels in the document's cleared copy of the image
+            // (made from the original at its first such draw), which every draw of it then uses.
+            let cleared = if scope.covered(b) {
+                Err(())
+            } else {
+                image::clear(doc, scope.shared.images.get(&r).map_or(s, |c| &c.stream), &gs.ctm, &scope.rects)
+            };
+            match cleared {
                 Ok(None) => None,
                 Ok(Some(new)) => {
-                    let nr = doc.add(Object::Stream(new));
-                    let n = fresh_name(scope, xobjects);
-                    xobjects.set(n.clone(), Object::Ref(nr));
-                    out.xobjects.push((n.clone(), nr));
                     scope.report.images_cleared += 1;
+                    match scope.shared.images.get_mut(&r) {
+                        Some(c) => {
+                            c.stream = new;
+                            c.draws += 1;
+                        }
+                        None => {
+                            let copy = doc.add(Object::Null);
+                            scope.shared.images.insert(r, SharedImage { copy, stream: new, draws: 1 });
+                        }
+                    }
+                    let n = match out.cleared.iter().find(|c| c.original == r) {
+                        Some(c) => c.name.clone(),
+                        None => {
+                            let n = fresh_name(scope, xobjects);
+                            out.cleared.push(Cleared { original: r, name: n.clone() });
+                            n
+                        }
+                    };
                     Some(Some(Op::new("Do", vec![Object::Name(n)])))
                 }
+                // Wholly covered, or can't be cleared: this draw goes, `process` removes the
+                // image's other draws in this scope, and `apply` blanks its copy elsewhere.
                 Err(()) => {
                     scope.report.images_removed += 1;
+                    out.gone.insert(r);
+                    scope.shared.gone.insert(r);
                     Some(None)
                 }
             }
@@ -583,41 +712,98 @@ fn xobject(
             {
                 return None;
             }
+            if scope.shared.collect {
+                let draw = (scope.page, fctm, scope.rects.to_vec());
+                let draws = scope.shared.forms.entry(r).or_default();
+                if !draws.contains(&draw) {
+                    if draws.len() < MAX_FORM_DRAWS {
+                        draws.push(draw);
+                    } else {
+                        scope.shared.unmapped.insert(r);
+                    }
+                }
+            }
             if scope.depth >= MAX_DEPTH {
                 if scope.mode == Mode::Verify {
                     return None;
                 }
                 scope.report.forms_removed += 1;
+                out.forms.insert(r);
                 return Some(None);
             }
             let data = match s.decoded() {
                 Ok(d) => d,
                 Err(_) if scope.mode == Mode::Apply => {
                     scope.report.forms_removed += 1;
+                    out.forms.insert(r);
                     return Some(None);
                 }
                 Err(_) => return None,
             };
             let own = s.dict.get(b"Resources").and_then(|r| doc.resolve(r).as_dict().cloned());
             let res = own.clone().unwrap_or_else(|| resources.clone());
+            // Every draw of this form over the marks, on any page, redacts the same content: the
+            // marks of its other draws, mapped through the form into this draw's page space, are
+            // added here. No copy then keeps what another draw's marks removed.
+            let mut others: Vec<[f64; 4]> = Vec::new();
+            if scope.mode == Mode::Apply
+                && let Some(draws) = scope.shared.forms.get(&r)
+            {
+                let mut unmapped = false;
+                for (page, m, rects) in draws {
+                    // This draw (or one placed and marked the same way) adds nothing.
+                    if *page == scope.page && *m == fctm && rects.as_slice() == &*scope.rects {
+                        continue;
+                    }
+                    let Some(to_form) = m.invert() else {
+                        unmapped = true;
+                        continue;
+                    };
+                    for q in rects {
+                        let mapped = fctm.bbox(to_form.bbox(*q));
+                        if mapped.iter().all(|v| v.is_finite()) {
+                            others.push(mapped);
+                        } else {
+                            unmapped = true;
+                        }
+                    }
+                }
+                if unmapped {
+                    scope.shared.unmapped.insert(r);
+                }
+                if !others.is_empty() {
+                    scope.report.shared_redacted += 1;
+                }
+            }
+            let saved_rects = (!others.is_empty()).then(|| {
+                let all: Vec<[f64; 4]> = scope.rects.iter().copied().chain(others).collect();
+                std::mem::replace(&mut scope.rects, Cow::Owned(all))
+            });
             let saved_fonts = std::mem::take(&mut scope.fonts);
             scope.depth += 1;
             let inner = process(doc, scope, &[data], &res, fctm);
+            out.retired.extend(&inner.retired);
             scope.depth -= 1;
             scope.fonts = saved_fonts;
+            if let Some(rects) = saved_rects {
+                scope.rects = rects;
+            }
             out.residue += inner.residue;
             if scope.mode == Mode::Verify {
                 return None;
             }
             let new_data = inner.streams.into_iter().next().flatten();
-            if new_data.is_none() && inner.xobjects.is_empty() {
+            if new_data.is_none() && inner.xobjects.is_empty() && inner.remove_xobjects.is_empty() {
                 return None;
             }
             let mut dict = s.dict.clone();
             dict.remove(b"Length");
-            if !inner.xobjects.is_empty() {
+            if !inner.xobjects.is_empty() || !inner.remove_xobjects.is_empty() {
                 let mut res = res;
                 let mut xo = res_dict(doc, &res, b"XObject");
+                for n in &inner.remove_xobjects {
+                    xo.remove(n);
+                }
                 for (n, r) in &inner.xobjects {
                     xo.set(n.clone(), Object::Ref(*r));
                 }
@@ -633,6 +819,7 @@ fn xobject(
             xobjects.set(n.clone(), Object::Ref(nr));
             out.xobjects.push((n.clone(), nr));
             scope.report.forms_rewritten += 1;
+            out.forms.insert(r);
             Some(Some(Op::new("Do", vec![Object::Name(n)])))
         }
         _ => None,

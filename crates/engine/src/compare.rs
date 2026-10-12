@@ -126,6 +126,7 @@ impl Session {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum OfficeFormat {
     Docx,
+    Xlsx,
     Html,
     Rtf,
 }
@@ -134,6 +135,7 @@ impl OfficeFormat {
     pub fn extension(self) -> &'static str {
         match self {
             OfficeFormat::Docx => "docx",
+            OfficeFormat::Xlsx => "xlsx",
             OfficeFormat::Html => "html",
             OfficeFormat::Rtf => "rtf",
         }
@@ -142,6 +144,7 @@ impl OfficeFormat {
     pub fn from_extension(ext: &str) -> Option<OfficeFormat> {
         match ext.to_ascii_lowercase().as_str() {
             "docx" => Some(OfficeFormat::Docx),
+            "xlsx" => Some(OfficeFormat::Xlsx),
             "html" | "htm" => Some(OfficeFormat::Html),
             "rtf" => Some(OfficeFormat::Rtf),
             _ => None,
@@ -188,12 +191,13 @@ impl crate::Document {
             .collect()
     }
 
-    /// The document as a Word, HTML or RTF file.
+    /// The document as a Word, Excel, HTML or RTF file.
     pub fn export_office(&self, format: OfficeFormat) -> Vec<u8> {
         let pages = self.export_pages();
         let title = self.info.title.clone().unwrap_or_else(|| self.name.trim_end_matches(".pdf").to_string());
         match format {
             OfficeFormat::Docx => pdfcraft_export::docx(&pages, &title),
+            OfficeFormat::Xlsx => pdfcraft_export::xlsx(&pages, &title),
             OfficeFormat::Html => pdfcraft_export::html(&pages, &title).into_bytes(),
             OfficeFormat::Rtf => pdfcraft_export::rtf(&pages).into_bytes(),
         }

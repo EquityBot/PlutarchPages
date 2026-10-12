@@ -248,6 +248,12 @@ pub struct OutlineItem {
     pub view: DestView,
     pub children: Vec<OutlineItem>,
     pub open: bool,
+    /// Text colour (`/C`, RGB 0–1); `None` for the default black.
+    pub color: Option<[f32; 3]>,
+    /// `/F` bit 2.
+    pub bold: bool,
+    /// `/F` bit 1.
+    pub italic: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -716,7 +722,23 @@ impl<'a> Inspector<'a> {
             }
             let open = d.get(b"Count").ok().and_then(|c| c.as_i64().ok()).is_some_and(|c| c > 0);
             let title = self.text(d, b"Title").unwrap_or_default();
-            listed.push((depth, OutlineItem { title, page, view, children: Vec::new(), open }));
+            // ISO 32000-2 §12.3.3, Table 151: /C is an RGB colour, /F bit 1 italic and bit 2 bold.
+            let num = |o: &Object| match o {
+                Object::Integer(i) => Some(*i as f32),
+                Object::Real(r) => Some(*r),
+                _ => None,
+            };
+            let color = d
+                .get(b"C")
+                .ok()
+                .and_then(|c| c.as_array().ok())
+                .and_then(|c| {
+                    <[f32; 3]>::try_from(c.iter().filter_map(num).map(|v| if v.is_finite() { v.clamp(0.0, 1.0) } else { 0.0 }).collect::<Vec<_>>())
+                        .ok()
+                })
+                .filter(|c| *c != [0.0; 3]);
+            let flags = d.get(b"F").ok().and_then(|f| f.as_i64().ok()).unwrap_or(0);
+            listed.push((depth, OutlineItem { title, page, view, children: Vec::new(), open, color, bold: flags & 2 != 0, italic: flags & 1 != 0 }));
         }
         (nest_outline(listed), more)
     }

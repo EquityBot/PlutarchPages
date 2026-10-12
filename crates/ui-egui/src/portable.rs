@@ -132,7 +132,7 @@ mod tests {
     #[test]
     fn an_existing_data_folder_is_reused() {
         let exe = temp("reuse");
-        std::fs::write(exe.join("portable.txt"), b"PdfCraft portable mode").unwrap();
+        std::fs::write(exe.join("portable.txt"), b"PlutarchPages portable mode").unwrap();
         std::fs::create_dir_all(exe.join(DATA_DIR)).unwrap();
         std::fs::write(exe.join(DATA_DIR).join("app.ron"), b"()").unwrap();
         assert_eq!(resolve(Some(&exe)).dir, Some(exe.join(DATA_DIR)));
