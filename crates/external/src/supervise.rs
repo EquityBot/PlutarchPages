@@ -47,7 +47,18 @@ pub(crate) fn spawn_with_stdout(mut cmd: Command, what: &str) -> Result<Child, E
         use std::os::windows::process::CommandExt;
         cmd.creation_flags(CREATE_NEW_PROCESS_GROUP | CREATE_NO_WINDOW);
     }
-    cmd.spawn().map_err(|e| ExternalError::ProcessFailed(format!("couldn't start {what}: {e}")))
+    // A program file still open for writing somewhere (being installed or updated, or just
+    // written while another thread forks) can't start yet: try again briefly.
+    let mut attempt = 0;
+    loop {
+        match cmd.spawn() {
+            Err(e) if e.kind() == std::io::ErrorKind::ExecutableFileBusy && attempt < 20 => {
+                attempt += 1;
+                thread::sleep(Duration::from_millis(50));
+            }
+            result => return result.map_err(|e| ExternalError::ProcessFailed(format!("couldn't start {what}: {e}"))),
+        }
+    }
 }
 
 /// Wait for `child` until it exits, `done` returns true, `cancel` is set or `deadline` passes. In

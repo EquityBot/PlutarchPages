@@ -12,7 +12,9 @@ use std::sync::atomic::AtomicBool;
 
 use pdfcraft_render::{PageRenderer, RenderConfig, RenderRequest, RequestKind};
 
-use crate::{DocId, EditError, Session, SourceKind, guard, open_source};
+#[cfg(not(target_arch = "wasm32"))]
+use crate::open_source;
+use crate::{DocId, EditError, Session, SourceKind, guard};
 
 #[cfg(not(target_arch = "wasm32"))]
 use pdfcraft_external::MAX_SPEECH;
@@ -51,6 +53,7 @@ pub struct ExternalConverters {
     pub office: Option<PathBuf>,
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn off(name: &str, what: &str) -> EditError {
     EditError::Source(format!(
         "{name}: {what} can't be converted while External converters are off. They use programs installed on this computer \
@@ -131,6 +134,7 @@ pub fn web_page_name(url: &str) -> Result<String, EditError> {
 
 /// The converter's output must open as a PDF here before anyone sees it (parsing untrusted bytes:
 /// a panic is caught).
+#[cfg(not(target_arch = "wasm32"))]
 fn checked(name: &str, pdf: Vec<u8>) -> Result<Vec<u8>, EditError> {
     let bytes = Arc::new(pdf);
     guard(|| open_source(name, &bytes).map(|_| ()))

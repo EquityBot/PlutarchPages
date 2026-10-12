@@ -476,7 +476,8 @@ mod tests {
         assert!(rx.recv_timeout(Duration::from_millis(30)).is_err());
         assert!(lock(&q.state).bytes <= 1024);
         drop(recv);
-        assert!(rx.recv_timeout(Duration::from_secs(2)).unwrap().is_err());
+        // Generous: a loaded CI machine (the FreeBSD VM) can take seconds to run the woken thread.
+        assert!(rx.recv_timeout(Duration::from_secs(10)).unwrap().is_err());
         worker.join().unwrap();
     }
 
