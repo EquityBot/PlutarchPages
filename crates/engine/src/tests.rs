@@ -1345,6 +1345,23 @@ fn create_and_reduce() {
 }
 
 #[test]
+fn reduce_saves_nothing_for_a_compact_file_whatever_the_time() {
+    use std::sync::atomic::{AtomicI64, Ordering};
+    // The copy gets a new /ModDate inside a compressed object stream. Made a few seconds after
+    // the document, it was sometimes a byte or two smaller and saved (#490).
+    static NOW: AtomicI64 = AtomicI64::new(1_760_000_000);
+    let mut s = Session::new().with_clock(|| NOW.load(Ordering::Relaxed));
+    let text = s.create_from_text("notes", &"lorem ipsum ".repeat(500)).unwrap();
+    let id = s.open_new("notes.pdf", text.clone()).unwrap();
+    for t in (1..86_400).step_by(863) {
+        NOW.store(1_760_000_000 + t, Ordering::Relaxed);
+        let (reduced, _) = s.reduced_bytes(id).unwrap();
+        assert!(!optimizer::reduce_saves(text.len(), reduced.len()), "{t}: {} → {}", text.len(), reduced.len());
+    }
+    assert!(optimizer::reduce_saves(10_000, 9_000));
+}
+
+#[test]
 fn an_optimize_job_reports_its_stages_and_can_be_cancelled() {
     use crate::optimizer::OptimizeStage;
     let (s, id) = session_with(2);

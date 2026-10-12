@@ -44,6 +44,17 @@ impl OptimizeStage {
 /// The optimized copy's bytes and what was done.
 pub type Optimized = (Arc<Vec<u8>>, OptimizeReport);
 
+/// How many bytes a rewritten copy can change by through its new `/ModDate` alone: the date
+/// is packed into a compressed object stream, and its digits move the compressed size by a
+/// few bytes.
+const DATE_SLACK: usize = 64;
+
+/// Whether a Reduce File Size copy of `after` bytes is worth saving over the `before`-byte
+/// document (#490): it must be smaller by more than a new modification date can explain.
+pub fn reduce_saves(before: usize, after: usize) -> bool {
+    after.saturating_add(DATE_SLACK) < before
+}
+
 /// What an optimization needs, independent of the session.
 pub struct OptimizeJob {
     cos: pdfcraft_cos::Document,
