@@ -37,7 +37,7 @@ struct Probe {
 pub fn run(args: &[String]) -> anyhow::Result<()> {
     let options = parse_args(args)?;
     if options.help {
-        println!("Usage: cargo xtask macos-integration [--bundle PdfCraft.app] [--pdf file.pdf]");
+        println!("Usage: cargo xtask macos-integration [--bundle PlutarchPages.app] [--pdf file.pdf]");
         return Ok(());
     }
     let mut report = String::new();
@@ -47,7 +47,7 @@ pub fn run(args: &[String]) -> anyhow::Result<()> {
 
     match options.bundle.as_deref() {
         Some(bundle) => write_bundle_report(&mut report, bundle)?,
-        None => writeln!(report, "bundle: not supplied (use --bundle /path/to/PdfCraft.app)")?,
+        None => writeln!(report, "bundle: not supplied (use --bundle /path/to/PlutarchPages.app)")?,
     }
 
     write_tool_report(&mut report, "quick look", "qlmanage", &["-m", "plugins"])?;
@@ -110,7 +110,7 @@ fn write_bundle_report(report: &mut String, bundle: &Path) -> anyhow::Result<()>
         writeln!(report, "  bundle identifier: {bundle_id}")?;
         writeln!(report, "  minimum macOS: {minimum}")?;
         writeln!(report, "  PDF registration: {}", pdf_registration(text))?;
-        let executable = plist_value(text, "CFBundleExecutable").unwrap_or_else(|| "PdfCraft".into());
+        let executable = plist_value(text, "CFBundleExecutable").unwrap_or_else(|| "PlutarchPages".into());
         write_architecture_report(report, &contents.join("MacOS").join(executable))?;
     } else if plist.exists() {
         writeln!(report, "  Info.plist: present but not UTF-8 XML (binary plist inspection unavailable)")?;

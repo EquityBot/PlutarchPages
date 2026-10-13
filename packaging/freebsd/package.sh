@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build PdfCraft for FreeBSD and package it:
+# Build PlutarchPages for FreeBSD and package it:
 #   $DIST/pdfcraft-<version>-freebsd-<arch>.tar.gz   a /usr/local-style tree (bin/, share/)
 #
 # Extract it into /usr/local (or anywhere, and run bin/pdfcraft from there). The desktop entry,
@@ -30,7 +30,7 @@ case "$ARCH" in
 esac
 BASENAME="pdfcraft-$VERSION-freebsd-$ARCH"
 
-echo "==> PdfCraft $VERSION for FreeBSD $ARCH"
+echo "==> PlutarchPages $VERSION for FreeBSD $ARCH"
 
 if [ "$SKIP_BUILD" = 0 ]; then
   (cd "$ROOT" && cargo build --release --locked -p pdfcraft -p pdfcraft-cli)
