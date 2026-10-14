@@ -1,7 +1,8 @@
 //! Export to Excel (.xlsx; ECMA-376 SpreadsheetML): one worksheet per page. Detected tables keep
 //! their rows and columns (a spanning header cell is merged); other paragraphs take one row each
 //! in column A, in reading order, with a blank row around each table. Cells that read as plain
-//! numbers (`1234.5`, `-7`, `1,234.50`) are written as numbers; everything else is text.
+//! numbers (`1234.5`, `-7`, `1,234.50`) of at most 15 significant digits are written as numbers;
+//! everything else is text.
 
 use crate::{Item, Page, Zip, esc, items};
 
@@ -44,6 +45,10 @@ fn number(text: &str) -> Option<f64> {
     }
     // A leading zero (an ID or postcode such as 0042) stays text.
     if int.len() > 1 && int.starts_with('0') {
+        return None;
+    }
+    // An f64 (and Excel) keeps 15 significant digits; more would be rounded, so it stays text.
+    if format!("{int}{}", frac.trim_end_matches('0')).trim_start_matches('0').len() > 15 {
         return None;
     }
     let v: f64 = format!("{sign}{int}.{}", if frac.is_empty() { "0" } else { frac }).parse().ok()?;
@@ -213,6 +218,25 @@ mod tests {
         assert_eq!(number(" -7 "), Some(-7.0));
         assert_eq!(number("1,234.50"), Some(1234.5));
         for text in ["0042", "12,34", "1.2.3", "abc", "", "-", "$5", "1e9", "12%", ",123"] {
+            assert_eq!(number(text), None, "{text:?}");
+        }
+    }
+
+    #[test]
+    fn numbers_past_fifteen_significant_digits_stay_text() {
+        // Up to 15 significant digits survive the f64 round trip exactly.
+        for (text, written) in [
+            ("99999999999.9999", "99999999999.9999"),
+            ("-1,234,567,890.12345", "-1234567890.12345"),
+            ("12345.1234567891", "12345.1234567891"),
+            ("0.0012345678", "0.0012345678"),
+            ("999,999,999,999,999", "999999999999999"),
+            ("12.5000000000", "12.5"),
+        ] {
+            assert_eq!(number(text).map(|v| v.to_string()).as_deref(), Some(written), "{text:?}");
+        }
+        // More would be rounded (999999999999999.99 becomes 1000000000000000), so they stay text.
+        for text in ["999999999999999.99", "-999999999999999.99", "999,999,999,999,999.99", "999999999999.9999", "123456.1234567891"] {
             assert_eq!(number(text), None, "{text:?}");
         }
     }
