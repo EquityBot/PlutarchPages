@@ -378,7 +378,7 @@ impl Automation {
                 let path = self.resolve(a.str("path")?, true)?;
                 let (bytes, merged) = self.session.reduced_bytes(id).map_err(failed)?;
                 // As in the app, a copy that isn't smaller is not written (#490).
-                let written = bytes.len() < before;
+                let written = pdfcraft_engine::optimizer::reduce_saves(before, bytes.len());
                 if written {
                     write_atomic(&path, &bytes)?;
                 }

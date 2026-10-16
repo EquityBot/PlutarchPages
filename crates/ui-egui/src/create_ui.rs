@@ -259,7 +259,7 @@ impl PdfCraftApp {
             }
         };
         let after = bytes.len();
-        if kind == crate::optimize_ui::OptimizeKind::Reduce && after >= before {
+        if kind == crate::optimize_ui::OptimizeKind::Reduce && !pdfcraft_engine::optimizer::reduce_saves(before, after) {
             self.notify_fmt(
                 "This file is already as small as it can be made ({size}). No copy was saved.",
                 &[("size", &crate::panels::human_size(before))],
