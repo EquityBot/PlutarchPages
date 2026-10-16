@@ -1,6 +1,6 @@
 # PdfCraft roadmap: milestones and what's next
 
-> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-15 · **Change:** minor (localized shortcut labels, #496; alpha gate added; convert-and-share re-judged with the cross-app rule → alpha) · **Target:** Adobe Acrobat Pro (Acrobat DC, continuous track 26.002.21931, macOS)
+> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-17 · **Change:** minor (parser cancellation regression; localized shortcut labels, #496; alpha gate added; convert-and-share re-judged with the cross-app rule → alpha) · **Target:** Adobe Acrobat Pro (Acrobat DC, continuous track 26.002.21931, macOS)
 
 Forward-looking: the milestones, the current focus and what comes next. The parity numbers behind
 it are in [target-app-parity.md](target-app-parity.md), the ranked work list in [gaps.md](gaps.md),
@@ -64,7 +64,7 @@ total matches the parity estimate.
 
 | M | Milestone | Plan size (h) | Done | Remaining (h, 2026-10-10) | Notes |
 |---|---|---|---|---|---|
-| M0 | Skeleton: workspace, xtask gates, CI | 15–30 | 98% | 1–2 | GitHub workflow, `deny.toml` (licence audit of every dependency), parity checklist (826 features, `xtask parity`) done. Dependency maintenance, 2026-10-15: locked rustls 0.23.46 for four RustSec advisories. Missing: remaining crate stubs, testkit/oracle crates |
+| M0 | Skeleton: workspace, xtask gates, CI | 15–30 | 98% | 1–2 | GitHub workflow, `deny.toml` (licence audit of every dependency), parity checklist (826 features, `xtask parity`) done. Dependency maintenance, 2026-10-15: locked rustls 0.23.46 for four RustSec advisories. Cancellation regression, 2026-10-17: block on a channel handshake before requesting cancellation. Missing: remaining crate stubs, testkit/oracle crates |
 | M1 | COS: filters, crypt, parser, xref, writer | 120–200 | 80% | 20–40 | Done:<br>- filters and crypt: every standard-security revision R2–R6 (RC4, AES-128/256), SASLprep, permissions, creating encryption;<br>- cos: parse and repair (including invalid xref object-number ranges), decoded-stream limits including unfiltered data, decrypt on load, re-encrypt on save, incremental and full writing.<br>Corpus: open/edit/save passes on 958 files, and all 7 password-protected files open.<br>Full saves now pack objects into compressed object streams. Fuzzing runs nightly (`xtask fuzz`). Missing: ≥ 250 tests, own image codecs |
 | M2 | Model, render, text | 200–350 | 15% | 130–230 | hayro bootstrap renderer (vendored patches); inspector predictor scratch is bounded by available input, and JPX sample rescaling handles 1–32 bits safely. Text extraction reaches word-F1 0.98 against pdftotext. Missing: model crate, fonts, DisplayList, renderer independent of hayro. Inspector page-label traversal and output are resource-bounded, with physical-number fallback warnings |
 | M3 | Viewer app (native + web) | 80–150 | 90% | 10–20 | Acrobat-style shell, find, select, panels, tiles, web build, UI control channel for agents (opt-in). Missing: 60 fps test on a 500-page document, snapshot tests of every panel<br>Done since: fit visible, document title in the window; Linux middle-button scrolling; shared three-state theme preferences in the toolbar, View menu and control channel; late browser startup downloads preserve the current document and Save target (#171). |
@@ -121,6 +121,7 @@ M2 (renderer), M7 (content editing), M10 (OCR and Office), M11 (Preflight and st
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-10-17 | minor | M0: coordinate the parser cancellation regression with a channel handshake. |
 | 2026-10-15 | minor | M0 dependency maintenance: rustls 0.23.46 addresses RUSTSEC-2026-0346 through RUSTSEC-2026-0349. Feature estimates were not remeasured. |
 | 2026-10-10 | minor | M14: localized shortcut key names (#496), including runtime switching and native layout checks. Estimates unchanged. |
 | 2026-10-10 | minor | Re-judged convert and share with the cross-app gate rule (only a workflow that can't be completed at all blocks): partial, not blocking → stage alpha |
