@@ -2,7 +2,7 @@
 
 **Stage: alpha** · next: beta, ~26% (ready for real work 49% → 75%) and ~400–700 h away
 
-> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-15 · **Change:** minor (localized shortcut labels, #496; readiness table with hours per audience; full number as weighted sum 49%; earlier: second look: ready 40% → 47%, mainstream 55% added; core-workflow gate applied → alpha) · **Target:** Adobe Acrobat Pro (Acrobat DC, continuous track 26.002.21931, macOS)
+> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-17 · **Change:** minor (parser cancellation regression; localized shortcut labels, #496; readiness table with hours per audience; full number as weighted sum 49%; earlier: second look: ready 40% → 47%, mainstream 55% added; core-workflow gate applied → alpha) · **Target:** Adobe Acrobat Pro (Acrobat DC, continuous track 26.002.21931, macOS)
 
 PdfCraft's one-page summary: how close it is to Adobe Acrobat Pro's offline feature set, and what
 comes next. Adobe's cloud services (Document Cloud, Acrobat Sign requests, shared review, the AI
@@ -134,6 +134,8 @@ Ranked; detail and the full milestone table in [docs/roadmap.md](docs/roadmap.md
 ## Progress log
 
 Newest first: the date, what moved, and the new overall estimate.
+
+- **2026-10-17 (M0, cancellation regression):** Replace the parser wait test's yield loop with a blocking channel handshake. The test observes cancellation as false before requesting it and requires the waiter to finish while initialisation remains blocked. Feature readiness was not remeasured.
 
 - **2026-10-15 (M0, dependency audit):** Updated the locked rustls dependency to 0.23.46 for RUSTSEC-2026-0346 through RUSTSEC-2026-0349. This maintenance change does not remeasure feature readiness.
 
@@ -319,6 +321,7 @@ Newest first: the date, what moved, and the new overall estimate.
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-10-17 | minor | M0: coordinate the parser cancellation regression with a channel handshake. |
 | 2026-10-10 | minor | Readiness table with hours per audience; full number restated as the additive weighted sum over dimensions (47% → 49%; method aligned with the standard, no new evidence) |
 | 2026-10-10 | minor | Essentials-user score added (≈ 66%) |
 | 2026-10-10 | minor | Gate consistency check: convert and share re-judged partial, not blocking; stage pre-alpha → alpha |

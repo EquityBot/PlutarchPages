@@ -1287,10 +1287,7 @@ mod tests {
     #[cfg(not(target_arch = "wasm32"))]
     #[test]
     fn waiting_worker_can_cancel_before_initializer_returns() {
-        use std::{
-            sync::{atomic::AtomicUsize, mpsc},
-            time::Duration,
-        };
+        use std::{sync::mpsc, time::Duration};
         let parser = Arc::new(PoolParser::default());
         let (started_tx, started_rx) = mpsc::channel();
         let (release_tx, release_rx) = mpsc::channel();
@@ -1309,26 +1306,23 @@ mod tests {
         };
         started_rx.recv_timeout(Duration::from_secs(2)).unwrap();
         let cancelled = Arc::new(AtomicBool::new(false));
-        let checks = Arc::new(AtomicUsize::new(0));
+        let (checked_tx, checked_rx) = mpsc::channel();
         let (done_tx, done_rx) = mpsc::channel();
         let waiter = {
-            let (parser, cancelled, checks) = (parser.clone(), cancelled.clone(), checks.clone());
+            let (parser, cancelled) = (parser.clone(), cancelled.clone());
             std::thread::spawn(move || {
                 let result = parser.acquire(
                     || panic!("must not initialize twice"),
                     || {
-                        checks.fetch_add(1, Ordering::Relaxed);
-                        cancelled.load(Ordering::Acquire)
+                        let observed = cancelled.load(Ordering::Acquire);
+                        checked_tx.send(observed).unwrap();
+                        observed
                     },
                 );
                 done_tx.send(result.unwrap().is_none()).unwrap();
             })
         };
-        let deadline = std::time::Instant::now() + Duration::from_secs(2);
-        while checks.load(Ordering::Relaxed) == 0 {
-            assert!(std::time::Instant::now() < deadline);
-            std::thread::yield_now();
-        }
+        assert!(!checked_rx.recv_timeout(Duration::from_secs(2)).unwrap());
         cancelled.store(true, Ordering::Release);
         assert!(done_rx.recv_timeout(Duration::from_secs(2)).unwrap());
         waiter.join().unwrap();
