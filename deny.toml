@@ -43,10 +43,12 @@ ignore = [
     # private-key operations use aws-lc-rs on native targets and are refused in the browser
     # (ADR-0009). Revisit when a fixed `rsa` ships.
     { id = "RUSTSEC-2023-0071", reason = "rsa is used for verification only (ADR-0009)" },
-    # zbus_names is now maintained inside zbus (z-galaxy/zbus#2043). It reaches us only through
-    # egui's Linux accessibility stack (accesskit_unix, atspi) and no release drops it yet.
-    # Revisit when zbus or accesskit stop depending on it.
-    { id = "RUSTSEC-2026-0371", reason = "unmaintained, transitive via accesskit/atspi; no replacement released" },
+    # zbus_names, zvariant and zvariant_derive are now maintained inside zbus (z-galaxy/zbus#2043).
+    # They reach us only through egui's Linux accessibility stack (accesskit_unix, atspi) and no
+    # release drops them yet. Revisit when zbus or accesskit stop depending on them.
+    { id = "RUSTSEC-2026-0370", reason = "zvariant: unmaintained, transitive via accesskit/atspi; no replacement released" },
+    { id = "RUSTSEC-2026-0371", reason = "zbus_names: unmaintained, transitive via accesskit/atspi; no replacement released" },
+    { id = "RUSTSEC-2026-0372", reason = "zvariant_derive: unmaintained, transitive via accesskit/atspi; no replacement released" },
 ]
 
 # egui's default UI fonts (Ubuntu-Light, Hack, emoji-icon-font): font licences on the AGENTS.md
