@@ -7,10 +7,10 @@
 </p>
 
 <p align="center">
-  <img alt="License: MIT OR Apache-2.0" src="https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-12a58a">
-  <img alt="Written in Rust" src="https://img.shields.io/badge/written%20in-Rust-0a7563">
-  <img alt="Platforms: macOS, Windows, Linux, FreeBSD, web" src="https://img.shields.io/badge/runs%20on-macOS%20%C2%B7%20Windows%20%C2%B7%20Linux%20%C2%B7%20FreeBSD%20%C2%B7%20web-12a58a">
-  <img alt="No account, no telemetry" src="https://img.shields.io/badge/no%20account-no%20telemetry-0a7563">
+  <img alt="License: MIT OR Apache-2.0" src="https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-66023C?style=flat&labelColor=000000&color=66023C">
+  <img alt="Written in Rust" src="https://img.shields.io/badge/written%20in-Rust-66023C?style=flat&labelColor=000000&color=66023C">
+  <img alt="Platforms: macOS, Windows, Linux, FreeBSD, web" src="https://img.shields.io/badge/runs%20on-macOS%20%C2%B7%20Windows%20%C2%B7%20Linux%20%C2%B7%20FreeBSD%20%C2%B7%20web-66023C?style=flat&labelColor=000000&color=66023C">
+  <img alt="No account, no telemetry" src="https://img.shields.io/badge/no%20account-no%20telemetry-66023C?style=flat&labelColor=000000&color=66023C">
 </p>
 
 > [!NOTE]
