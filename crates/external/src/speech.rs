@@ -295,7 +295,7 @@ mod tests {
         std::fs::set_permissions(&fake, std::fs::Permissions::from_mode(0o755)).unwrap();
         let backend = SpeechBackend::EspeakNg(fake);
         let mut s = Speech::default();
-        s.start(&backend, "hello").unwrap();
+        s.start(&backend, "hello, friend").unwrap();
         assert!(s.speaking());
         let started = std::time::Instant::now();
         s.stop();
