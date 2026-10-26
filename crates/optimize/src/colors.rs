@@ -249,7 +249,7 @@ fn convert_xobjects(
     let mut changed = false;
     for name in names {
         let Some(Object::Ref(r)) = xo.get(name).cloned() else { continue };
-        let inherits = matches!(&*doc.get(r), Object::Stream(s) if s.dict.name(b"Subtype") == Some(b"Form") && s.dict.get(b"Resources").is_none());
+        let inherits = matches!(&*doc.get(r), Object::Stream(s) if s.dict.name(b"Subtype") == Some(b"Form") && own_resources(doc, s).is_none());
         let key = (r, inherits.then_some(owner));
         // A walk cut short deeper down is redone from here, so each form is walked at most once
         // per depth and context.
@@ -322,6 +322,11 @@ fn convert_xobject(
     }
 }
 
+/// The form's own resource dictionary; without one it draws from its caller's.
+fn own_resources(doc: &Document, s: &Stream) -> Option<Dict> {
+    s.dict.get(b"Resources").map(|x| doc.resolve(x)).and_then(|x| x.as_dict().cloned())
+}
+
 /// A converted copy of the form stream `s` (object `r`) as a new object, or `None` if it stays.
 #[allow(clippy::too_many_arguments)]
 fn convert_form(
@@ -334,8 +339,7 @@ fn convert_form(
     done: &mut Converted,
     report: &mut ColorReport,
 ) -> Option<ObjRef> {
-    let own = s.dict.get(b"Resources").map(|x| doc.resolve(x)).and_then(|x| x.as_dict().cloned());
-    let (resources, owner) = match own {
+    let (resources, owner) = match own_resources(doc, s) {
         Some(res) => (res, r),
         None => (parent.clone(), owner),
     };

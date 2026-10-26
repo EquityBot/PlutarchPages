@@ -603,16 +603,21 @@ fn gray_conversion_visits_each_unchanged_form_once() {
 #[test]
 fn gray_conversion_follows_each_context_of_a_form_without_resources() {
     // A form with no /Resources draws /Im from its caller's: gray on one page, colour on the other.
-    // Either order, each page must end up drawing its own image, and the colour one in gray.
-    for colour_first in [false, true] {
+    // Either order, each page must end up drawing its own image, and the colour one in gray. A
+    // /Resources that is not a dictionary (here a missing object) counts as none.
+    for (colour_first, dangling) in [(false, false), (true, false), (false, true)] {
         let mut doc = Document::new_empty();
-        let form = doc.add(Object::Stream(Stream::from_raw(form_dict(None), b"/Im Do".to_vec())));
+        let mut dict = form_dict(None);
+        if dangling {
+            dict.set(b"Resources".to_vec(), Object::Ref(ObjRef::new(999, 0)));
+        }
+        let form = doc.add(Object::Stream(Stream::from_raw(dict, b"/Im Do".to_vec())));
         let gray = image(&mut doc, 4, 4, 1, false, None);
         let colour = image(&mut doc, 6, 6, 3, false, None);
         let order = if colour_first { [colour, gray] } else { [gray, colour] };
         let pages = order.map(|im| page(&mut doc, &[("X", form), ("Im", im)], "/X Do"));
         let report = pdfcraft_optimize::convert_to_gray(&mut doc, None).unwrap();
-        assert_eq!(report.images, 1, "colour first: {colour_first}");
+        assert_eq!(report.images, 1, "colour first: {colour_first}, dangling: {dangling}");
         for (p, original) in pages.into_iter().zip(order) {
             let res = |d: &Dict| d.get(b"Resources").and_then(|r| doc.resolve(r).as_dict().cloned());
             let page_res = res(doc.get(p).as_dict().unwrap()).unwrap();
@@ -620,8 +625,8 @@ fn gray_conversion_follows_each_context_of_a_form_without_resources() {
                 |r: &Dict, name: &[u8]| r.get(b"XObject").and_then(|x| doc.resolve(x).as_dict().cloned()).and_then(|x| x.reference(name)).unwrap();
             let drawn = stream(&doc, xo(&page_res, b"X"));
             let im = stream(&doc, xo(&res(&drawn.dict).unwrap_or(page_res), b"Im"));
-            assert_eq!(im.dict.int(b"Width"), stream(&doc, original).dict.int(b"Width"), "colour first: {colour_first}");
-            assert_eq!(im.dict.name(b"ColorSpace"), Some(&b"DeviceGray"[..]), "colour first: {colour_first}");
+            assert_eq!(im.dict.int(b"Width"), stream(&doc, original).dict.int(b"Width"), "colour first: {colour_first}, dangling: {dangling}");
+            assert_eq!(im.dict.name(b"ColorSpace"), Some(&b"DeviceGray"[..]), "colour first: {colour_first}, dangling: {dangling}");
         }
     }
 }
