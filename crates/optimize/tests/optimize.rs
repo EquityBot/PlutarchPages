@@ -583,3 +583,34 @@ fn nothing_is_dropped_when_a_stream_cannot_be_checked() {
         assert_eq!(build(s), kept, "{dict:?}");
     }
 }
+
+#[test]
+fn gray_conversion_visits_each_unchanged_form_once() {
+    // Ten nested forms, each drawing the next eight times, with an already-gray leaf: re-walking
+    // unchanged forms per draw would mean about 8^10 visits from a document of a few kilobytes.
+    let mut doc = Document::new_empty();
+    let mut next = doc.add(Object::Stream(Stream::from_raw(form_dict(None), b"0 g".to_vec())));
+    for _ in 0..10 {
+        next = doc.add(Object::Stream(Stream::from_raw(form_dict(Some(next)), b"/X Do\n".repeat(8))));
+    }
+    page(&mut doc, &[("X", next)], "/X Do /X Do");
+    let (sender, receiver) = std::sync::mpsc::channel();
+    std::thread::spawn(move || sender.send(pdfcraft_optimize::convert_to_gray(&mut doc, None).unwrap()));
+    let report = receiver.recv_timeout(std::time::Duration::from_secs(20)).expect("conversion finishes");
+    assert_eq!((report.pages, report.forms, report.operators), (1, 0, 0));
+}
+
+fn form_dict(child: Option<ObjRef>) -> Dict {
+    let mut d = Dict::new();
+    d.set(b"Type".to_vec(), Object::name("XObject"));
+    d.set(b"Subtype".to_vec(), Object::name("Form"));
+    d.set(b"BBox".to_vec(), Object::Array(vec![0.into(), 0.into(), 10.into(), 10.into()]));
+    if let Some(c) = child {
+        let mut x = Dict::new();
+        x.set(b"X".to_vec(), Object::Ref(c));
+        let mut res = Dict::new();
+        res.set(b"XObject".to_vec(), Object::Dict(x));
+        d.set(b"Resources".to_vec(), Object::Dict(res));
+    }
+    d
+}

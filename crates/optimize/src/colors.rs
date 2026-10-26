@@ -282,18 +282,20 @@ fn convert_xobject(doc: &mut Document, r: ObjRef, parent: &Dict, depth: usize, d
                 if !gray {
                     report.left += 1;
                 }
+                // Remember that it stays, so later draws do not decode it again.
+                done.xobjects.insert(r, r);
                 None
             }
         },
         Some(b"Form") if depth < MAX_DEPTH => {
-            // Placeholder first, so a form that draws itself stops here.
+            // Placeholder first, so a form that draws itself stops here. It stays as the memo when
+            // the form is unchanged: re-walking unchanged forms on every draw grows as fan-out^depth.
             done.xobjects.insert(r, r);
             let resources = s.dict.get(b"Resources").map(|x| doc.resolve(x)).and_then(|x| x.as_dict().cloned()).unwrap_or_else(|| parent.clone());
             let data = s.decoded().ok()?;
             let (bytes, changed, drawn) = convert_ops(doc, &data, &resources, report);
             let new_res = convert_xobjects(doc, &resources, &drawn, depth + 1, done, report);
             if !changed && new_res.is_none() {
-                done.xobjects.remove(&r);
                 return None;
             }
             let mut d = s.dict.clone();
