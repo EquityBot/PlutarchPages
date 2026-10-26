@@ -586,11 +586,11 @@ fn nothing_is_dropped_when_a_stream_cannot_be_checked() {
 
 #[test]
 fn gray_conversion_visits_each_unchanged_form_once() {
-    // Ten nested forms, each drawing the next eight times, with an already-gray leaf: re-walking
-    // unchanged forms per draw would mean about 8^10 visits from a document of a few kilobytes.
+    // Twenty nested forms, each drawing the next eight times, with an already-gray leaf: re-walking
+    // unchanged forms per draw would mean about 8^12 visits (to the depth limit) from a few kilobytes.
     let mut doc = Document::new_empty();
     let mut next = doc.add(Object::Stream(Stream::from_raw(form_dict(None), b"0 g".to_vec())));
-    for _ in 0..10 {
+    for _ in 0..20 {
         next = doc.add(Object::Stream(Stream::from_raw(form_dict(Some(next)), b"/X Do\n".repeat(8))));
     }
     page(&mut doc, &[("X", next)], "/X Do /X Do");
@@ -598,6 +598,48 @@ fn gray_conversion_visits_each_unchanged_form_once() {
     std::thread::spawn(move || sender.send(pdfcraft_optimize::convert_to_gray(&mut doc, None).unwrap()));
     let report = receiver.recv_timeout(std::time::Duration::from_secs(20)).expect("conversion finishes");
     assert_eq!((report.pages, report.forms, report.operators), (1, 0, 0));
+}
+
+#[test]
+fn gray_conversion_follows_each_context_of_a_form_without_resources() {
+    // A form with no /Resources draws /Im from its caller's: gray on one page, colour on the other.
+    // Either order, each page must end up drawing its own image, and the colour one in gray.
+    for colour_first in [false, true] {
+        let mut doc = Document::new_empty();
+        let form = doc.add(Object::Stream(Stream::from_raw(form_dict(None), b"/Im Do".to_vec())));
+        let gray = image(&mut doc, 4, 4, 1, false, None);
+        let colour = image(&mut doc, 6, 6, 3, false, None);
+        let order = if colour_first { [colour, gray] } else { [gray, colour] };
+        let pages = order.map(|im| page(&mut doc, &[("X", form), ("Im", im)], "/X Do"));
+        let report = pdfcraft_optimize::convert_to_gray(&mut doc, None).unwrap();
+        assert_eq!(report.images, 1, "colour first: {colour_first}");
+        for (p, original) in pages.into_iter().zip(order) {
+            let res = |d: &Dict| d.get(b"Resources").and_then(|r| doc.resolve(r).as_dict().cloned());
+            let page_res = res(doc.get(p).as_dict().unwrap()).unwrap();
+            let xo =
+                |r: &Dict, name: &[u8]| r.get(b"XObject").and_then(|x| doc.resolve(x).as_dict().cloned()).and_then(|x| x.reference(name)).unwrap();
+            let drawn = stream(&doc, xo(&page_res, b"X"));
+            let im = stream(&doc, xo(&res(&drawn.dict).unwrap_or(page_res), b"Im"));
+            assert_eq!(im.dict.int(b"Width"), stream(&doc, original).dict.int(b"Width"), "colour first: {colour_first}");
+            assert_eq!(im.dict.name(b"ColorSpace"), Some(&b"DeviceGray"[..]), "colour first: {colour_first}");
+        }
+    }
+}
+
+#[test]
+fn gray_conversion_revisits_a_form_first_reached_at_the_depth_limit() {
+    // The page reaches S first through ten nested forms, where S's own child T (red) is past the
+    // depth limit, then draws S directly: that draw must still convert T.
+    let mut doc = Document::new_empty();
+    let t = doc.add(Object::Stream(Stream::from_raw(form_dict(None), b"1 0 0 rg".to_vec())));
+    let s = doc.add(Object::Stream(Stream::from_raw(form_dict(Some(t)), b"/X Do".to_vec())));
+    let mut chain = s;
+    for _ in 0..11 {
+        chain = doc.add(Object::Stream(Stream::from_raw(form_dict(Some(chain)), b"/X Do".to_vec())));
+    }
+    page(&mut doc, &[("A", chain), ("S", s)], "/A Do /S Do");
+    let report = pdfcraft_optimize::convert_to_gray(&mut doc, None).unwrap();
+    assert_eq!((report.forms, report.operators), (2, 1));
 }
 
 fn form_dict(child: Option<ObjRef>) -> Dict {
