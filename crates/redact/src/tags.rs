@@ -185,13 +185,22 @@ pub(crate) fn drop_annotations(doc: &mut Document, gone: &HashSet<ObjRef>) -> Re
                 if !seen.insert(r) || seen.len() > 2_000_000 {
                     continue;
                 }
-                let Some(d) = doc.get(r).as_dict().cloned() else { continue };
-                if !d.contains(b"S") {
-                    continue;
-                }
-                let kids: Vec<Object> = match d.get(b"K") {
-                    Some(Object::Array(a)) => a.clone(),
-                    Some(o) => vec![o.clone()],
+                let d = match &*doc.get(r) {
+                    // An indirect /K array.
+                    Object::Array(a) => {
+                        todo.extend(a.iter().cloned());
+                        continue;
+                    }
+                    Object::Dict(d) if d.contains(b"S") => d.clone(),
+                    _ => continue,
+                };
+                let k = d.get(b"K").map(|k| match &*doc.resolve(k) {
+                    a @ Object::Array(_) => a.clone(),
+                    _ => k.clone(),
+                });
+                let kids: Vec<Object> = match k {
+                    Some(Object::Array(a)) => a,
+                    Some(o) => vec![o],
                     None => Vec::new(),
                 };
                 if kids.iter().any(|x| objr_target(doc, x).is_some_and(|t| gone.contains(&t))) {

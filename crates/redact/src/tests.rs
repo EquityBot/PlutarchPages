@@ -765,6 +765,38 @@ fn removed_comments_and_links_do_not_stay_reachable() {
     assert!(!saved_bytes_hold(&doc, b"canary-secret@example.invalid"), "the structure tree kept the removed link");
     assert!(!saved_bytes_hold(&doc, b"canary-alt"), "the link element kept its alternate text");
 
+    // The same through indirect /K arrays, at the root and in the element.
+    let mut doc = annotated_page(
+        "/StructTreeRoot 6 0 R /MarkInfo << /Marked true >>",
+        "5 0 R",
+        vec![
+            b"<< /Type /Annot /Subtype /Link /Rect [20 20 40 40] /StructParent 0 /A << /S /URI /URI (mailto:canary-secret@example.invalid) >> >>"
+                .to_vec(),
+            b"<< /Type /StructTreeRoot /K 7 0 R >>".to_vec(),
+            b"[8 0 R]".to_vec(),
+            b"<< /Type /StructElem /S /Link /P 6 0 R /K 9 0 R >>".to_vec(),
+            b"[<< /Type /OBJR /Obj 5 0 R >>]".to_vec(),
+        ],
+    );
+    mark(&mut doc, 0, &[[0.0, 0.0, 120.0, 80.0]], "");
+    let r = apply(&mut doc, None).unwrap();
+    assert_eq!((r.annotations, r.tags), (1, 1), "{r:?}");
+    assert!(!saved_bytes_hold(&doc, b"canary-secret@example.invalid"), "an indirect /K array kept the removed link");
+
+    // A form field's widget and a comment's pop-up under the mark are detached, not refused.
+    let mut doc = annotated_page(
+        "/AcroForm << /Fields [5 0 R] >>",
+        "5 0 R 6 0 R 7 0 R",
+        vec![
+            b"<< /Type /Annot /Subtype /Widget /FT /Tx /T (name) /V (CANARY-FIELD) /Rect [20 20 40 40] >>".to_vec(),
+            b"<< /Type /Annot /Subtype /Text /Rect [50 20 70 40] /Contents (CANARY-NOTE) /Popup 7 0 R >>".to_vec(),
+            b"<< /Type /Annot /Subtype /Popup /Rect [150 150 250 250] /Parent 6 0 R >>".to_vec(),
+        ],
+    );
+    mark(&mut doc, 0, &[[0.0, 0.0, 120.0, 80.0]], "");
+    apply(&mut doc, None).unwrap();
+    assert!(!saved_bytes_hold(&doc, b"CANARY-FIELD") && !saved_bytes_hold(&doc, b"CANARY-NOTE"));
+
     // Any other reference to a removed annotation fails closed.
     let mut doc =
         annotated_page("/PCKeep 5 0 R", "5 0 R", vec![b"<< /Type /Annot /Subtype /Text /Rect [20 20 40 40] /Contents (CANARY-SECRET-2) >>".to_vec()]);
