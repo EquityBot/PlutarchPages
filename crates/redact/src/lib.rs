@@ -457,6 +457,8 @@ pub fn apply(doc: &mut Document, pages: Option<&[usize]>) -> Result<Report, Reda
     let widget_owner: Vec<(ObjRef, String)> =
         pdfcraft_forms::fields(doc).into_iter().flat_map(|f| f.widgets.iter().map(|w| (w.obj, f.name.clone())).collect::<Vec<_>>()).collect();
     let mut retired: HashSet<ObjRef> = HashSet::new();
+    // Annotations dropped from page /Annots (under a mark, replies to those, their pop-ups).
+    let mut gone_annots: HashSet<ObjRef> = HashSet::new();
 
     // 0. Where each form XObject is drawn over the marks, on every page, so each such draw is
     // redacted with the marks of all of them (changes nothing).
@@ -567,18 +569,32 @@ pub fn apply(doc: &mut Document, pages: Option<&[usize]>) -> Result<Report, Reda
                 }
             }
         }
-        let kept: Vec<Object> = annots
-            .into_iter()
-            .filter(|a| {
-                let Some(r) = a.as_ref() else { return true };
-                if removed.contains(&r) {
-                    return false;
+        // Replies (`/IRT`) to anything removed go too, to a fixpoint, as deleting a comment does:
+        // a kept reply would otherwise keep the removed comment reachable.
+        loop {
+            let before = removed.len();
+            for a in &annots {
+                let Some(r) = a.as_ref() else { continue };
+                if !removed.contains(&r) && doc.get(r).as_dict().and_then(|d| d.reference(b"IRT")).is_some_and(|t| removed.contains(&t)) {
+                    removed.push(r);
+                    report.annotations += 1;
                 }
-                // Pop-ups of removed annotations go too.
-                let obj = doc.get(r);
-                !obj.as_dict().and_then(|d| d.get(b"Parent")).and_then(Object::as_ref).is_some_and(|p| removed.contains(&p))
-            })
-            .collect();
+            }
+            if removed.len() == before {
+                break;
+            }
+        }
+        let (kept, dropped): (Vec<Object>, Vec<Object>) = annots.into_iter().partition(|a| {
+            let Some(r) = a.as_ref() else { return true };
+            if removed.contains(&r) {
+                return false;
+            }
+            // Pop-ups of removed annotations go too.
+            let obj = doc.get(r);
+            !obj.as_dict().and_then(|d| d.get(b"Parent")).and_then(Object::as_ref).is_some_and(|p| removed.contains(&p))
+        });
+        // Nothing removed may stay reachable (step 6 checks).
+        gone_annots.extend(dropped.iter().filter_map(Object::as_ref));
         doc.update_dict(page.obj, |d| {
             if kept.is_empty() {
                 d.remove(b"Annots");
@@ -652,7 +668,10 @@ pub fn apply(doc: &mut Document, pages: Option<&[usize]>) -> Result<Report, Reda
     if residue > 0 {
         return Err(RedactError::Residue(residue));
     }
-    // 6. Nothing redacted may stay reachable through another page or draw.
+    // 6. Nothing redacted may stay reachable through another page or draw. The structure tree's
+    // references to removed annotations go first; any other reference fails closed.
+    report.tags += tags::drop_annotations(doc, &gone_annots)?;
+    retired.extend(&gone_annots);
     check_retired(doc, &retired)?;
     // The previous revision still holds the removed content: the next save must rewrite.
     doc.require_full_save();

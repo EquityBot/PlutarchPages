@@ -154,3 +154,66 @@ pub(crate) fn clean(doc: &mut Document, page: ObjRef, changed: &HashSet<i64>, em
     }
     Ok(n)
 }
+
+/// The annotation an object-reference kid (`OBJR`, inline or indirect) points at.
+fn objr_target(doc: &Document, kid: &Object) -> Option<ObjRef> {
+    let resolved = doc.resolve(kid);
+    let d = resolved.as_dict()?;
+    (d.name(b"Type") == Some(b"OBJR")).then(|| d.get(b"Obj").and_then(Object::as_ref)).flatten()
+}
+
+/// Drop object references to annotations in `gone` from the structure tree, with the alternate
+/// text, actual text and expansion of each element that held one; returns how many elements changed.
+pub(crate) fn drop_annotations(doc: &mut Document, gone: &HashSet<ObjRef>) -> Result<usize, pdfcraft_cos::CosError> {
+    if gone.is_empty() {
+        return Ok(0);
+    }
+    let Some(root) = doc
+        .root()
+        .and_then(|r| doc.get(r).as_dict().cloned())
+        .and_then(|c| c.get(b"StructTreeRoot").map(|s| doc.resolve(s)).and_then(|s| s.as_dict().cloned()))
+    else {
+        return Ok(0);
+    };
+    let mut todo: Vec<Object> = root.get(b"K").map(|k| vec![k.clone()]).unwrap_or_default();
+    let mut seen = HashSet::new();
+    let mut hits: Vec<(ObjRef, Vec<Object>)> = Vec::new();
+    while let Some(k) = todo.pop() {
+        match k {
+            Object::Array(a) => todo.extend(a),
+            Object::Ref(r) => {
+                if !seen.insert(r) || seen.len() > 2_000_000 {
+                    continue;
+                }
+                let Some(d) = doc.get(r).as_dict().cloned() else { continue };
+                if !d.contains(b"S") {
+                    continue;
+                }
+                let kids: Vec<Object> = match d.get(b"K") {
+                    Some(Object::Array(a)) => a.clone(),
+                    Some(o) => vec![o.clone()],
+                    None => Vec::new(),
+                };
+                if kids.iter().any(|x| objr_target(doc, x).is_some_and(|t| gone.contains(&t))) {
+                    hits.push((r, kids.iter().filter(|x| !objr_target(doc, x).is_some_and(|t| gone.contains(&t))).cloned().collect()));
+                }
+                todo.extend(kids);
+            }
+            _ => {}
+        }
+    }
+    let n = hits.len();
+    for (r, keep) in hits {
+        doc.update_dict(r, |e| {
+            for key in [&b"Alt"[..], b"ActualText", b"E"] {
+                e.remove(key);
+            }
+            if keep.is_empty() {
+                e.remove(b"K");
+            } else {
+                e.set(b"K".to_vec(), Object::Array(keep));
+            }
+        })?;
+    }
+    Ok(n)
+}

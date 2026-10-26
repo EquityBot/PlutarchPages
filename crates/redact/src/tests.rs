@@ -711,3 +711,63 @@ fn tags_lose_what_redaction_removed() {
     assert_eq!(public.get(b"K").and_then(Object::as_int), Some(1));
     assert!(public.get(b"ActualText").is_some(), "untouched content keeps its tags");
 }
+
+/// Whether a full save of `doc` (classic table, so dictionaries stay readable) holds `secret`.
+fn saved_bytes_hold(doc: &Document, secret: &[u8]) -> bool {
+    let bytes = write_full(doc, &SaveOptions { object_streams: false, ..SaveOptions::default() }).unwrap();
+    bytes.windows(secret.len()).any(|w| w == secret)
+}
+
+/// Objects 1 to 4: a catalog (with `catalog_extra`), the page tree, one 300×300 page with
+/// `annots`, and its empty content.
+fn annotated_page(catalog_extra: &str, annots: &str, extra: Vec<Vec<u8>>) -> Document {
+    let mut objs: Vec<Vec<u8>> = vec![
+        format!("<< /Type /Catalog /Pages 2 0 R {catalog_extra} >>").into_bytes(),
+        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>".to_vec(),
+        format!("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 300] /Contents 4 0 R /Annots [{annots}] >>").into_bytes(),
+        stream("", b""),
+    ];
+    objs.extend(extra);
+    pdf(objs)
+}
+
+#[test]
+fn removed_comments_and_links_do_not_stay_reachable() {
+    // A comment under the mark with a reply outside it that points back at it.
+    let mut doc = annotated_page(
+        "",
+        "5 0 R 6 0 R",
+        vec![
+            b"<< /Type /Annot /Subtype /Text /Rect [20 20 40 40] /Contents (CANARY-SECRET-1) >>".to_vec(),
+            b"<< /Type /Annot /Subtype /Text /Rect [200 200 220 220] /IRT 5 0 R /Contents (reply) >>".to_vec(),
+        ],
+    );
+    mark(&mut doc, 0, &[[0.0, 0.0, 120.0, 80.0]], "");
+    assert_eq!(apply(&mut doc, None).unwrap().annotations, 2, "the reply goes with its comment");
+    assert!(!saved_bytes_hold(&doc, b"CANARY-SECRET-1"), "a reply kept the removed comment");
+
+    // A tagged link under the mark, referenced from two structure elements (inline and indirect).
+    let mut doc = annotated_page(
+        "/StructTreeRoot 6 0 R /MarkInfo << /Marked true >>",
+        "5 0 R",
+        vec![
+            b"<< /Type /Annot /Subtype /Link /Rect [20 20 40 40] /StructParent 0 /A << /S /URI /URI (mailto:canary-secret@example.invalid) >> >>"
+                .to_vec(),
+            b"<< /Type /StructTreeRoot /K [7 0 R 8 0 R] >>".to_vec(),
+            b"<< /Type /StructElem /S /Link /P 6 0 R /Alt (canary-alt) /K [<< /Type /OBJR /Obj 5 0 R >>] >>".to_vec(),
+            b"<< /Type /StructElem /S /Link /P 6 0 R /K 9 0 R >>".to_vec(),
+            b"<< /Type /OBJR /Obj 5 0 R >>".to_vec(),
+        ],
+    );
+    mark(&mut doc, 0, &[[0.0, 0.0, 120.0, 80.0]], "");
+    let r = apply(&mut doc, None).unwrap();
+    assert_eq!((r.annotations, r.tags), (1, 2), "{r:?}");
+    assert!(!saved_bytes_hold(&doc, b"canary-secret@example.invalid"), "the structure tree kept the removed link");
+    assert!(!saved_bytes_hold(&doc, b"canary-alt"), "the link element kept its alternate text");
+
+    // Any other reference to a removed annotation fails closed.
+    let mut doc =
+        annotated_page("/PCKeep 5 0 R", "5 0 R", vec![b"<< /Type /Annot /Subtype /Text /Rect [20 20 40 40] /Contents (CANARY-SECRET-2) >>".to_vec()]);
+    mark(&mut doc, 0, &[[0.0, 0.0, 120.0, 80.0]], "");
+    assert!(matches!(apply(&mut doc, None), Err(RedactError::StillUsed(_))));
+}
