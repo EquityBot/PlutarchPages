@@ -15,8 +15,11 @@ use std::path::{Path, PathBuf};
 pub use pdfcraft_fonts::helvetica_width;
 
 /// The model files, as named in ATTRIBUTION.toml.
-pub const DETECTION_MODEL: &str = "text-detection.rten";
-pub const RECOGNITION_MODEL: &str = "text-recognition.rten";
+pub const DETECTION_MODEL: &str = "text-detection.onnx";
+pub const RECOGNITION_MODEL: &str = "text-recognition.onnx";
+/// The `.rten` pair ocrs withdrew on 27 October 2026; still loaded when it is all a folder has.
+const LEGACY_DETECTION_MODEL: &str = "text-detection.rten";
+const LEGACY_RECOGNITION_MODEL: &str = "text-recognition.rten";
 
 /// The recognition model's alphabet, as it was trained (ocrs-models' `DEFAULT_ALPHABET`): its
 /// output classes follow this order. The ocrs crate's own copy has an `E` where the training had
@@ -48,10 +51,13 @@ pub struct Models {
 }
 
 impl Models {
-    /// The models in `dir`, if both files are there.
+    /// A complete model pair in `dir`, preferring the ONNX files over the legacy `.rten` pair
+    /// that source builds fetched before ocrs withdrew it. Formats are never mixed.
     pub fn in_dir(dir: &Path) -> Option<Models> {
-        let m = Models { detection: dir.join(DETECTION_MODEL), recognition: dir.join(RECOGNITION_MODEL) };
-        (m.detection.is_file() && m.recognition.is_file()).then_some(m)
+        [(DETECTION_MODEL, RECOGNITION_MODEL), (LEGACY_DETECTION_MODEL, LEGACY_RECOGNITION_MODEL)].into_iter().find_map(|(detection, recognition)| {
+            let m = Models { detection: dir.join(detection), recognition: dir.join(recognition) };
+            (m.detection.is_file() && m.recognition.is_file()).then_some(m)
+        })
     }
 
     /// Look for the models: `$PDFCRAFT_MODELS`, then where the release packages install them
@@ -281,6 +287,24 @@ mod tests {
             assert_eq!(models.detection.canonicalize().unwrap(), models_dir.join(DETECTION_MODEL).canonicalize().unwrap(), "{name}");
         }
         let _ = std::fs::remove_dir_all(&base);
+    }
+
+    /// A source build that fetched the `.rten` pair before ocrs withdrew it keeps working; a
+    /// complete ONNX pair wins, and half of each is no pair at all.
+    #[test]
+    fn prefers_the_onnx_pair_and_falls_back_to_a_complete_legacy_pair() {
+        let dir = std::env::temp_dir().join(format!("pdfcraft-ocr-formats-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let touch = |name: &str| std::fs::write(dir.join(name), b"model").unwrap();
+        touch(LEGACY_DETECTION_MODEL);
+        assert_eq!(Models::in_dir(&dir), None, "half a legacy pair");
+        touch(RECOGNITION_MODEL);
+        assert_eq!(Models::in_dir(&dir), None, "formats are not mixed");
+        touch(LEGACY_RECOGNITION_MODEL);
+        assert_eq!(Models::in_dir(&dir).map(|m| m.detection), Some(dir.join(LEGACY_DETECTION_MODEL)));
+        touch(DETECTION_MODEL);
+        assert_eq!(Models::in_dir(&dir), Some(Models { detection: dir.join(DETECTION_MODEL), recognition: dir.join(RECOGNITION_MODEL) }));
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     /// The message tells end users what to do; release builds have no cargo.
