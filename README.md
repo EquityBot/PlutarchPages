@@ -1,4 +1,11 @@
-<h1 align="center">PlutarchPages</h1>
+<p align="center">
+  <picture>
+    <source media="(max-width: 600px) and (prefers-color-scheme: light)" srcset=".github/assets/banner-phone-light.svg">
+    <source media="(max-width: 600px)" srcset=".github/assets/banner-phone.svg">
+    <source media="(prefers-color-scheme: light)" srcset=".github/assets/banner-light.svg">
+    <img src=".github/assets/banner.svg" width="100%" alt="PlutarchPages: Read, organise and secure PDFs, in pure Rust. Pixel art of an unrolled scroll beside the PlutarchPages wordmark in slab-serif block letters.">
+  </picture>
+</p>
 
 <p align="center">
   <b>The PDF workbench; an open-source, clean-room reimplementation of Adobe Acrobat, rebuilt in pure Rust.</b><br>
@@ -527,6 +534,8 @@ the Japanese fonts of [craft-fonts](https://github.com/storytold/craft-fonts/blo
 PdfCraft is made by the ArtCraft team and community. The ArtCraft name, wordmark and logos are
 trademarks of the ArtCraft Team; this fork has removed them, as the upstream brand licence requires
 for modified versions, and is not an ArtCraft product.
+
+The banner's lettering and emblem are drawn from Cascadia Mono glyphs (SIL OFL 1.1).
 
 <sub>Adobe, Photoshop, Illustrator, Premiere Pro, Lightroom, Acrobat, After Effects and InDesign are trademarks or registered trademarks of Adobe Inc. in the United States and/or other countries. PdfCraft is an independent, open-source project and is not affiliated with, sponsored by or endorsed by Adobe Inc.; these names are used only to describe the workflows it is compatible with.</sub>
 
