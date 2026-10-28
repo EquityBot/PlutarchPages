@@ -15,8 +15,8 @@ use std::path::{Path, PathBuf};
 pub use pdfcraft_fonts::helvetica_width;
 
 /// The model files, as named in ATTRIBUTION.toml.
-pub const DETECTION_MODEL: &str = "text-detection.rten";
-pub const RECOGNITION_MODEL: &str = "text-recognition.rten";
+pub const DETECTION_MODEL: &str = "text-detection.onnx";
+pub const RECOGNITION_MODEL: &str = "text-recognition.onnx";
 
 /// The recognition model's alphabet, as it was trained (ocrs-models' `DEFAULT_ALPHABET`): its
 /// output classes follow this order. The ocrs crate's own copy has an `E` where the training had
