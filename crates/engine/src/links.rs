@@ -7,9 +7,9 @@ use icu_properties::props::Script;
 pub const APP_NAME: &str = "PlutarchPages";
 
 /// This fork: its source, issues and releases.
-pub const GITHUB: &str = "https://github.com/ryanduguid/PlutarchPages";
+pub const GITHUB: &str = "https://github.com/EquityBot/PlutarchPages";
 /// Where to report a problem with this fork.
-pub const ISSUES: &str = "https://github.com/ryanduguid/PlutarchPages/issues";
+pub const ISSUES: &str = "https://github.com/EquityBot/PlutarchPages/issues";
 /// Upstream PdfCraft, by the ArtCraft team, which this fork is based on.
 pub const UPSTREAM: &str = "https://github.com/storytold/pdfcraft";
 
@@ -342,7 +342,7 @@ fn mixes_scripts(label: &str) -> bool {
 mod tests {
     #[test]
     fn urls_point_at_this_fork_and_upstream() {
-        assert_eq!(super::GITHUB, format!("https://github.com/ryanduguid/{}", super::APP_NAME));
+        assert_eq!(super::GITHUB, format!("https://github.com/EquityBot/{}", super::APP_NAME));
         assert_eq!(super::ISSUES, format!("{}/issues", super::GITHUB));
         assert_eq!(super::UPSTREAM, "https://github.com/storytold/pdfcraft");
         for l in super::LINKS {

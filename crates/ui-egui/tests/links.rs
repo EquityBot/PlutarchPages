@@ -20,8 +20,8 @@ fn harness(setup: impl FnOnce(&mut PdfCraftApp) + 'static) -> Harness<'static, P
 #[test]
 fn home_screen_links() {
     for (label, url) in [
-        ("PlutarchPages on GitHub", "https://github.com/ryanduguid/PlutarchPages"),
-        ("Report a problem", "https://github.com/ryanduguid/PlutarchPages/issues"),
+        ("PlutarchPages on GitHub", "https://github.com/EquityBot/PlutarchPages"),
+        ("Report a problem", "https://github.com/EquityBot/PlutarchPages/issues"),
         ("Upstream PdfCraft", "https://github.com/storytold/pdfcraft"),
     ] {
         let mut h = harness(|_| {});

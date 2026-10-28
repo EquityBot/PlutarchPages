@@ -55,7 +55,7 @@ if (-not $haveCert -and -not $haveAzure) {
 }
 
 $script:SignTool = Find-SignTool
-$common = @('sign', '/v', '/fd', 'SHA256', '/td', 'SHA256', '/d', 'PlutarchPages', '/du', 'https://github.com/ryanduguid/PlutarchPages')
+$common = @('sign', '/v', '/fd', 'SHA256', '/td', 'SHA256', '/d', 'PlutarchPages', '/du', 'https://github.com/EquityBot/PlutarchPages')
 $tmp = Join-Path ([IO.Path]::GetTempPath()) "pdfcraft-sign-$PID"
 New-Item -ItemType Directory -Force -Path $tmp | Out-Null
 

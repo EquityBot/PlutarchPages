@@ -17,7 +17,7 @@
 > **PlutarchPages is a fork of [PdfCraft](https://github.com/storytold/pdfcraft) by the ArtCraft team.** It adds
 > the fixes and converters listed under [Fork changes](#fork-changes). It is not an ArtCraft product, and the
 > ArtCraft name and logos have been removed as the upstream brand licence requires for modified versions.
-> Report problems at [ryanduguid/PlutarchPages](https://github.com/ryanduguid/PlutarchPages/issues). Most of this
+> Report problems at [EquityBot/PlutarchPages](https://github.com/EquityBot/PlutarchPages/issues). Most of this
 > README describes the upstream app; the program, crates and binaries keep their `pdfcraft` names.
 
 <br>
@@ -51,7 +51,7 @@
 
 This fork has no Discord or web page of its own:
 
-- **PlutarchPages source and issues:** [github.com/ryanduguid/PlutarchPages](https://github.com/ryanduguid/PlutarchPages)
+- **PlutarchPages source and issues:** [github.com/EquityBot/PlutarchPages](https://github.com/EquityBot/PlutarchPages)
 - **Upstream PdfCraft:** [github.com/storytold/pdfcraft](https://github.com/storytold/pdfcraft)
 
 ## Highlights
