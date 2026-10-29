@@ -904,3 +904,27 @@ fn a_removed_link_sharing_its_action_with_a_kept_one_is_refused() {
     apply(&mut doc, None).unwrap();
     assert!(!saved_bytes_hold(&doc, b"own@example.invalid") && !saved_bytes_hold(&doc, b"CANARY-OWN-TEXT"));
 }
+
+#[test]
+fn what_a_removed_annotation_names_elsewhere_fails_closed() {
+    // An inline comment sharing its indirect text with a kept comment.
+    let mut doc = annotated_page(
+        "",
+        "<< /Type /Annot /Subtype /Text /Rect [20 20 40 40] /Contents 6 0 R >> 5 0 R",
+        vec![b"<< /Type /Annot /Subtype /Text /Rect [200 200 220 220] /Contents 6 0 R >>".to_vec(), b"(shared text)".to_vec()],
+    );
+    mark(&mut doc, 0, &[[0.0, 0.0, 120.0, 80.0]], "");
+    assert!(matches!(apply(&mut doc, None), Err(RedactError::StillUsed(_))));
+
+    // A /Popup naming a kept comment rather than a pop-up: the comment stays and apply refuses.
+    let mut doc = annotated_page(
+        "",
+        "5 0 R 6 0 R",
+        vec![
+            b"<< /Type /Annot /Subtype /Text /Rect [20 20 40 40] /Contents (comment) /Popup 6 0 R >>".to_vec(),
+            b"<< /Type /Annot /Subtype /Text /Rect [200 200 220 220] /Contents (kept) >>".to_vec(),
+        ],
+    );
+    mark(&mut doc, 0, &[[0.0, 0.0, 120.0, 80.0]], "");
+    assert!(matches!(apply(&mut doc, None), Err(RedactError::StillUsed(_))));
+}

@@ -383,6 +383,11 @@ fn without_retired(doc: &Document, res: &Dict, retired: &HashSet<ObjRef>) -> Opt
     Some(res)
 }
 
+/// What a removed annotation may hold as separate objects that must go with it. Appearance
+/// streams are left out: identical icons commonly share one, and a kept annotation sharing it
+/// draws it outside the marks.
+const PAYLOAD_KEYS: [&[u8]; 4] = [b"Contents", b"RC", b"A", b"Popup"];
+
 /// Fail closed when an original that redaction replaced or removed (an image, a form, a content
 /// stream) could still be saved with the file: a page draws it outside the marks (those pages
 /// are named), or something else still refers to it. Resource entries for it that no content
@@ -459,6 +464,8 @@ pub fn apply(doc: &mut Document, pages: Option<&[usize]>) -> Result<Report, Reda
     let mut retired: HashSet<ObjRef> = HashSet::new();
     // Annotations dropped from page /Annots (under a mark, replies to those, their pop-ups).
     let mut gone_annots: HashSet<ObjRef> = HashSet::new();
+    // What removed annotations hold as separate objects (text, actions, named pop-ups).
+    let mut gone_payloads: HashSet<ObjRef> = HashSet::new();
 
     // 0. Where each form XObject is drawn over the marks, on every page, so each such draw is
     // redacted with the marks of all of them (changes nothing).
@@ -600,7 +607,7 @@ pub fn apply(doc: &mut Document, pages: Option<&[usize]>) -> Result<Report, Reda
         let (kept, dropped): (Vec<Object>, Vec<Object>) = annots.into_iter().partition(|a| {
             // An annotation written inline in /Annots (not as its own object) goes with the page entry.
             let Some(r) = a.as_ref() else { return !inline_under(a) };
-            if removed.contains(&r) || popups.contains(&r) {
+            if removed.contains(&r) || popups.contains(&r) && doc.get(r).as_dict().and_then(|d| d.name(b"Subtype")) == Some(b"Popup") {
                 return false;
             }
             // Pop-ups of removed annotations go too.
@@ -608,6 +615,10 @@ pub fn apply(doc: &mut Document, pages: Option<&[usize]>) -> Result<Report, Reda
             !obj.as_dict().and_then(|d| d.get(b"Parent")).and_then(Object::as_ref).is_some_and(|p| removed.contains(&p))
         });
         report.annotations += dropped.iter().filter(|a| a.as_ref().is_none()).count();
+        for a in &dropped {
+            let d = a.as_ref().map_or_else(|| a.as_dict().cloned(), |r| doc.get(r).as_dict().cloned());
+            gone_payloads.extend(d.iter().flat_map(|d| PAYLOAD_KEYS.iter().filter_map(|k| d.reference(k))));
+        }
         // Nothing removed may stay reachable (step 6 checks).
         gone_annots.extend(dropped.iter().filter_map(Object::as_ref));
         doc.update_dict(page.obj, |d| {
@@ -689,13 +700,13 @@ pub fn apply(doc: &mut Document, pages: Option<&[usize]>) -> Result<Report, Reda
     // references to removed annotations go first; any other reference fails closed.
     report.tags += tags::drop_annotations(doc, &gone_annots)?;
     retired.extend(&gone_annots);
-    // Text and actions they hold as separate objects too, as a redacted image drawn elsewhere
-    // is refused: if a kept annotation shares one, apply fails closed. Appearance streams are
-    // left out, since identical icons commonly share one.
+    // Text, actions and pop-ups they hold as separate objects too, as a redacted image drawn
+    // elsewhere is refused: if anything kept shares one, apply fails closed.
     for r in &gone_annots {
         let Some(d) = doc.get(*r).as_dict().cloned() else { continue };
-        retired.extend([&b"Contents"[..], b"RC", b"A"].iter().filter_map(|k| d.reference(k)));
+        gone_payloads.extend(PAYLOAD_KEYS.iter().filter_map(|k| d.reference(k)));
     }
+    retired.extend(&gone_payloads);
     check_retired(doc, &retired)?;
     // The previous revision still holds the removed content: the next save must rewrite.
     doc.require_full_save();
