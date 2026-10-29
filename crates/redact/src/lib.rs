@@ -16,7 +16,7 @@
 
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use pdfcraft_cos::{Dict, Document, ObjRef, Object, Stream};
 
@@ -435,7 +435,7 @@ fn check_retired(doc: &mut Document, retired: &HashSet<ObjRef>) -> Result<(), Re
             doc.update_dict(h, |d| d.set(b"Resources".to_vec(), Object::Dict(pruned)))?;
         }
     }
-    let roots: Vec<Object> = [&b"Root"[..], b"Info"].iter().filter_map(|k| doc.trailer().get(k).cloned()).collect();
+    let roots: Vec<Object> = [&b"Root"[..], b"Info", b"Encrypt"].iter().filter_map(|k| doc.trailer().get(k).cloned()).collect();
     if reachable(doc, &roots).is_disjoint(retired) { Ok(()) } else { Err(RedactError::StillUsed(Vec::new())) }
 }
 
@@ -541,7 +541,8 @@ pub fn apply(doc: &mut Document, pages: Option<&[usize]>) -> Result<Report, Reda
 
         // 2. Annotations: the marks, and whatever lies under them (with their pop-ups).
         let annots = annots_of(doc, &doc.get(page.obj).as_dict().cloned().unwrap_or_default());
-        let mut removed: Vec<ObjRef> = Vec::new();
+        let mut removed: HashSet<ObjRef> = HashSet::new();
+        let under = |d: &Dict| rect_of(doc, d.get(b"Rect")).is_some_and(|b| rects.iter().any(|x| pdfcraft_content::overlaps(*x, b, 0.0)));
         for a in &annots {
             let Some(r) = a.as_ref() else { continue };
             let obj = doc.get(r);
@@ -549,15 +550,14 @@ pub fn apply(doc: &mut Document, pages: Option<&[usize]>) -> Result<Report, Reda
             let subtype = d.name(b"Subtype").unwrap_or(b"");
             if subtype == b"Redact" {
                 if page_marks.iter().any(|m| m.obj == r) {
-                    removed.push(r);
+                    removed.insert(r);
                 }
                 continue;
             }
             if subtype == b"Popup" {
                 continue;
             }
-            if rect_of(doc, d.get(b"Rect")).is_some_and(|b| rects.iter().any(|x| pdfcraft_content::overlaps(*x, b, 0.0))) {
-                removed.push(r);
+            if under(d) && removed.insert(r) {
                 if subtype == b"Widget" {
                     if let Some((_, name)) = widget_owner.iter().find(|(w, _)| *w == r)
                         && !doomed_fields.contains(name)
@@ -569,23 +569,27 @@ pub fn apply(doc: &mut Document, pages: Option<&[usize]>) -> Result<Report, Reda
                 }
             }
         }
-        // Replies (`/IRT`) to anything removed go too, to a fixpoint, as deleting a comment does:
-        // a kept reply would otherwise keep the removed comment reachable.
-        loop {
-            let before = removed.len();
-            for a in &annots {
-                let Some(r) = a.as_ref() else { continue };
-                if !removed.contains(&r) && doc.get(r).as_dict().and_then(|d| d.reference(b"IRT")).is_some_and(|t| removed.contains(&t)) {
-                    removed.push(r);
-                    report.annotations += 1;
-                }
-            }
-            if removed.len() == before {
-                break;
+        // Replies (`/IRT`) to anything removed go too, and replies to those, as deleting a comment
+        // does: a kept reply would otherwise keep the removed comment reachable.
+        let mut replies: HashMap<ObjRef, Vec<ObjRef>> = HashMap::new();
+        for r in annots.iter().filter_map(Object::as_ref) {
+            if let Some(t) = doc.get(r).as_dict().and_then(|d| d.reference(b"IRT")) {
+                replies.entry(t).or_default().push(r);
             }
         }
+        let mut todo: Vec<ObjRef> = removed.iter().copied().collect();
+        while let Some(t) = todo.pop() {
+            for &r in replies.get(&t).into_iter().flatten() {
+                if removed.insert(r) {
+                    report.annotations += 1;
+                    todo.push(r);
+                }
+            }
+        }
+        let inline_under = |a: &Object| a.as_dict().is_some_and(|d| d.name(b"Subtype") != Some(b"Popup") && under(d));
         let (kept, dropped): (Vec<Object>, Vec<Object>) = annots.into_iter().partition(|a| {
-            let Some(r) = a.as_ref() else { return true };
+            // An annotation written inline in /Annots (not as its own object) goes with the page entry.
+            let Some(r) = a.as_ref() else { return !inline_under(a) };
             if removed.contains(&r) {
                 return false;
             }
@@ -593,6 +597,7 @@ pub fn apply(doc: &mut Document, pages: Option<&[usize]>) -> Result<Report, Reda
             let obj = doc.get(r);
             !obj.as_dict().and_then(|d| d.get(b"Parent")).and_then(Object::as_ref).is_some_and(|p| removed.contains(&p))
         });
+        report.annotations += dropped.iter().filter(|a| a.as_ref().is_none()).count();
         // Nothing removed may stay reachable (step 6 checks).
         gone_annots.extend(dropped.iter().filter_map(Object::as_ref));
         doc.update_dict(page.obj, |d| {
@@ -635,6 +640,8 @@ pub fn apply(doc: &mut Document, pages: Option<&[usize]>) -> Result<Report, Reda
         if pdfcraft_forms::fields(doc).iter().any(|f| &f.name == name) {
             pdfcraft_forms::delete_field(doc, name)?;
             report.fields += 1;
+            // Its widgets on other pages and outside the marks are gone too (step 6 checks).
+            gone_annots.extend(widget_owner.iter().filter(|(_, n)| n == name).map(|(w, _)| *w));
         }
     }
 

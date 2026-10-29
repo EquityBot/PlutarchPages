@@ -284,7 +284,15 @@ fn convert_xobject(
     report: &mut ColorReport,
 ) -> ObjRef {
     let r = key.0;
-    let Object::Stream(s) = (*doc.get(r)).clone() else { return r };
+    let s = match &*doc.get(r) {
+        // Past the depth limit before copying: such a form may be drawn many times.
+        Object::Stream(s) if depth >= MAX_DEPTH && s.dict.name(b"Subtype") == Some(b"Form") => {
+            done.cut = true;
+            return r;
+        }
+        Object::Stream(s) => s.clone(),
+        _ => return r,
+    };
     match s.dict.name(b"Subtype") {
         Some(b"Image") => {
             let n = match convert_image(doc, &s) {
@@ -303,7 +311,7 @@ fn convert_xobject(
             done.xobjects.insert(key, (n, None));
             n
         }
-        Some(b"Form") if depth < MAX_DEPTH => {
+        Some(b"Form") => {
             // Placeholder first, so a form that draws itself stops here. Unchanged forms are
             // remembered too: re-walking them on every draw grows as fan-out^depth.
             done.xobjects.insert(key, (r, None));
@@ -313,10 +321,6 @@ fn convert_xobject(
             done.cut |= outer;
             done.xobjects.insert(key, (n, cut.then_some(depth)));
             n
-        }
-        Some(b"Form") => {
-            done.cut = true;
-            r
         }
         _ => r,
     }

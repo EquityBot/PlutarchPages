@@ -803,3 +803,48 @@ fn removed_comments_and_links_do_not_stay_reachable() {
     mark(&mut doc, 0, &[[0.0, 0.0, 120.0, 80.0]], "");
     assert!(matches!(apply(&mut doc, None), Err(RedactError::StillUsed(_))));
 }
+
+#[test]
+fn a_reply_chain_goes_with_its_comment() {
+    // Replies listed before what they reply to, outside the mark: the whole chain goes.
+    let mut doc = annotated_page(
+        "",
+        "8 0 R 7 0 R 6 0 R 5 0 R",
+        vec![
+            b"<< /Type /Annot /Subtype /Text /Rect [20 20 40 40] /Contents (comment) >>".to_vec(),
+            b"<< /Type /Annot /Subtype /Text /Rect [200 200 220 220] /IRT 5 0 R /Contents (reply 1) >>".to_vec(),
+            b"<< /Type /Annot /Subtype /Text /Rect [200 200 220 220] /IRT 6 0 R /Contents (reply 2) >>".to_vec(),
+            b"<< /Type /Annot /Subtype /Text /Rect [200 200 220 220] /IRT 7 0 R /Contents (CANARY-CHAIN) >>".to_vec(),
+        ],
+    );
+    mark(&mut doc, 0, &[[0.0, 0.0, 120.0, 80.0]], "");
+    assert_eq!(apply(&mut doc, None).unwrap().annotations, 4);
+    assert!(!saved_bytes_hold(&doc, b"CANARY-CHAIN"), "a reply chain kept the removed comment");
+}
+
+#[test]
+fn an_inline_comment_under_a_mark_goes() {
+    let mut doc = annotated_page("", "<< /Type /Annot /Subtype /Text /Rect [20 20 40 40] /Contents (CANARY-INLINE) >>", vec![]);
+    mark(&mut doc, 0, &[[0.0, 0.0, 120.0, 80.0]], "");
+    assert_eq!(apply(&mut doc, None).unwrap().annotations, 1);
+    assert!(!saved_bytes_hold(&doc, b"CANARY-INLINE"), "the inline comment stayed");
+}
+
+#[test]
+fn a_tagged_sibling_widget_does_not_keep_a_redacted_field() {
+    // One widget under the mark, one outside it that the structure tree tags.
+    let mut doc = annotated_page(
+        "/AcroForm << /Fields [5 0 R] >> /StructTreeRoot 8 0 R /MarkInfo << /Marked true >>",
+        "6 0 R 7 0 R",
+        vec![
+            b"<< /FT /Tx /T (name) /V (CANARY-SIBLING) /Kids [6 0 R 7 0 R] >>".to_vec(),
+            b"<< /Type /Annot /Subtype /Widget /Parent 5 0 R /Rect [20 20 40 40] >>".to_vec(),
+            b"<< /Type /Annot /Subtype /Widget /Parent 5 0 R /Rect [200 200 220 220] /StructParent 0 >>".to_vec(),
+            b"<< /Type /StructTreeRoot /K 9 0 R >>".to_vec(),
+            b"<< /Type /StructElem /S /Form /P 8 0 R /K [<< /Type /OBJR /Obj 7 0 R >>] >>".to_vec(),
+        ],
+    );
+    mark(&mut doc, 0, &[[0.0, 0.0, 120.0, 80.0]], "");
+    assert_eq!(apply(&mut doc, None).unwrap().fields, 1);
+    assert!(!saved_bytes_hold(&doc, b"CANARY-SIBLING"), "the tagged sibling widget kept the field");
+}
