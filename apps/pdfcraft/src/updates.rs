@@ -1,10 +1,13 @@
-//! Asks GitHub for the latest PdfCraft release (Help ▸ Check for updates, issue #28).
+//! Asks GitHub for the latest PlutarchPages release (Help ▸ Check for updates, issue #28).
 
 use std::time::Duration;
 
 use pdfcraft_ui_egui::updates::{RELEASES_PAGE, Release};
 
-const LATEST: &str = "https://api.github.com/repos/storytold/pdfcraft/releases/latest";
+const LATEST: &str = "https://api.github.com/repos/EquityBot/PlutarchPages/releases/latest";
+
+/// What GitHub's 404 for [`LATEST`] means: the fork has not published a release yet.
+const NO_RELEASE: &str = "PlutarchPages hasn't published a release yet; build it from source";
 
 /// The latest release. The answer is untrusted: its size is capped, and only a page under
 /// [`RELEASES_PAGE`] is ever offered for download (anything else falls back to that list).
@@ -26,12 +29,9 @@ pub fn latest_release() -> Result<Release, String> {
         .call()
         .map_err(|e| format!("couldn't reach GitHub ({e})"))?;
     let status = response.status().as_u16();
-    if status == 403 {
-        let reset = response.headers().get("x-ratelimit-reset").and_then(|v| v.to_str().ok());
-        return Err(rate_limited(reset, now_unix()));
-    }
-    if !(200..300).contains(&status) {
-        return Err(format!("couldn't reach GitHub (http status: {status})"));
+    let reset = response.headers().get("x-ratelimit-reset").and_then(|v| v.to_str().ok());
+    if let Some(e) = status_error(status, reset, now_unix()) {
+        return Err(e);
     }
     let body = response.body_mut().with_config().limit(1 << 20).read_to_string().map_err(|e| format!("unreadable answer ({e})"))?;
     parse(&body)
@@ -69,14 +69,31 @@ fn rate_limited(reset: Option<&str>, now: u64) -> String {
     }
 }
 
+/// What to tell the user about a non-success HTTP status, or `None` for success. GitHub
+/// answers 404 for `releases/latest` until the first release is published.
+fn status_error(status: u16, reset: Option<&str>, now: u64) -> Option<String> {
+    match status {
+        200..300 => None,
+        403 => Some(rate_limited(reset, now)),
+        404 => Some(NO_RELEASE.into()),
+        _ => Some(format!("couldn't reach GitHub (http status: {status})")),
+    }
+}
+
+/// Whether `rest`, the part of a release URL after [`RELEASES_PAGE`], stays on that page once a
+/// browser resolves it. Dot segments could climb to another repository's releases, and URL
+/// parsing drops tabs and newlines (so `.\t.` is `..`) and decodes `%2e`, so only the characters
+/// of a plain tag path are allowed; anything refused falls back to the list.
+fn offered_path(rest: &str) -> bool {
+    rest.starts_with('/')
+        && rest.bytes().all(|b| b.is_ascii_alphanumeric() || b"/-_.+".contains(&b))
+        && !rest.split('/').any(|segment| segment == "." || segment == "..")
+}
+
 fn parse(body: &str) -> Result<Release, String> {
     let v: serde_json::Value = serde_json::from_str(body).map_err(|e| format!("unreadable answer ({e})"))?;
     let version = v["tag_name"].as_str().filter(|t| !t.is_empty() && t.len() <= 64).ok_or("no release found")?.to_string();
-    let url = v["html_url"]
-        .as_str()
-        .filter(|u| u.strip_prefix(RELEASES_PAGE).is_some_and(|rest| rest.starts_with('/') && !rest.contains(['?', '#', '\\'])))
-        .unwrap_or(RELEASES_PAGE)
-        .to_string();
+    let url = v["html_url"].as_str().filter(|u| u.strip_prefix(RELEASES_PAGE).is_some_and(offered_path)).unwrap_or(RELEASES_PAGE).to_string();
     Ok(Release { version, url })
 }
 
@@ -86,9 +103,23 @@ mod tests {
 
     #[test]
     fn answers_are_read_and_only_our_release_pages_are_offered() {
-        let r = parse(r#"{"tag_name":"v0.2.0","html_url":"https://github.com/storytold/pdfcraft/releases/tag/v0.2.0"}"#).unwrap();
-        assert_eq!(r, Release { version: "v0.2.0".into(), url: "https://github.com/storytold/pdfcraft/releases/tag/v0.2.0".into() });
-        for elsewhere in ["https://example.com/pdfcraft.exe", "https://github.com/storytold/pdfcraft/releases.evil/x", "javascript:alert(1)"] {
+        let r = parse(r#"{"tag_name":"v0.2.0","html_url":"https://github.com/EquityBot/PlutarchPages/releases/tag/v0.2.0"}"#).unwrap();
+        assert_eq!(r, Release { version: "v0.2.0".into(), url: "https://github.com/EquityBot/PlutarchPages/releases/tag/v0.2.0".into() });
+        // Upstream PdfCraft builds lack this fork's changes, so they are never offered either.
+        for elsewhere in [
+            "https://example.com/pdfcraft.exe",
+            "https://github.com/EquityBot/PlutarchPages/releases.evil/x",
+            "https://github.com/storytold/pdfcraft/releases/tag/v0.15.0",
+            // Browsers resolve dot segments, so these would land on upstream's page.
+            "https://github.com/EquityBot/PlutarchPages/releases/../../../storytold/pdfcraft/releases/tag/v0.15.0",
+            "https://github.com/EquityBot/PlutarchPages/releases/tag/%2e%2e/%2e%2e/%2e%2e/%2e%2e/storytold/pdfcraft",
+            "https://github.com/EquityBot/PlutarchPages/releases/./tag/v1",
+            // JSON escapes decode to a tab and a newline, which URL parsing removes: `.\t.` is `..`.
+            "https://github.com/EquityBot/PlutarchPages/releases/.\\t./.\\t./.\\t./storytold/pdfcraft/releases/tag/v1",
+            "https://github.com/EquityBot/PlutarchPages/releases/.\\n./.\\n./.\\n./storytold/pdfcraft/releases/tag/v1",
+            "https://github.com/EquityBot/PlutarchPages/releases/tag/v1 x",
+            "javascript:alert(1)",
+        ] {
             let r = parse(&format!(r#"{{"tag_name":"v9.9.9","html_url":"{elsewhere}"}}"#)).unwrap();
             assert_eq!(r.url, RELEASES_PAGE, "{elsewhere}");
         }
@@ -116,12 +147,28 @@ mod tests {
         }
     }
 
+    #[test]
+    fn statuses_read_as_messages() {
+        assert_eq!(status_error(200, None, 0), None);
+        assert_eq!(status_error(404, None, 0).as_deref(), Some(NO_RELEASE));
+        assert_eq!(
+            status_error(403, Some("1800001200"), 1800000000).as_deref(),
+            Some("GitHub is limiting update checks for now (shared hourly quota); try again in about 20 minutes")
+        );
+        assert_eq!(status_error(500, None, 0).as_deref(), Some("couldn't reach GitHub (http status: 500)"));
+    }
+
     /// Live: asks GitHub over TLS with the OS's roots (`cargo test -p pdfcraft -- --ignored`).
     #[test]
     #[ignore = "needs network access"]
     fn github_answers_with_the_latest_release() {
-        let r = latest_release().unwrap();
-        assert!(pdfcraft_ui_egui::updates::is_newer(&r.version, "0.0.0"), "{r:?}");
-        assert!(r.url.starts_with(RELEASES_PAGE), "{r:?}");
+        match latest_release() {
+            Ok(r) => {
+                assert!(pdfcraft_ui_egui::updates::is_newer(&r.version, "0.0.0"), "{r:?}");
+                assert!(r.url.starts_with(RELEASES_PAGE), "{r:?}");
+            }
+            // Until the fork's first release, GitHub answers 404.
+            Err(e) => assert_eq!(e, NO_RELEASE),
+        }
     }
 }
