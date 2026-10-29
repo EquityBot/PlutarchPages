@@ -689,6 +689,13 @@ pub fn apply(doc: &mut Document, pages: Option<&[usize]>) -> Result<Report, Reda
     // references to removed annotations go first; any other reference fails closed.
     report.tags += tags::drop_annotations(doc, &gone_annots)?;
     retired.extend(&gone_annots);
+    // Text and actions they hold as separate objects too, as a redacted image drawn elsewhere
+    // is refused: if a kept annotation shares one, apply fails closed. Appearance streams are
+    // left out, since identical icons commonly share one.
+    for r in &gone_annots {
+        let Some(d) = doc.get(*r).as_dict().cloned() else { continue };
+        retired.extend([&b"Contents"[..], b"RC", b"A"].iter().filter_map(|k| d.reference(k)));
+    }
     check_retired(doc, &retired)?;
     // The previous revision still holds the removed content: the next save must rewrite.
     doc.require_full_save();

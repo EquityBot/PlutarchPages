@@ -875,3 +875,32 @@ fn a_pop_up_named_only_by_a_removed_comment_goes() {
     apply(&mut doc, None).unwrap();
     assert!(!saved_bytes_hold(&doc, b"CANARY-POPUP"), "the pop-up stayed");
 }
+
+#[test]
+fn a_removed_link_sharing_its_action_with_a_kept_one_is_refused() {
+    let mut doc = annotated_page(
+        "",
+        "5 0 R 6 0 R",
+        vec![
+            b"<< /Type /Annot /Subtype /Link /Rect [20 20 40 40] /A 7 0 R >>".to_vec(),
+            b"<< /Type /Annot /Subtype /Link /Rect [200 200 220 220] /A 7 0 R >>".to_vec(),
+            b"<< /S /URI /URI (mailto:shared@example.invalid) >>".to_vec(),
+        ],
+    );
+    mark(&mut doc, 0, &[[0.0, 0.0, 120.0, 80.0]], "");
+    assert!(matches!(apply(&mut doc, None), Err(RedactError::StillUsed(_))));
+
+    // Its own indirect text and action go with it.
+    let mut doc = annotated_page(
+        "",
+        "5 0 R",
+        vec![
+            b"<< /Type /Annot /Subtype /Link /Rect [20 20 40 40] /A 6 0 R /Contents 7 0 R >>".to_vec(),
+            b"<< /S /URI /URI (mailto:own@example.invalid) >>".to_vec(),
+            b"(CANARY-OWN-TEXT)".to_vec(),
+        ],
+    );
+    mark(&mut doc, 0, &[[0.0, 0.0, 120.0, 80.0]], "");
+    apply(&mut doc, None).unwrap();
+    assert!(!saved_bytes_hold(&doc, b"own@example.invalid") && !saved_bytes_hold(&doc, b"CANARY-OWN-TEXT"));
+}
