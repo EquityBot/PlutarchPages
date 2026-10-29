@@ -80,14 +80,17 @@ fn status_error(status: u16, reset: Option<&str>, now: u64) -> Option<String> {
     }
 }
 
+/// Whether `rest`, the part of a release URL after [`RELEASES_PAGE`], stays on that page once a
+/// browser resolves it. Dot segments could climb to another repository's releases, so they are
+/// refused, and so is `%`, which could encode one; anything refused falls back to the list.
+fn offered_path(rest: &str) -> bool {
+    rest.starts_with('/') && !rest.contains(['?', '#', '\\', '%']) && !rest.split('/').any(|segment| segment == "." || segment == "..")
+}
+
 fn parse(body: &str) -> Result<Release, String> {
     let v: serde_json::Value = serde_json::from_str(body).map_err(|e| format!("unreadable answer ({e})"))?;
     let version = v["tag_name"].as_str().filter(|t| !t.is_empty() && t.len() <= 64).ok_or("no release found")?.to_string();
-    let url = v["html_url"]
-        .as_str()
-        .filter(|u| u.strip_prefix(RELEASES_PAGE).is_some_and(|rest| rest.starts_with('/') && !rest.contains(['?', '#', '\\'])))
-        .unwrap_or(RELEASES_PAGE)
-        .to_string();
+    let url = v["html_url"].as_str().filter(|u| u.strip_prefix(RELEASES_PAGE).is_some_and(offered_path)).unwrap_or(RELEASES_PAGE).to_string();
     Ok(Release { version, url })
 }
 
@@ -104,6 +107,10 @@ mod tests {
             "https://example.com/pdfcraft.exe",
             "https://github.com/EquityBot/PlutarchPages/releases.evil/x",
             "https://github.com/storytold/pdfcraft/releases/tag/v0.15.0",
+            // Browsers resolve dot segments, so these would land on upstream's page.
+            "https://github.com/EquityBot/PlutarchPages/releases/../../../storytold/pdfcraft/releases/tag/v0.15.0",
+            "https://github.com/EquityBot/PlutarchPages/releases/tag/%2e%2e/%2e%2e/%2e%2e/%2e%2e/storytold/pdfcraft",
+            "https://github.com/EquityBot/PlutarchPages/releases/./tag/v1",
             "javascript:alert(1)",
         ] {
             let r = parse(&format!(r#"{{"tag_name":"v9.9.9","html_url":"{elsewhere}"}}"#)).unwrap();
