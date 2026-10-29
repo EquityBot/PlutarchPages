@@ -958,6 +958,47 @@ fn import_fdf(doc: &mut Document, bytes: &[u8]) -> Result<Report, DataError> {
     Ok(report)
 }
 
+// Inspect the first logical record: tabs within quoted CSV cells are data. A quote
+// in the middle of an unquoted TSV name stays literal, as in the TSV reader.
+fn has_tab_delimiter(text: &str) -> bool {
+    tab_outside_quotes(text, true)
+}
+
+// With `follow`, a first record whose only tabs are quoted is tab-delimited after all when the
+// next record has a tab outside quotes: the quotes were literal parts of TSV names such as
+// `"Name` and `Agree"`. A CSV export quotes any tab it writes, so its records never do this, and
+// a first record with a comma outside quotes is CSV whatever the next record holds.
+fn tab_outside_quotes(text: &str, follow: bool) -> bool {
+    let mut quoted = false;
+    let mut cell_start = true;
+    let mut quoted_tab = false;
+    let mut bare_comma = false;
+    let mut chars = text.char_indices().peekable();
+    while let Some((i, c)) = chars.next() {
+        match c {
+            '"' if quoted && chars.peek().map(|&(_, c)| c) == Some('"') => {
+                chars.next();
+            }
+            '"' if quoted || cell_start => {
+                quoted = !quoted;
+                cell_start = false;
+            }
+            '\t' if !quoted => return true,
+            '\t' => quoted_tab = true,
+            '\r' | '\n' if !quoted => {
+                return follow && quoted_tab && !bare_comma && tab_outside_quotes(text[i..].trim_start_matches(['\r', '\n']), false);
+            }
+            ',' if !quoted => {
+                cell_start = true;
+                bare_comma = true;
+            }
+            _ => cell_start = false,
+        }
+    }
+    // An unclosed quote can be a literal TSV field-name character.
+    quoted && text.lines().next().is_some_and(|line| line.contains('\t'))
+}
+
 /// Form data from XML, CSV or tab-delimited text.
 fn import_table(doc: &mut Document, text: &str) -> Result<Report, DataError> {
     let mut report = Report::default();
@@ -973,7 +1014,7 @@ fn import_table(doc: &mut Document, text: &str) -> Result<Report, DataError> {
                 (name, vec![c.text().unwrap_or("").to_string()])
             })
             .collect()
-    } else if t.lines().next().is_some_and(|l| l.contains('\t')) {
+    } else if has_tab_delimiter(t) {
         let mut lines = t.lines();
         let (Some(head), Some(row)) = (lines.next(), lines.next()) else { return Err(DataError::UnknownFormat) };
         head.split('\t').map(str::to_string).zip(row.split('\t')).map(|(k, v)| (k, vec![v.to_string()])).collect()

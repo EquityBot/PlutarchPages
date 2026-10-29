@@ -514,3 +514,45 @@ fn csv_import_keeps_a_leading_apostrophe() {
     import(&mut dst, export_data(&src, Format::Csv).as_bytes()).unwrap();
     assert_eq!(values(&dst)[0].1, ["'=1+1"]);
 }
+
+#[test]
+fn a_csv_header_with_a_quoted_tab_is_read_as_csv() {
+    // CSV export quotes a field name holding a tab; import must not take that tab as a delimiter.
+    let rename = |doc: &mut Document| {
+        let field = fields(doc).into_iter().find(|f| f.name == "Name").unwrap().obj;
+        doc.update_dict(field, |d| d.set(b"T".to_vec(), PdfString::text("First\tName"))).unwrap();
+    };
+    let mut src = blank();
+    rename(&mut src);
+    set_value(&mut src, "First\tName", &FieldValue::Text("Ada".into())).unwrap();
+    let csv = export_data(&src, Format::Csv);
+    assert!(csv.starts_with("\"First\tName\",Agree,"), "{csv}");
+    let mut dst = blank();
+    rename(&mut dst);
+    let r = import(&mut dst, csv.as_bytes()).unwrap();
+    assert!(r.rejected.is_empty(), "{r:?}");
+    assert_eq!(values(&dst)[0].1, ["Ada"]);
+    // Tab-delimited text stays tab-delimited when a name holds a quote or a comma (text export
+    // writes both as they are), an unclosed leading quote included.
+    for name in ["Na\"me, x", "\"Name\"", "\"Name"] {
+        let mut dst = blank();
+        let r = import(&mut dst, format!("{name}\tAgree\r\nv\tYes\r\n").as_bytes()).unwrap();
+        assert_eq!(values(&dst)[1].1, ["Yes"], "{name:?}: {r:?}");
+    }
+    // Names `"Name` and `Agree"` put the header's only tab between quotes; the value row's bare
+    // tab shows the file is tab-delimited.
+    let mut dst = blank();
+    for (from, to) in [("Name", "\"Name"), ("Agree", "Agree\"")] {
+        let field = fields(&dst).into_iter().find(|f| f.name == from).unwrap().obj;
+        dst.update_dict(field, |d| d.set(b"T".to_vec(), PdfString::text(to))).unwrap();
+    }
+    let r = import(&mut dst, b"\"Name\tAgree\"\r\nv\tYes\r\n").unwrap();
+    assert!(r.rejected.is_empty(), "{r:?}");
+    assert_eq!((values(&dst)[0].1.clone(), values(&dst)[1].1.clone()), (vec!["v".to_string()], vec!["Yes".to_string()]));
+    // A comma outside quotes in the header keeps it CSV even when a value holds a bare tab.
+    let mut dst = blank();
+    rename(&mut dst);
+    let r = import(&mut dst, b"\"First\tName\",Agree\r\nAda\tMary,Yes\r\n").unwrap();
+    assert!(r.rejected.is_empty(), "{r:?}");
+    assert_eq!((values(&dst)[0].1.clone(), values(&dst)[1].1.clone()), (vec!["Ada\tMary".to_string()], vec!["Yes".to_string()]));
+}
