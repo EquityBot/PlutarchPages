@@ -1,0 +1,40 @@
+# PlutarchPages
+
+> A fork of PdfCraft: a clean-room PDF application in pure Rust for macOS, Windows, Linux, FreeBSD
+> and the web, aiming at Adobe Acrobat Pro parity. It is alpha: pages are still drawn by the `hayro`
+> crate, and editing existing text, OCR beyond Latin script and Office import and export are thin or missing.
+
+This fork publishes no builds of its own; build it from source with Rust 1.90 or later, for example
+`git clone https://github.com/EquityBot/PlutarchPages` and then
+`cargo run --release -p pdfcraft -- some.pdf`. The program, crates and binaries keep their `pdfcraft` names.
+
+## Start
+
+- [README](https://github.com/EquityBot/PlutarchPages#readme): features, fork changes, getting started and licence.
+- [Development](https://github.com/EquityBot/PlutarchPages/blob/main/docs/development.md): environment variables, logs and diagnostics.
+- [Roadmap summary](https://github.com/EquityBot/PlutarchPages/blob/main/ROADMAP.md): stage, parity numbers and progress log.
+
+## Docs
+
+- [Architecture](https://github.com/EquityBot/PlutarchPages/blob/main/docs/architecture.md): how the crates are built and layered today.
+- [Gaps](https://github.com/EquityBot/PlutarchPages/blob/main/docs/gaps.md): known shortfalls against Acrobat Pro, ranked.
+- [Parity with Acrobat Pro](https://github.com/EquityBot/PlutarchPages/blob/main/docs/target-app-parity.md): the overall assessment and how it is measured.
+- [Milestones](https://github.com/EquityBot/PlutarchPages/blob/main/docs/roadmap.md): milestones and current focus.
+- [MCP conventions](https://github.com/EquityBot/PlutarchPages/blob/main/docs/mcp.md): the opt-in `pdfcraft-cli mcp` server.
+- [Interface language](https://github.com/EquityBot/PlutarchPages/blob/main/docs/localization.md): choosing the interface language and what each catalogue covers.
+- [Editing images](https://github.com/EquityBot/PlutarchPages/blob/main/docs/editing-images.md): moving, resizing and deleting figures.
+- [Editing several objects](https://github.com/EquityBot/PlutarchPages/blob/main/docs/editing-multiple-objects.md): moving several objects together.
+- [File format parity](https://github.com/EquityBot/PlutarchPages/blob/main/docs/file-format-parity.md): formats read and written.
+- [PDF specification parity](https://github.com/EquityBot/PlutarchPages/blob/main/docs/pdf-spec-parity.md): ISO 32000-2 and subset standards coverage.
+- [UI parity](https://github.com/EquityBot/PlutarchPages/blob/main/docs/ui-parity.md): tools, panels and shortcuts against Acrobat Pro.
+- [Hardware and platform parity](https://github.com/EquityBot/PlutarchPages/blob/main/docs/hardware-parity.md): hardware features per platform.
+- [Localization parity](https://github.com/EquityBot/PlutarchPages/blob/main/docs/localization-parity.md): per-language interface status.
+- [Contributors](https://github.com/EquityBot/PlutarchPages/blob/main/docs/contributors.md): how the About window credits contributors.
+- [Releasing](https://github.com/EquityBot/PlutarchPages/blob/main/docs/releasing.md): the release workflow.
+- [Attribution](https://github.com/EquityBot/PlutarchPages/blob/main/ATTRIBUTION.md): every bundled asset with its author, source and licence.
+- [Agent and contributor rules](https://github.com/EquityBot/PlutarchPages/blob/main/AGENTS.md): asset, clean-room and safety rules.
+
+## Related
+
+- [EquityBot](https://github.com/EquityBot): other EquityBot tools.
+- [PdfCraft](https://github.com/storytold/pdfcraft): the upstream project.

@@ -7,17 +7,17 @@
   </picture>
 </p>
 
+<div align="center">
+
+[![tests](https://img.shields.io/github/actions/workflow/status/EquityBot/PlutarchPages/ci.yml?branch=main&label=tests&labelColor=000000&style=flat)](https://github.com/EquityBot/PlutarchPages/actions/workflows/ci.yml) [![CodeQL](https://img.shields.io/github/actions/workflow/status/EquityBot/PlutarchPages/codeql.yml?branch=main&label=CodeQL&labelColor=000000&style=flat)](https://github.com/EquityBot/PlutarchPages/actions/workflows/codeql.yml)<br>
+[![rust: 1.90+](https://img.shields.io/badge/rust-1.90%2B-66023C?labelColor=000000&style=flat&color=66023C)](https://www.rust-lang.org/) [![licence: MIT OR Apache-2.0](https://img.shields.io/badge/licence-MIT%20OR%20Apache--2.0-66023C?labelColor=000000&style=flat&color=66023C)](#license-and-credits) [![fork of: PdfCraft](https://img.shields.io/badge/fork%20of-PdfCraft-66023C?labelColor=000000&style=flat&color=66023C)](https://github.com/storytold/pdfcraft)
+
+</div>
+
 <p align="center">
   <b>The PDF workbench; an open-source, clean-room reimplementation of Adobe Acrobat, rebuilt in pure Rust.</b><br>
   Read, organize, combine, split and secure PDFs in a fast, native app, written in Rust from the ground up.<br>
   macOS · Windows · Linux · FreeBSD · the web
-</p>
-
-<p align="center">
-  <img alt="License: MIT OR Apache-2.0" src="https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-66023C?style=flat&labelColor=000000&color=66023C">
-  <img alt="Written in Rust" src="https://img.shields.io/badge/written%20in-Rust-66023C?style=flat&labelColor=000000&color=66023C">
-  <img alt="Platforms: macOS, Windows, Linux, FreeBSD, web" src="https://img.shields.io/badge/runs%20on-macOS%20%C2%B7%20Windows%20%C2%B7%20Linux%20%C2%B7%20FreeBSD%20%C2%B7%20web-66023C?style=flat&labelColor=000000&color=66023C">
-  <img alt="No account, no telemetry" src="https://img.shields.io/badge/no%20account-no%20telemetry-66023C?style=flat&labelColor=000000&color=66023C">
 </p>
 
 > [!NOTE]
