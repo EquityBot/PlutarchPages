@@ -961,12 +961,20 @@ fn import_fdf(doc: &mut Document, bytes: &[u8]) -> Result<Report, DataError> {
 // Inspect the first logical record: tabs within quoted CSV cells are data. A quote
 // in the middle of an unquoted TSV name stays literal, as in the TSV reader.
 fn has_tab_delimiter(text: &str) -> bool {
+    tab_outside_quotes(text, true)
+}
+
+// With `follow`, a first record whose only tabs are quoted is tab-delimited after all when the
+// next record has a tab outside quotes: the quotes were literal parts of TSV names such as
+// `"Name` and `Agree"`. A CSV export quotes any tab it writes, so its records never do this.
+fn tab_outside_quotes(text: &str, follow: bool) -> bool {
     let mut quoted = false;
     let mut cell_start = true;
-    let mut chars = text.chars().peekable();
-    while let Some(c) = chars.next() {
+    let mut quoted_tab = false;
+    let mut chars = text.char_indices().peekable();
+    while let Some((i, c)) = chars.next() {
         match c {
-            '"' if quoted && chars.peek() == Some(&'"') => {
+            '"' if quoted && chars.peek().map(|&(_, c)| c) == Some('"') => {
                 chars.next();
             }
             '"' if quoted || cell_start => {
@@ -974,7 +982,10 @@ fn has_tab_delimiter(text: &str) -> bool {
                 cell_start = false;
             }
             '\t' if !quoted => return true,
-            '\r' | '\n' if !quoted => return false,
+            '\t' => quoted_tab = true,
+            '\r' | '\n' if !quoted => {
+                return follow && quoted_tab && tab_outside_quotes(text[i..].trim_start_matches(['\r', '\n']), false);
+            }
             ',' if !quoted => cell_start = true,
             _ => cell_start = false,
         }
