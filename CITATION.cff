@@ -1,0 +1,24 @@
+cff-version: 1.2.0
+message: "If you use this work, cite it with this metadata and the release tag or commit you used."
+title: "PlutarchPages"
+type: software
+authors:
+  - name: "EquityBot"
+abstract: "A clean-room PDF application in pure Rust, aiming at Adobe Acrobat Pro parity. A fork of PdfCraft."
+repository-code: "https://github.com/EquityBot/PlutarchPages"
+license-url: "https://github.com/EquityBot/PlutarchPages/blob/main/README.md#license-and-credits"
+keywords:
+  - desktop-app
+  - pdf
+  - pdf-editor
+  - pdf-tools
+  - pdf-viewer
+  - pdfcraft
+  - redaction
+  - rust
+references:
+  - type: software
+    title: "PdfCraft"
+    authors:
+      - name: "ArtCraft Team and the PdfCraft contributors"
+    repository-code: "https://github.com/storytold/pdfcraft"
