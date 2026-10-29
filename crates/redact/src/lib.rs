@@ -587,10 +587,20 @@ pub fn apply(doc: &mut Document, pages: Option<&[usize]>) -> Result<Report, Reda
             }
         }
         let inline_under = |a: &Object| a.as_dict().is_some_and(|d| d.name(b"Subtype") != Some(b"Popup") && under(d));
+        // An inline widget has no field we can delete with it: refuse rather than keep its value.
+        if annots.iter().any(|a| inline_under(a) && a.as_dict().and_then(|d| d.name(b"Subtype")) == Some(b"Widget")) {
+            return Err(RedactError::StillUsed(vec![pi]));
+        }
+        // Pop-ups a removed annotation names go too, even without a /Parent pointing back.
+        let popups: HashSet<ObjRef> = removed
+            .iter()
+            .filter_map(|r| doc.get(*r).as_dict().and_then(|d| d.reference(b"Popup")))
+            .chain(annots.iter().filter(|a| inline_under(a)).filter_map(|a| a.as_dict()?.reference(b"Popup")))
+            .collect();
         let (kept, dropped): (Vec<Object>, Vec<Object>) = annots.into_iter().partition(|a| {
             // An annotation written inline in /Annots (not as its own object) goes with the page entry.
             let Some(r) = a.as_ref() else { return !inline_under(a) };
-            if removed.contains(&r) {
+            if removed.contains(&r) || popups.contains(&r) {
                 return false;
             }
             // Pop-ups of removed annotations go too.

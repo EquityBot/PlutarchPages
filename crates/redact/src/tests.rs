@@ -848,3 +848,30 @@ fn a_tagged_sibling_widget_does_not_keep_a_redacted_field() {
     assert_eq!(apply(&mut doc, None).unwrap().fields, 1);
     assert!(!saved_bytes_hold(&doc, b"CANARY-SIBLING"), "the tagged sibling widget kept the field");
 }
+
+#[test]
+fn an_inline_widget_under_a_mark_is_refused() {
+    let mut doc = annotated_page(
+        "/AcroForm << /Fields [5 0 R] >>",
+        "<< /Type /Annot /Subtype /Widget /Parent 5 0 R /Rect [20 20 40 40] >>",
+        vec![b"<< /FT /Tx /T (name) /V (CANARY-INLINE-FIELD) >>".to_vec()],
+    );
+    mark(&mut doc, 0, &[[0.0, 0.0, 120.0, 80.0]], "");
+    assert!(matches!(apply(&mut doc, None), Err(RedactError::StillUsed(_))));
+}
+
+#[test]
+fn a_pop_up_named_only_by_a_removed_comment_goes() {
+    // The pop-up has no /Parent pointing back at the comment.
+    let mut doc = annotated_page(
+        "",
+        "5 0 R 6 0 R",
+        vec![
+            b"<< /Type /Annot /Subtype /Text /Rect [20 20 40 40] /Contents (comment) /Popup 6 0 R >>".to_vec(),
+            b"<< /Type /Annot /Subtype /Popup /Rect [150 150 250 250] /Contents (CANARY-POPUP) >>".to_vec(),
+        ],
+    );
+    mark(&mut doc, 0, &[[0.0, 0.0, 120.0, 80.0]], "");
+    apply(&mut doc, None).unwrap();
+    assert!(!saved_bytes_hold(&doc, b"CANARY-POPUP"), "the pop-up stayed");
+}

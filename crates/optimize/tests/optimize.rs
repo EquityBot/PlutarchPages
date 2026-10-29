@@ -661,3 +661,24 @@ fn form_dict(child: Option<ObjRef>) -> Dict {
     }
     d
 }
+
+#[test]
+fn gray_conversion_converts_a_form_once_for_pages_sharing_its_resources() {
+    // Pages sharing one indirect resource dictionary give a form without /Resources the same
+    // context, so it is converted once rather than once per page.
+    let mut doc = Document::new_empty();
+    let form = doc.add(Object::Stream(Stream::from_raw(form_dict(None), b"/Im Do".to_vec())));
+    let colour = image(&mut doc, 6, 6, 3, false, None);
+    let mut x = Dict::new();
+    x.set(b"X".to_vec(), Object::Ref(form));
+    x.set(b"Im".to_vec(), Object::Ref(colour));
+    let mut res = Dict::new();
+    res.set(b"XObject".to_vec(), Object::Dict(x));
+    let shared = doc.add(Object::Dict(res));
+    for _ in 0..3 {
+        let p = page(&mut doc, &[], "/X Do");
+        doc.update_dict(p, |d| d.set(b"Resources".to_vec(), Object::Ref(shared))).unwrap();
+    }
+    let report = pdfcraft_optimize::convert_to_gray(&mut doc, None).unwrap();
+    assert_eq!((report.pages, report.forms, report.images), (3, 1, 1));
+}

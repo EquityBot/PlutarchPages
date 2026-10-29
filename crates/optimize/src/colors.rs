@@ -94,7 +94,8 @@ fn numbers(op: &Op) -> Option<Vec<f64>> {
 
 /// Forms and images already walked, shared across pages: old → new (itself when it stays), with
 /// the depth of a walk that `MAX_DEPTH` cut short. A form without its own /Resources draws from
-/// its caller's, so it is keyed by the object owning those resources too.
+/// its caller's, so it is keyed by those resources too: their own object when indirect (shared
+/// by every page using them), otherwise the page or form holding them.
 #[derive(Default)]
 struct Converted {
     xobjects: HashMap<(ObjRef, Option<ObjRef>), (ObjRef, Option<usize>)>,
@@ -233,7 +234,7 @@ fn convert_image(doc: &Document, s: &Stream) -> Option<Stream> {
     Some(Stream::flate(nd, &gray))
 }
 
-/// Convert the XObjects named in `names` (from `resources`, owned by the page or form `owner`),
+/// Convert the XObjects named in `names` (from `resources`, identified by `owner` as in `Converted`),
 /// returning the resources with the converted ones swapped in (or `None` if nothing changed).
 fn convert_xobjects(
     doc: &mut Document,
@@ -326,6 +327,11 @@ fn convert_xobject(
     }
 }
 
+/// What identifies the resources of `holder` (object `r`): their object when indirect, else `r`.
+fn resources_id(holder: &Dict, r: ObjRef) -> ObjRef {
+    holder.get(b"Resources").and_then(Object::as_ref).unwrap_or(r)
+}
+
 /// The form's own resource dictionary; without one it draws from its caller's.
 fn own_resources(doc: &Document, s: &Stream) -> Option<Dict> {
     s.dict.get(b"Resources").map(|x| doc.resolve(x)).and_then(|x| x.as_dict().cloned())
@@ -353,7 +359,7 @@ fn convert_form(
     report: &mut ColorReport,
 ) -> Option<ObjRef> {
     let (resources, owner) = match own_resources(doc, s) {
-        Some(res) => (res, r),
+        Some(res) => (res, resources_id(&s.dict, r)),
         None => (parent.clone(), owner),
     };
     let data = s.decoded().ok()?;
@@ -406,7 +412,7 @@ pub fn convert_to_gray(doc: &mut Document, pages: Option<&[usize]>) -> Result<Co
         let resources = page.dict.get(b"Resources").map(|r| doc.resolve(r)).and_then(|r| r.as_dict().cloned()).unwrap_or_default();
         let Some(data) = page.dict.get(b"Contents").and_then(|c| content_bytes(doc, c)) else { continue };
         let (bytes, changed, drawn) = convert_ops(doc, &data, &resources, &mut report);
-        let new_res = convert_xobjects(doc, &resources, page.obj, &drawn, 0, &mut done, &mut report);
+        let new_res = convert_xobjects(doc, &resources, resources_id(&page.dict, page.obj), &drawn, 0, &mut done, &mut report);
         if changed || new_res.is_some() {
             // New objects: the old contents and resources may be shared with other pages.
             let contents = doc.add(Object::Stream(Stream::flate(Dict::new(), &bytes)));
