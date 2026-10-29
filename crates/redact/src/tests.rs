@@ -711,3 +711,220 @@ fn tags_lose_what_redaction_removed() {
     assert_eq!(public.get(b"K").and_then(Object::as_int), Some(1));
     assert!(public.get(b"ActualText").is_some(), "untouched content keeps its tags");
 }
+
+/// Whether a full save of `doc` (classic table, so dictionaries stay readable) holds `secret`.
+fn saved_bytes_hold(doc: &Document, secret: &[u8]) -> bool {
+    let bytes = write_full(doc, &SaveOptions { object_streams: false, ..SaveOptions::default() }).unwrap();
+    bytes.windows(secret.len()).any(|w| w == secret)
+}
+
+/// Objects 1 to 4: a catalog (with `catalog_extra`), the page tree, one 300×300 page with
+/// `annots`, and its empty content.
+fn annotated_page(catalog_extra: &str, annots: &str, extra: Vec<Vec<u8>>) -> Document {
+    let mut objs: Vec<Vec<u8>> = vec![
+        format!("<< /Type /Catalog /Pages 2 0 R {catalog_extra} >>").into_bytes(),
+        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>".to_vec(),
+        format!("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 300] /Contents 4 0 R /Annots [{annots}] >>").into_bytes(),
+        stream("", b""),
+    ];
+    objs.extend(extra);
+    pdf(objs)
+}
+
+#[test]
+fn removed_comments_and_links_do_not_stay_reachable() {
+    // A comment under the mark with a reply outside it that points back at it.
+    let mut doc = annotated_page(
+        "",
+        "5 0 R 6 0 R",
+        vec![
+            b"<< /Type /Annot /Subtype /Text /Rect [20 20 40 40] /Contents (CANARY-SECRET-1) >>".to_vec(),
+            b"<< /Type /Annot /Subtype /Text /Rect [200 200 220 220] /IRT 5 0 R /Contents (reply) >>".to_vec(),
+        ],
+    );
+    mark(&mut doc, 0, &[[0.0, 0.0, 120.0, 80.0]], "");
+    assert_eq!(apply(&mut doc, None).unwrap().annotations, 2, "the reply goes with its comment");
+    assert!(!saved_bytes_hold(&doc, b"CANARY-SECRET-1"), "a reply kept the removed comment");
+
+    // A tagged link under the mark, referenced from two structure elements (inline and indirect).
+    let mut doc = annotated_page(
+        "/StructTreeRoot 6 0 R /MarkInfo << /Marked true >>",
+        "5 0 R",
+        vec![
+            b"<< /Type /Annot /Subtype /Link /Rect [20 20 40 40] /StructParent 0 /A << /S /URI /URI (mailto:canary-secret@example.invalid) >> >>"
+                .to_vec(),
+            b"<< /Type /StructTreeRoot /K [7 0 R 8 0 R] >>".to_vec(),
+            b"<< /Type /StructElem /S /Link /P 6 0 R /Alt (canary-alt) /K [<< /Type /OBJR /Obj 5 0 R >>] >>".to_vec(),
+            b"<< /Type /StructElem /S /Link /P 6 0 R /K 9 0 R >>".to_vec(),
+            b"<< /Type /OBJR /Obj 5 0 R >>".to_vec(),
+        ],
+    );
+    mark(&mut doc, 0, &[[0.0, 0.0, 120.0, 80.0]], "");
+    let r = apply(&mut doc, None).unwrap();
+    assert_eq!((r.annotations, r.tags), (1, 2), "{r:?}");
+    assert!(!saved_bytes_hold(&doc, b"canary-secret@example.invalid"), "the structure tree kept the removed link");
+    assert!(!saved_bytes_hold(&doc, b"canary-alt"), "the link element kept its alternate text");
+
+    // The same through indirect /K arrays, at the root and in the element.
+    let mut doc = annotated_page(
+        "/StructTreeRoot 6 0 R /MarkInfo << /Marked true >>",
+        "5 0 R",
+        vec![
+            b"<< /Type /Annot /Subtype /Link /Rect [20 20 40 40] /StructParent 0 /A << /S /URI /URI (mailto:canary-secret@example.invalid) >> >>"
+                .to_vec(),
+            b"<< /Type /StructTreeRoot /K 7 0 R >>".to_vec(),
+            b"[8 0 R]".to_vec(),
+            b"<< /Type /StructElem /S /Link /P 6 0 R /K 9 0 R >>".to_vec(),
+            b"[<< /Type /OBJR /Obj 5 0 R >>]".to_vec(),
+        ],
+    );
+    mark(&mut doc, 0, &[[0.0, 0.0, 120.0, 80.0]], "");
+    let r = apply(&mut doc, None).unwrap();
+    assert_eq!((r.annotations, r.tags), (1, 1), "{r:?}");
+    assert!(!saved_bytes_hold(&doc, b"canary-secret@example.invalid"), "an indirect /K array kept the removed link");
+
+    // A form field's widget and a comment's pop-up under the mark are detached, not refused.
+    let mut doc = annotated_page(
+        "/AcroForm << /Fields [5 0 R] >>",
+        "5 0 R 6 0 R 7 0 R",
+        vec![
+            b"<< /Type /Annot /Subtype /Widget /FT /Tx /T (name) /V (CANARY-FIELD) /Rect [20 20 40 40] >>".to_vec(),
+            b"<< /Type /Annot /Subtype /Text /Rect [50 20 70 40] /Contents (CANARY-NOTE) /Popup 7 0 R >>".to_vec(),
+            b"<< /Type /Annot /Subtype /Popup /Rect [150 150 250 250] /Parent 6 0 R >>".to_vec(),
+        ],
+    );
+    mark(&mut doc, 0, &[[0.0, 0.0, 120.0, 80.0]], "");
+    apply(&mut doc, None).unwrap();
+    assert!(!saved_bytes_hold(&doc, b"CANARY-FIELD") && !saved_bytes_hold(&doc, b"CANARY-NOTE"));
+
+    // Any other reference to a removed annotation fails closed.
+    let mut doc =
+        annotated_page("/PCKeep 5 0 R", "5 0 R", vec![b"<< /Type /Annot /Subtype /Text /Rect [20 20 40 40] /Contents (CANARY-SECRET-2) >>".to_vec()]);
+    mark(&mut doc, 0, &[[0.0, 0.0, 120.0, 80.0]], "");
+    assert!(matches!(apply(&mut doc, None), Err(RedactError::StillUsed(_))));
+}
+
+#[test]
+fn a_reply_chain_goes_with_its_comment() {
+    // Replies listed before what they reply to, outside the mark: the whole chain goes.
+    let mut doc = annotated_page(
+        "",
+        "8 0 R 7 0 R 6 0 R 5 0 R",
+        vec![
+            b"<< /Type /Annot /Subtype /Text /Rect [20 20 40 40] /Contents (comment) >>".to_vec(),
+            b"<< /Type /Annot /Subtype /Text /Rect [200 200 220 220] /IRT 5 0 R /Contents (reply 1) >>".to_vec(),
+            b"<< /Type /Annot /Subtype /Text /Rect [200 200 220 220] /IRT 6 0 R /Contents (reply 2) >>".to_vec(),
+            b"<< /Type /Annot /Subtype /Text /Rect [200 200 220 220] /IRT 7 0 R /Contents (CANARY-CHAIN) >>".to_vec(),
+        ],
+    );
+    mark(&mut doc, 0, &[[0.0, 0.0, 120.0, 80.0]], "");
+    assert_eq!(apply(&mut doc, None).unwrap().annotations, 4);
+    assert!(!saved_bytes_hold(&doc, b"CANARY-CHAIN"), "a reply chain kept the removed comment");
+}
+
+#[test]
+fn an_inline_comment_under_a_mark_goes() {
+    let mut doc = annotated_page("", "<< /Type /Annot /Subtype /Text /Rect [20 20 40 40] /Contents (CANARY-INLINE) >>", vec![]);
+    mark(&mut doc, 0, &[[0.0, 0.0, 120.0, 80.0]], "");
+    assert_eq!(apply(&mut doc, None).unwrap().annotations, 1);
+    assert!(!saved_bytes_hold(&doc, b"CANARY-INLINE"), "the inline comment stayed");
+}
+
+#[test]
+fn a_tagged_sibling_widget_does_not_keep_a_redacted_field() {
+    // One widget under the mark, one outside it that the structure tree tags.
+    let mut doc = annotated_page(
+        "/AcroForm << /Fields [5 0 R] >> /StructTreeRoot 8 0 R /MarkInfo << /Marked true >>",
+        "6 0 R 7 0 R",
+        vec![
+            b"<< /FT /Tx /T (name) /V (CANARY-SIBLING) /Kids [6 0 R 7 0 R] >>".to_vec(),
+            b"<< /Type /Annot /Subtype /Widget /Parent 5 0 R /Rect [20 20 40 40] >>".to_vec(),
+            b"<< /Type /Annot /Subtype /Widget /Parent 5 0 R /Rect [200 200 220 220] /StructParent 0 >>".to_vec(),
+            b"<< /Type /StructTreeRoot /K 9 0 R >>".to_vec(),
+            b"<< /Type /StructElem /S /Form /P 8 0 R /K [<< /Type /OBJR /Obj 7 0 R >>] >>".to_vec(),
+        ],
+    );
+    mark(&mut doc, 0, &[[0.0, 0.0, 120.0, 80.0]], "");
+    assert_eq!(apply(&mut doc, None).unwrap().fields, 1);
+    assert!(!saved_bytes_hold(&doc, b"CANARY-SIBLING"), "the tagged sibling widget kept the field");
+}
+
+#[test]
+fn an_inline_widget_under_a_mark_is_refused() {
+    let mut doc = annotated_page(
+        "/AcroForm << /Fields [5 0 R] >>",
+        "<< /Type /Annot /Subtype /Widget /Parent 5 0 R /Rect [20 20 40 40] >>",
+        vec![b"<< /FT /Tx /T (name) /V (CANARY-INLINE-FIELD) >>".to_vec()],
+    );
+    mark(&mut doc, 0, &[[0.0, 0.0, 120.0, 80.0]], "");
+    assert!(matches!(apply(&mut doc, None), Err(RedactError::StillUsed(_))));
+}
+
+#[test]
+fn a_pop_up_named_only_by_a_removed_comment_goes() {
+    // The pop-up has no /Parent pointing back at the comment.
+    let mut doc = annotated_page(
+        "",
+        "5 0 R 6 0 R",
+        vec![
+            b"<< /Type /Annot /Subtype /Text /Rect [20 20 40 40] /Contents (comment) /Popup 6 0 R >>".to_vec(),
+            b"<< /Type /Annot /Subtype /Popup /Rect [150 150 250 250] /Contents (CANARY-POPUP) >>".to_vec(),
+        ],
+    );
+    mark(&mut doc, 0, &[[0.0, 0.0, 120.0, 80.0]], "");
+    apply(&mut doc, None).unwrap();
+    assert!(!saved_bytes_hold(&doc, b"CANARY-POPUP"), "the pop-up stayed");
+}
+
+#[test]
+fn a_removed_link_sharing_its_action_with_a_kept_one_is_refused() {
+    let mut doc = annotated_page(
+        "",
+        "5 0 R 6 0 R",
+        vec![
+            b"<< /Type /Annot /Subtype /Link /Rect [20 20 40 40] /A 7 0 R >>".to_vec(),
+            b"<< /Type /Annot /Subtype /Link /Rect [200 200 220 220] /A 7 0 R >>".to_vec(),
+            b"<< /S /URI /URI (mailto:shared@example.invalid) >>".to_vec(),
+        ],
+    );
+    mark(&mut doc, 0, &[[0.0, 0.0, 120.0, 80.0]], "");
+    assert!(matches!(apply(&mut doc, None), Err(RedactError::StillUsed(_))));
+
+    // Its own indirect text and action go with it.
+    let mut doc = annotated_page(
+        "",
+        "5 0 R",
+        vec![
+            b"<< /Type /Annot /Subtype /Link /Rect [20 20 40 40] /A 6 0 R /Contents 7 0 R >>".to_vec(),
+            b"<< /S /URI /URI (mailto:own@example.invalid) >>".to_vec(),
+            b"(CANARY-OWN-TEXT)".to_vec(),
+        ],
+    );
+    mark(&mut doc, 0, &[[0.0, 0.0, 120.0, 80.0]], "");
+    apply(&mut doc, None).unwrap();
+    assert!(!saved_bytes_hold(&doc, b"own@example.invalid") && !saved_bytes_hold(&doc, b"CANARY-OWN-TEXT"));
+}
+
+#[test]
+fn what_a_removed_annotation_names_elsewhere_fails_closed() {
+    // An inline comment sharing its indirect text with a kept comment.
+    let mut doc = annotated_page(
+        "",
+        "<< /Type /Annot /Subtype /Text /Rect [20 20 40 40] /Contents 6 0 R >> 5 0 R",
+        vec![b"<< /Type /Annot /Subtype /Text /Rect [200 200 220 220] /Contents 6 0 R >>".to_vec(), b"(shared text)".to_vec()],
+    );
+    mark(&mut doc, 0, &[[0.0, 0.0, 120.0, 80.0]], "");
+    assert!(matches!(apply(&mut doc, None), Err(RedactError::StillUsed(_))));
+
+    // A /Popup naming a kept comment rather than a pop-up: the comment stays and apply refuses.
+    let mut doc = annotated_page(
+        "",
+        "5 0 R 6 0 R",
+        vec![
+            b"<< /Type /Annot /Subtype /Text /Rect [20 20 40 40] /Contents (comment) /Popup 6 0 R >>".to_vec(),
+            b"<< /Type /Annot /Subtype /Text /Rect [200 200 220 220] /Contents (kept) >>".to_vec(),
+        ],
+    );
+    mark(&mut doc, 0, &[[0.0, 0.0, 120.0, 80.0]], "");
+    assert!(matches!(apply(&mut doc, None), Err(RedactError::StillUsed(_))));
+}

@@ -92,10 +92,15 @@ fn numbers(op: &Op) -> Option<Vec<f64>> {
     op.operands.iter().map(Object::as_f64).collect()
 }
 
-/// Forms and images already converted (old → new), shared across pages.
+/// Forms and images already walked, shared across pages: old → new (itself when it stays), with
+/// the depth of a walk that `MAX_DEPTH` cut short. A form without its own /Resources draws from
+/// its caller's, so it is keyed by those resources too: their own object when indirect (shared
+/// by every page using them), otherwise the page or form holding them.
 #[derive(Default)]
 struct Converted {
-    xobjects: HashMap<ObjRef, ObjRef>,
+    xobjects: HashMap<(ObjRef, Option<ObjRef>), (ObjRef, Option<usize>)>,
+    /// Whether the walk in progress reached a form past `MAX_DEPTH`.
+    cut: bool,
 }
 
 /// Rewrite the colour operators of one content stream. Returns the new bytes, whether anything
@@ -229,11 +234,12 @@ fn convert_image(doc: &Document, s: &Stream) -> Option<Stream> {
     Some(Stream::flate(nd, &gray))
 }
 
-/// Convert the XObjects named in `names` (from `resources`), returning the resources with the
-/// converted ones swapped in (or `None` if nothing changed).
+/// Convert the XObjects named in `names` (from `resources`, identified by `owner` as in `Converted`),
+/// returning the resources with the converted ones swapped in (or `None` if nothing changed).
 fn convert_xobjects(
     doc: &mut Document,
     resources: &Dict,
+    owner: ObjRef,
     names: &[Vec<u8>],
     depth: usize,
     done: &mut Converted,
@@ -244,19 +250,18 @@ fn convert_xobjects(
     let mut changed = false;
     for name in names {
         let Some(Object::Ref(r)) = xo.get(name).cloned() else { continue };
-        let new_ref = match done.xobjects.get(&r) {
-            Some(n) => Some(*n),
-            None => {
-                let converted = convert_xobject(doc, r, resources, depth, done, report);
-                if let Some(n) = converted {
-                    done.xobjects.insert(r, n);
-                }
-                converted
+        let inherits = matches!(&*doc.get(r), Object::Stream(s) if s.dict.name(b"Subtype") == Some(b"Form") && !has_own_resources(doc, s));
+        let key = (r, inherits.then_some(owner));
+        // A walk cut short deeper down is redone from here, so each form is walked at most once
+        // per depth and context.
+        let n = match done.xobjects.get(&key) {
+            Some(&(n, cut)) if cut.is_none_or(|d| d <= depth) => {
+                done.cut |= cut.is_some();
+                n
             }
+            _ => convert_xobject(doc, key, owner, resources, depth, done, report),
         };
-        if let Some(n) = new_ref
-            && n != r
-        {
+        if n != r {
             new_xo.set(name.clone(), Object::Ref(n));
             changed = true;
         }
@@ -268,46 +273,110 @@ fn convert_xobjects(
     })
 }
 
-/// A converted copy of the image or form at `r` as a new object, or `None` if it stays.
-fn convert_xobject(doc: &mut Document, r: ObjRef, parent: &Dict, depth: usize, done: &mut Converted, report: &mut ColorReport) -> Option<ObjRef> {
-    let Object::Stream(s) = (*doc.get(r)).clone() else { return None };
-    match s.dict.name(b"Subtype") {
-        Some(b"Image") => match convert_image(doc, &s) {
-            Some(new) => {
-                report.images += 1;
-                Some(doc.add(Object::Stream(new)))
-            }
-            None => {
-                let gray = s.dict.get(b"ColorSpace").and_then(|c| components(doc, c)) == Some(1) || s.dict.get(b"ImageMask").is_some();
-                if !gray {
-                    report.left += 1;
-                }
-                None
-            }
-        },
-        Some(b"Form") if depth < MAX_DEPTH => {
-            // Placeholder first, so a form that draws itself stops here.
-            done.xobjects.insert(r, r);
-            let resources = s.dict.get(b"Resources").map(|x| doc.resolve(x)).and_then(|x| x.as_dict().cloned()).unwrap_or_else(|| parent.clone());
-            let data = s.decoded().ok()?;
-            let (bytes, changed, drawn) = convert_ops(doc, &data, &resources, report);
-            let new_res = convert_xobjects(doc, &resources, &drawn, depth + 1, done, report);
-            if !changed && new_res.is_none() {
-                done.xobjects.remove(&r);
-                return None;
-            }
-            let mut d = s.dict.clone();
-            for k in [&b"Filter"[..], b"DecodeParms", b"Length", b"DL"] {
-                d.remove(k);
-            }
-            if let Some(res) = new_res {
-                d.set(b"Resources".to_vec(), Object::Dict(res));
-            }
-            report.forms += 1;
-            Some(doc.add(Object::Stream(Stream::flate(d, &bytes))))
+/// The image or form at `key.0` converted into a new object, or itself if it stays, remembered
+/// in `done` so later draws reuse it.
+fn convert_xobject(
+    doc: &mut Document,
+    key: (ObjRef, Option<ObjRef>),
+    owner: ObjRef,
+    parent: &Dict,
+    depth: usize,
+    done: &mut Converted,
+    report: &mut ColorReport,
+) -> ObjRef {
+    let r = key.0;
+    let s = match &*doc.get(r) {
+        // Past the depth limit before copying: such a form may be drawn many times.
+        Object::Stream(s) if depth >= MAX_DEPTH && s.dict.name(b"Subtype") == Some(b"Form") => {
+            done.cut = true;
+            return r;
         }
-        _ => None,
+        Object::Stream(s) => s.clone(),
+        _ => return r,
+    };
+    match s.dict.name(b"Subtype") {
+        Some(b"Image") => {
+            let n = match convert_image(doc, &s) {
+                Some(new) => {
+                    report.images += 1;
+                    doc.add(Object::Stream(new))
+                }
+                None => {
+                    let gray = s.dict.get(b"ColorSpace").and_then(|c| components(doc, c)) == Some(1) || s.dict.get(b"ImageMask").is_some();
+                    if !gray {
+                        report.left += 1;
+                    }
+                    r
+                }
+            };
+            done.xobjects.insert(key, (n, None));
+            n
+        }
+        Some(b"Form") => {
+            // Placeholder first, so a form that draws itself stops here. Unchanged forms are
+            // remembered too: re-walking them on every draw grows as fan-out^depth.
+            done.xobjects.insert(key, (r, None));
+            let outer = std::mem::take(&mut done.cut);
+            let n = convert_form(doc, &s, r, owner, parent, depth, done, report).unwrap_or(r);
+            let cut = done.cut;
+            done.cut |= outer;
+            done.xobjects.insert(key, (n, cut.then_some(depth)));
+            n
+        }
+        _ => r,
     }
+}
+
+/// What identifies the resources of `holder` (object `r`): their object when indirect, else `r`.
+fn resources_id(holder: &Dict, r: ObjRef) -> ObjRef {
+    holder.get(b"Resources").and_then(Object::as_ref).unwrap_or(r)
+}
+
+/// The form's own resource dictionary; without one it draws from its caller's.
+fn own_resources(doc: &Document, s: &Stream) -> Option<Dict> {
+    s.dict.get(b"Resources").map(|x| doc.resolve(x)).and_then(|x| x.as_dict().cloned())
+}
+
+/// Whether `own_resources` finds one, without copying it (checked on every draw).
+fn has_own_resources(doc: &Document, s: &Stream) -> bool {
+    match s.dict.get(b"Resources") {
+        Some(Object::Ref(r)) => doc.get(*r).as_dict().is_some(),
+        Some(o) => o.as_dict().is_some(),
+        None => false,
+    }
+}
+
+/// A converted copy of the form stream `s` (object `r`) as a new object, or `None` if it stays.
+#[allow(clippy::too_many_arguments)]
+fn convert_form(
+    doc: &mut Document,
+    s: &Stream,
+    r: ObjRef,
+    owner: ObjRef,
+    parent: &Dict,
+    depth: usize,
+    done: &mut Converted,
+    report: &mut ColorReport,
+) -> Option<ObjRef> {
+    let (resources, owner) = match own_resources(doc, s) {
+        Some(res) => (res, resources_id(&s.dict, r)),
+        None => (parent.clone(), owner),
+    };
+    let data = s.decoded().ok()?;
+    let (bytes, changed, drawn) = convert_ops(doc, &data, &resources, report);
+    let new_res = convert_xobjects(doc, &resources, owner, &drawn, depth + 1, done, report);
+    if !changed && new_res.is_none() {
+        return None;
+    }
+    let mut d = s.dict.clone();
+    for k in [&b"Filter"[..], b"DecodeParms", b"Length", b"DL"] {
+        d.remove(k);
+    }
+    if let Some(res) = new_res {
+        d.set(b"Resources".to_vec(), Object::Dict(res));
+    }
+    report.forms += 1;
+    Some(doc.add(Object::Stream(Stream::flate(d, &bytes))))
 }
 
 fn content_bytes(doc: &Document, contents: &Object) -> Option<Vec<u8>> {
@@ -343,7 +412,7 @@ pub fn convert_to_gray(doc: &mut Document, pages: Option<&[usize]>) -> Result<Co
         let resources = page.dict.get(b"Resources").map(|r| doc.resolve(r)).and_then(|r| r.as_dict().cloned()).unwrap_or_default();
         let Some(data) = page.dict.get(b"Contents").and_then(|c| content_bytes(doc, c)) else { continue };
         let (bytes, changed, drawn) = convert_ops(doc, &data, &resources, &mut report);
-        let new_res = convert_xobjects(doc, &resources, &drawn, 0, &mut done, &mut report);
+        let new_res = convert_xobjects(doc, &resources, resources_id(&page.dict, page.obj), &drawn, 0, &mut done, &mut report);
         if changed || new_res.is_some() {
             // New objects: the old contents and resources may be shared with other pages.
             let contents = doc.add(Object::Stream(Stream::flate(Dict::new(), &bytes)));

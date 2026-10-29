@@ -16,7 +16,7 @@
 
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use pdfcraft_cos::{Dict, Document, ObjRef, Object, Stream};
 
@@ -383,6 +383,11 @@ fn without_retired(doc: &Document, res: &Dict, retired: &HashSet<ObjRef>) -> Opt
     Some(res)
 }
 
+/// What a removed annotation may hold as separate objects that must go with it. Appearance
+/// streams are left out: identical icons commonly share one, and a kept annotation sharing it
+/// draws it outside the marks.
+const PAYLOAD_KEYS: [&[u8]; 4] = [b"Contents", b"RC", b"A", b"Popup"];
+
 /// Fail closed when an original that redaction replaced or removed (an image, a form, a content
 /// stream) could still be saved with the file: a page draws it outside the marks (those pages
 /// are named), or something else still refers to it. Resource entries for it that no content
@@ -435,7 +440,7 @@ fn check_retired(doc: &mut Document, retired: &HashSet<ObjRef>) -> Result<(), Re
             doc.update_dict(h, |d| d.set(b"Resources".to_vec(), Object::Dict(pruned)))?;
         }
     }
-    let roots: Vec<Object> = [&b"Root"[..], b"Info"].iter().filter_map(|k| doc.trailer().get(k).cloned()).collect();
+    let roots: Vec<Object> = [&b"Root"[..], b"Info", b"Encrypt"].iter().filter_map(|k| doc.trailer().get(k).cloned()).collect();
     if reachable(doc, &roots).is_disjoint(retired) { Ok(()) } else { Err(RedactError::StillUsed(Vec::new())) }
 }
 
@@ -457,6 +462,10 @@ pub fn apply(doc: &mut Document, pages: Option<&[usize]>) -> Result<Report, Reda
     let widget_owner: Vec<(ObjRef, String)> =
         pdfcraft_forms::fields(doc).into_iter().flat_map(|f| f.widgets.iter().map(|w| (w.obj, f.name.clone())).collect::<Vec<_>>()).collect();
     let mut retired: HashSet<ObjRef> = HashSet::new();
+    // Annotations dropped from page /Annots (under a mark, replies to those, their pop-ups).
+    let mut gone_annots: HashSet<ObjRef> = HashSet::new();
+    // What removed annotations hold as separate objects (text, actions, named pop-ups).
+    let mut gone_payloads: HashSet<ObjRef> = HashSet::new();
 
     // 0. Where each form XObject is drawn over the marks, on every page, so each such draw is
     // redacted with the marks of all of them (changes nothing).
@@ -539,7 +548,8 @@ pub fn apply(doc: &mut Document, pages: Option<&[usize]>) -> Result<Report, Reda
 
         // 2. Annotations: the marks, and whatever lies under them (with their pop-ups).
         let annots = annots_of(doc, &doc.get(page.obj).as_dict().cloned().unwrap_or_default());
-        let mut removed: Vec<ObjRef> = Vec::new();
+        let mut removed: HashSet<ObjRef> = HashSet::new();
+        let under = |d: &Dict| rect_of(doc, d.get(b"Rect")).is_some_and(|b| rects.iter().any(|x| pdfcraft_content::overlaps(*x, b, 0.0)));
         for a in &annots {
             let Some(r) = a.as_ref() else { continue };
             let obj = doc.get(r);
@@ -547,15 +557,14 @@ pub fn apply(doc: &mut Document, pages: Option<&[usize]>) -> Result<Report, Reda
             let subtype = d.name(b"Subtype").unwrap_or(b"");
             if subtype == b"Redact" {
                 if page_marks.iter().any(|m| m.obj == r) {
-                    removed.push(r);
+                    removed.insert(r);
                 }
                 continue;
             }
             if subtype == b"Popup" {
                 continue;
             }
-            if rect_of(doc, d.get(b"Rect")).is_some_and(|b| rects.iter().any(|x| pdfcraft_content::overlaps(*x, b, 0.0))) {
-                removed.push(r);
+            if under(d) && removed.insert(r) {
                 if subtype == b"Widget" {
                     if let Some((_, name)) = widget_owner.iter().find(|(w, _)| *w == r)
                         && !doomed_fields.contains(name)
@@ -567,18 +576,51 @@ pub fn apply(doc: &mut Document, pages: Option<&[usize]>) -> Result<Report, Reda
                 }
             }
         }
-        let kept: Vec<Object> = annots
-            .into_iter()
-            .filter(|a| {
-                let Some(r) = a.as_ref() else { return true };
-                if removed.contains(&r) {
-                    return false;
+        // Replies (`/IRT`) to anything removed go too, and replies to those, as deleting a comment
+        // does: a kept reply would otherwise keep the removed comment reachable.
+        let mut replies: HashMap<ObjRef, Vec<ObjRef>> = HashMap::new();
+        for r in annots.iter().filter_map(Object::as_ref) {
+            if let Some(t) = doc.get(r).as_dict().and_then(|d| d.reference(b"IRT")) {
+                replies.entry(t).or_default().push(r);
+            }
+        }
+        let mut todo: Vec<ObjRef> = removed.iter().copied().collect();
+        while let Some(t) = todo.pop() {
+            for &r in replies.get(&t).into_iter().flatten() {
+                if removed.insert(r) {
+                    report.annotations += 1;
+                    todo.push(r);
                 }
-                // Pop-ups of removed annotations go too.
-                let obj = doc.get(r);
-                !obj.as_dict().and_then(|d| d.get(b"Parent")).and_then(Object::as_ref).is_some_and(|p| removed.contains(&p))
-            })
+            }
+        }
+        let inline_under = |a: &Object| a.as_dict().is_some_and(|d| d.name(b"Subtype") != Some(b"Popup") && under(d));
+        // An inline widget has no field we can delete with it: refuse rather than keep its value.
+        if annots.iter().any(|a| inline_under(a) && a.as_dict().and_then(|d| d.name(b"Subtype")) == Some(b"Widget")) {
+            return Err(RedactError::StillUsed(vec![pi]));
+        }
+        // Pop-ups a removed annotation names go too, even without a /Parent pointing back.
+        let popups: HashSet<ObjRef> = removed
+            .iter()
+            .filter_map(|r| doc.get(*r).as_dict().and_then(|d| d.reference(b"Popup")))
+            .chain(annots.iter().filter(|a| inline_under(a)).filter_map(|a| a.as_dict()?.reference(b"Popup")))
             .collect();
+        let (kept, dropped): (Vec<Object>, Vec<Object>) = annots.into_iter().partition(|a| {
+            // An annotation written inline in /Annots (not as its own object) goes with the page entry.
+            let Some(r) = a.as_ref() else { return !inline_under(a) };
+            if removed.contains(&r) || popups.contains(&r) && doc.get(r).as_dict().and_then(|d| d.name(b"Subtype")) == Some(b"Popup") {
+                return false;
+            }
+            // Pop-ups of removed annotations go too.
+            let obj = doc.get(r);
+            !obj.as_dict().and_then(|d| d.get(b"Parent")).and_then(Object::as_ref).is_some_and(|p| removed.contains(&p))
+        });
+        report.annotations += dropped.iter().filter(|a| a.as_ref().is_none()).count();
+        for a in &dropped {
+            let d = a.as_ref().map_or_else(|| a.as_dict().cloned(), |r| doc.get(r).as_dict().cloned());
+            gone_payloads.extend(d.iter().flat_map(|d| PAYLOAD_KEYS.iter().filter_map(|k| d.reference(k))));
+        }
+        // Nothing removed may stay reachable (step 6 checks).
+        gone_annots.extend(dropped.iter().filter_map(Object::as_ref));
         doc.update_dict(page.obj, |d| {
             if kept.is_empty() {
                 d.remove(b"Annots");
@@ -619,6 +661,8 @@ pub fn apply(doc: &mut Document, pages: Option<&[usize]>) -> Result<Report, Reda
         if pdfcraft_forms::fields(doc).iter().any(|f| &f.name == name) {
             pdfcraft_forms::delete_field(doc, name)?;
             report.fields += 1;
+            // Its widgets on other pages and outside the marks are gone too (step 6 checks).
+            gone_annots.extend(widget_owner.iter().filter(|(_, n)| n == name).map(|(w, _)| *w));
         }
     }
 
@@ -652,7 +696,17 @@ pub fn apply(doc: &mut Document, pages: Option<&[usize]>) -> Result<Report, Reda
     if residue > 0 {
         return Err(RedactError::Residue(residue));
     }
-    // 6. Nothing redacted may stay reachable through another page or draw.
+    // 6. Nothing redacted may stay reachable through another page or draw. The structure tree's
+    // references to removed annotations go first; any other reference fails closed.
+    report.tags += tags::drop_annotations(doc, &gone_annots)?;
+    retired.extend(&gone_annots);
+    // Text, actions and pop-ups they hold as separate objects too, as a redacted image drawn
+    // elsewhere is refused: if anything kept shares one, apply fails closed.
+    for r in &gone_annots {
+        let Some(d) = doc.get(*r).as_dict().cloned() else { continue };
+        gone_payloads.extend(PAYLOAD_KEYS.iter().filter_map(|k| d.reference(k)));
+    }
+    retired.extend(&gone_payloads);
     check_retired(doc, &retired)?;
     // The previous revision still holds the removed content: the next save must rewrite.
     doc.require_full_save();
