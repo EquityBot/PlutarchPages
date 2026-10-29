@@ -646,3 +646,39 @@ fn damaged_masks_and_sizes_never_panic() {
         let _ = image_file(&doc, r);
     }
 }
+
+#[test]
+fn a_cyclic_indexed_colour_space_is_refused() {
+    let mut doc = from_images(&[("flat.png".into(), png_bytes(false))]).unwrap();
+    // 5 0 obj [/Indexed 5 0 R 255 <00>]: the base is the indexed space itself.
+    let cs = doc.add(Object::Null);
+    doc.set(cs, Object::Array(vec![Object::name("Indexed"), Object::Ref(cs), Object::Int(255), Object::String(PdfString::literal(vec![0]))]));
+    with_image(&mut doc, |_| {
+        let mut dict = image_dict(1, 1, "DeviceGray", 8);
+        dict.set(b"ColorSpace".to_vec(), Object::Ref(cs));
+        Stream::from_raw(dict, vec![0])
+    });
+    let out = extract_images(&doc, &[0], 0);
+    assert!(out.images.is_empty());
+    assert_eq!(out.skipped.len(), 1, "{:?}", out.skipped);
+}
+
+#[test]
+fn indexed_colour_spaces_that_refer_to_each_other_are_refused() {
+    let mut doc = from_images(&[("flat.png".into(), png_bytes(false))]).unwrap();
+    // [/Indexed b 255 <00>] and [/Indexed a 255 <00>]: a cycle through two objects.
+    let (a, b) = (doc.add(Object::Null), doc.add(Object::Null));
+    let indexed =
+        |base| Object::Array(vec![Object::name("Indexed"), Object::Ref(base), Object::Int(255), Object::String(PdfString::literal(vec![0]))]);
+    doc.set(a, indexed(b));
+    doc.set(b, indexed(a));
+    with_image(&mut doc, |_| {
+        let mut dict = image_dict(1, 1, "DeviceGray", 8);
+        dict.set(b"ColorSpace".to_vec(), Object::Ref(a));
+        Stream::from_raw(dict, vec![0])
+    });
+    let out = extract_images(&doc, &[0], 0);
+    assert!(out.images.is_empty());
+    assert_eq!(out.skipped.len(), 1, "{:?}", out.skipped);
+    assert_eq!(out.skipped[0].2, "nested indexed colour spaces aren't valid");
+}
