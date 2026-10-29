@@ -445,3 +445,64 @@ fn xfdf_keeps_callout_leader_inset_and_ending() {
     assert_eq!(want.1.len(), 6, "{want:?}");
     assert_eq!(callout_keys(&dst), want, "{xfdf}");
 }
+
+/// Cell text and how both CSV writers must write it: a cell a spreadsheet would run as a formula
+/// gets a leading `'`, before the usual quoting.
+const FORMULA_CELLS: [(&str, &str); 18] = [
+    ("=1+1", "'=1+1"),
+    ("@SUM(A1)", "'@SUM(A1)"),
+    ("+1+cmd", "'+1+cmd"),
+    ("-2+3", "'-2+3"),
+    ("\t=1+1", "'\t=1+1"),
+    ("\tAda", "'\tAda"),
+    ("\r=1+1", "\"'\r=1+1\""),
+    // Leading whitespace is skipped before looking for a formula, as upstream does.
+    (" =1+1", "' =1+1"),
+    // Plain numbers stay numbers.
+    ("-12.50", "-12.50"),
+    ("+3", "+3"),
+    (" -4", " -4"),
+    // A genuine leading apostrophe is written as it is.
+    ("'=1+1", "'=1+1"),
+    ("'plain", "'plain"),
+    // Quoting still applies to the neutralised text.
+    ("=1,2", "\"'=1,2\""),
+    ("=\"x\"", "\"'=\"\"x\"\"\""),
+    // A lone carriage return is quoted, so a spreadsheet can't start a new row (and cell) there.
+    ("Ada\r=1+1", "\"Ada\r=1+1\""),
+    ("a=b", "a=b"),
+    ("Ada", "Ada"),
+];
+
+#[test]
+fn exported_csv_cells_never_start_a_formula() {
+    for (text, cell) in FORMULA_CELLS {
+        // As a value.
+        let mut doc = blank();
+        set_value(&mut doc, "Name", &FieldValue::Text(text.into())).unwrap();
+        assert_eq!(export_data(&doc, Format::Csv), format!("Name,Agree,Pick\n{cell},Off,\n"), "value {text:?}");
+        // As a field name.
+        let mut doc = blank();
+        let field = fields(&doc).into_iter().find(|f| f.name == "Name").unwrap().obj;
+        doc.update_dict(field, |d| d.set(b"T".to_vec(), PdfString::text(text))).unwrap();
+        assert_eq!(export_data(&doc, Format::Csv), format!("{cell},Agree,Pick\n,Off,\n"), "name {text:?}");
+    }
+}
+
+#[test]
+fn merged_spreadsheet_cells_never_start_a_formula() {
+    for (text, cell) in FORMULA_CELLS {
+        let csv = merge_csv(&[vec![("Name".to_string(), vec![text.to_string()]), (text.to_string(), vec!["v".to_string()])]]);
+        assert_eq!(csv, format!("Name,{cell}\n{cell},v\n"), "{text:?}");
+    }
+}
+
+/// Import keeps a leading `'`: it can't tell the one export added from one the value had.
+#[test]
+fn csv_import_keeps_a_leading_apostrophe() {
+    let mut src = blank();
+    set_value(&mut src, "Name", &FieldValue::Text("=1+1".into())).unwrap();
+    let mut dst = blank();
+    import(&mut dst, export_data(&src, Format::Csv).as_bytes()).unwrap();
+    assert_eq!(values(&dst)[0].1, ["'=1+1"]);
+}
