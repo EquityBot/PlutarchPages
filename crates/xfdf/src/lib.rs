@@ -477,6 +477,28 @@ fn xml_name(name: &str) -> String {
     s
 }
 
+/// Whether a spreadsheet program may run CSV cell `s` as a formula: after any leading whitespace
+/// or byte order mark, it starts with `=` or `@`, or with `+` or `-` and is not a plain number (so
+/// `-12.5` and `+3` stay numbers).
+fn runs_as_formula(s: &str) -> bool {
+    let t = s.trim_start_matches(|c: char| c.is_whitespace() || c == '\u{feff}');
+    match t.chars().next() {
+        Some('=' | '@') => true,
+        Some('+' | '-') => !t.parse::<f64>().is_ok_and(f64::is_finite),
+        _ => false,
+    }
+}
+
+/// One CSV cell, as both CSV writers write it. Names and values come from other people's files,
+/// so a cell that would run as a formula gets a leading `'`, which keeps it text; import leaves
+/// that `'` in place, since it can't be told from one the text already had. Then a cell with a
+/// comma, quote, tab or line break (a lone carriage return included) is quoted, so a spreadsheet
+/// that also splits on tabs can't start a new cell there.
+fn csv_cell(s: &str) -> String {
+    let s = if runs_as_formula(s) { format!("'{s}") } else { s.to_string() };
+    if s.contains([',', '"', '\t', '\n', '\r']) { format!("\"{}\"", s.replace('"', "\"\"")) } else { s }
+}
+
 /// Form data as XML, CSV or tab-delimited text (Acrobat's Export data formats).
 pub fn export_data(doc: &Document, format: Format) -> String {
     let fields: Vec<(String, String)> = pdfcraft_forms::fields(doc)
@@ -501,14 +523,11 @@ pub fn export_data(doc: &Document, format: Format) -> String {
             out.push_str("</fields>\n");
             out
         }
-        Format::Csv => {
-            let q = |s: &str| if s.contains([',', '"', '\n']) { format!("\"{}\"", s.replace('"', "\"\"")) } else { s.to_string() };
-            format!(
-                "{}\n{}\n",
-                fields.iter().map(|f| q(&f.0)).collect::<Vec<_>>().join(","),
-                fields.iter().map(|f| q(&f.1)).collect::<Vec<_>>().join(",")
-            )
-        }
+        Format::Csv => format!(
+            "{}\n{}\n",
+            fields.iter().map(|f| csv_cell(&f.0)).collect::<Vec<_>>().join(","),
+            fields.iter().map(|f| csv_cell(&f.1)).collect::<Vec<_>>().join(",")
+        ),
         _ => {
             let clean = |s: &str| s.replace(['\t', '\n', '\r'], " ");
             format!(
@@ -880,11 +899,11 @@ pub fn merge_csv(files: &[Vec<(String, Vec<String>)>]) -> String {
             }
         }
     }
-    let q = |s: &str| if s.contains([',', '"', '\n', '\r']) { format!("\"{}\"", s.replace('"', "\"\"")) } else { s.to_string() };
-    let mut out = columns.iter().map(|c| q(c)).collect::<Vec<_>>().join(",");
+    let mut out = columns.iter().map(|c| csv_cell(c)).collect::<Vec<_>>().join(",");
     out.push('\n');
     for f in files {
-        let row: Vec<String> = columns.iter().map(|c| f.iter().find(|(k, _)| k == c).map_or(String::new(), |(_, v)| q(&v.join(", ")))).collect();
+        let row: Vec<String> =
+            columns.iter().map(|c| f.iter().find(|(k, _)| k == c).map_or(String::new(), |(_, v)| csv_cell(&v.join(", ")))).collect();
         out.push_str(&row.join(","));
         out.push('\n');
     }
