@@ -966,11 +966,13 @@ fn has_tab_delimiter(text: &str) -> bool {
 
 // With `follow`, a first record whose only tabs are quoted is tab-delimited after all when the
 // next record has a tab outside quotes: the quotes were literal parts of TSV names such as
-// `"Name` and `Agree"`. A CSV export quotes any tab it writes, so its records never do this.
+// `"Name` and `Agree"`. A CSV export quotes any tab it writes, so its records never do this, and
+// a first record with a comma outside quotes is CSV whatever the next record holds.
 fn tab_outside_quotes(text: &str, follow: bool) -> bool {
     let mut quoted = false;
     let mut cell_start = true;
     let mut quoted_tab = false;
+    let mut bare_comma = false;
     let mut chars = text.char_indices().peekable();
     while let Some((i, c)) = chars.next() {
         match c {
@@ -984,9 +986,12 @@ fn tab_outside_quotes(text: &str, follow: bool) -> bool {
             '\t' if !quoted => return true,
             '\t' => quoted_tab = true,
             '\r' | '\n' if !quoted => {
-                return follow && quoted_tab && tab_outside_quotes(text[i..].trim_start_matches(['\r', '\n']), false);
+                return follow && quoted_tab && !bare_comma && tab_outside_quotes(text[i..].trim_start_matches(['\r', '\n']), false);
             }
-            ',' if !quoted => cell_start = true,
+            ',' if !quoted => {
+                cell_start = true;
+                bare_comma = true;
+            }
             _ => cell_start = false,
         }
     }

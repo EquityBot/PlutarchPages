@@ -549,4 +549,10 @@ fn a_csv_header_with_a_quoted_tab_is_read_as_csv() {
     let r = import(&mut dst, b"\"Name\tAgree\"\r\nv\tYes\r\n").unwrap();
     assert!(r.rejected.is_empty(), "{r:?}");
     assert_eq!((values(&dst)[0].1.clone(), values(&dst)[1].1.clone()), (vec!["v".to_string()], vec!["Yes".to_string()]));
+    // A comma outside quotes in the header keeps it CSV even when a value holds a bare tab.
+    let mut dst = blank();
+    rename(&mut dst);
+    let r = import(&mut dst, b"\"First\tName\",Agree\r\nAda\tMary,Yes\r\n").unwrap();
+    assert!(r.rejected.is_empty(), "{r:?}");
+    assert_eq!((values(&dst)[0].1.clone(), values(&dst)[1].1.clone()), (vec!["Ada\tMary".to_string()], vec!["Yes".to_string()]));
 }
