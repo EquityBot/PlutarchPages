@@ -448,16 +448,20 @@ fn xfdf_keeps_callout_leader_inset_and_ending() {
 
 /// Cell text and how both CSV writers must write it: a cell a spreadsheet would run as a formula
 /// gets a leading `'`, before the usual quoting.
-const FORMULA_CELLS: [(&str, &str); 18] = [
+const FORMULA_CELLS: [(&str, &str); 20] = [
     ("=1+1", "'=1+1"),
     ("@SUM(A1)", "'@SUM(A1)"),
     ("+1+cmd", "'+1+cmd"),
     ("-2+3", "'-2+3"),
-    ("\t=1+1", "'\t=1+1"),
-    ("\tAda", "'\tAda"),
-    ("\r=1+1", "\"'\r=1+1\""),
     // Leading whitespace is skipped before looking for a formula, as upstream does.
+    ("\t=1+1", "\"'\t=1+1\""),
+    ("\r=1+1", "\"'\r=1+1\""),
     (" =1+1", "' =1+1"),
+    // Leading whitespace before ordinary text adds no `'`; tabs and line breaks are quoted.
+    ("\tAda", "\"\tAda\""),
+    ("\rAda", "\"\rAda\""),
+    // A tab is quoted, so a spreadsheet that also splits on tabs can't start a cell there.
+    ("Ada\t=1+1", "\"Ada\t=1+1\""),
     // Plain numbers stay numbers.
     ("-12.50", "-12.50"),
     ("+3", "+3"),
@@ -495,6 +499,10 @@ fn merged_spreadsheet_cells_never_start_a_formula() {
         let csv = merge_csv(&[vec![("Name".to_string(), vec![text.to_string()]), (text.to_string(), vec!["v".to_string()])]]);
         assert_eq!(csv, format!("Name,{cell}\n{cell},v\n"), "{text:?}");
     }
+    // Merged data files are read as text, so a leading byte order mark can reach the first cell; a
+    // spreadsheet that drops it would see `=`. (Form values lose it before export.)
+    let csv = merge_csv(&[vec![("\u{feff}=1+1".to_string(), vec!["v".to_string()])]]);
+    assert_eq!(csv, "'\u{feff}=1+1\nv\n");
 }
 
 /// Import keeps a leading `'`: it can't tell the one export added from one the value had.

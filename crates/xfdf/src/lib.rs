@@ -477,14 +477,11 @@ fn xml_name(name: &str) -> String {
     s
 }
 
-/// Whether a spreadsheet program may run CSV cell `s` as a formula: it starts with a tab or
-/// carriage return, or, after any leading whitespace, with `=` or `@`, or with `+` or `-` and is
-/// not a plain number (so `-12.5` and `+3` stay numbers).
+/// Whether a spreadsheet program may run CSV cell `s` as a formula: after any leading whitespace
+/// or byte order mark, it starts with `=` or `@`, or with `+` or `-` and is not a plain number (so
+/// `-12.5` and `+3` stay numbers).
 fn runs_as_formula(s: &str) -> bool {
-    if s.starts_with(['\t', '\r']) {
-        return true;
-    }
-    let t = s.trim_start();
+    let t = s.trim_start_matches(|c: char| c.is_whitespace() || c == '\u{feff}');
     match t.chars().next() {
         Some('=' | '@') => true,
         Some('+' | '-') => !t.parse::<f64>().is_ok_and(f64::is_finite),
@@ -495,10 +492,11 @@ fn runs_as_formula(s: &str) -> bool {
 /// One CSV cell, as both CSV writers write it. Names and values come from other people's files,
 /// so a cell that would run as a formula gets a leading `'`, which keeps it text; import leaves
 /// that `'` in place, since it can't be told from one the text already had. Then a cell with a
-/// comma, quote or line break (a lone carriage return included) is quoted.
+/// comma, quote, tab or line break (a lone carriage return included) is quoted, so a spreadsheet
+/// that also splits on tabs can't start a new cell there.
 fn csv_cell(s: &str) -> String {
     let s = if runs_as_formula(s) { format!("'{s}") } else { s.to_string() };
-    if s.contains([',', '"', '\n', '\r']) { format!("\"{}\"", s.replace('"', "\"\"")) } else { s }
+    if s.contains([',', '"', '\t', '\n', '\r']) { format!("\"{}\"", s.replace('"', "\"\"")) } else { s }
 }
 
 /// Form data as XML, CSV or tab-delimited text (Acrobat's Export data formats).
