@@ -24,7 +24,7 @@ $installed = (Get-ItemProperty -LiteralPath $key -Name InstallDir).InstallDir.Tr
 if ($installed -ne $folder) { throw "InstallDir is '$installed', expected '$folder'" }
 
 $cli = Join-Path $folder 'pdfcraft-cli.exe'
-$version = & $cli --version
+$version = (& $cli --version) -join "`n"
 if ($LASTEXITCODE -ne 0) { throw "pdfcraft-cli --version exited with $LASTEXITCODE" }
 if ($version -notmatch [regex]::Escape($ExpectedVersion)) { throw "pdfcraft-cli reported '$version'" }
 
@@ -39,4 +39,4 @@ if (Test-Path -LiteralPath (Join-Path $folder 'pdfcraft.exe')) { throw 'pdfcraft
 if ($null -ne (Get-ItemProperty -LiteralPath $key -Name InstallDir -ErrorAction SilentlyContinue)) {
   throw 'The InstallDir record survived the uninstall.'
 }
-Write-Output "PASS installed, ran $version and uninstalled."
+Write-Output "PASS installed, ran $ExpectedVersion and uninstalled."
