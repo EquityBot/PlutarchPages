@@ -29,6 +29,13 @@ Upstream's tests for these were changed to assert the fork's behaviour. Keep the
 - Update check and repository links point at EquityBot.
 - Shared CI: workflows from `storytold/craft-common-actions` are pinned to a commit, and SonarCloud
   receives only `SONAR_TOKEN`. Upstream merges restore `@main` and `secrets: inherit`, so reapply both.
+- Releases: `.github/workflows/release.yml` is this fork's own and uses nothing from
+  `craft-common-actions`. It builds unsigned packages, tests an installed MSI with
+  `packaging/windows/test-install.ps1` and only drafts the release. Keep it over upstream's. Flatpak,
+  Arch, FreeBSD, riscv64 and web packages aren't built yet.
+- Windows registration: `PlutarchPages.*` names and its own context-menu component GUIDs, so it doesn't
+  share registry state with an upstream install. `pdfcraft.exe` stays, so `App Paths\pdfcraft.exe` and
+  `Applications\pdfcraft.exe` are still shared if both are installed.
 
 ## Merging upstream
 

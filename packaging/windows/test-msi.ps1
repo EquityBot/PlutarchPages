@@ -187,9 +187,9 @@ if ([int] $remove[0] -le [int] $validate[0] -or [int] $remove[0] -ge [int] $init
 # Image context menu (#190) opens the DPI chooser. Its own component, gated by INSTALLIMAGECONTEXTMENU
 # (on for a first install, kept on update only while present, secure), with the .png label as key
 # path so uninstall removes every row. No image default association is changed.
-$imageKey = 'Software\Classes\SystemFileAssociations\.png\shell\PdfCraft.CreatePdf'
+$imageKey = 'Software\Classes\SystemFileAssociations\.png\shell\PlutarchPages.CreatePdf'
 foreach ($ext in @('png', 'jpg', 'jpeg', 'tif', 'tiff', 'gif', 'bmp', 'jp2', 'j2k', 'jpx')) {
-  $key = 'Software\Classes\SystemFileAssociations\.' + $ext + '\shell\PdfCraft.CreatePdf'
+  $key = 'Software\Classes\SystemFileAssociations\.' + $ext + '\shell\PlutarchPages.CreatePdf'
   $menu = Read-Row ('SELECT `Value`, `Component_`, `Root` FROM `Registry` WHERE `Key` = ''' + $key + ''' AND `Name` IS NULL') 3
   Assert-Equal $menu[0] 'Create PDF with PlutarchPages…' "$ext context menu label"
   Assert-Equal $menu[1] 'PdfcraftImageContextMenu' "$ext context menu component"
@@ -222,7 +222,7 @@ if (($secure[0] -split ';') -notcontains 'INSTALLIMAGECONTEXTMENU') { throw "INS
 # checkbox), with its menu value as key path so uninstall removes it. Several selected PDFs each start pdfcraft.exe "%1" (Document), which the
 # single-instance hand-off opens as tabs. The .pdf default is never set, so the user's default app
 # stays.
-$pdfKey = 'Software\Classes\SystemFileAssociations\.pdf\shell\PdfCraft.Edit'
+$pdfKey = 'Software\Classes\SystemFileAssociations\.pdf\shell\PlutarchPages.Edit'
 $pdfMenu = Read-Row ('SELECT `Registry`, `Value`, `Component_`, `Root` FROM `Registry` WHERE `Key` = ''' + $pdfKey + ''' AND `Name` IS NULL') 4
 Assert-Equal $pdfMenu[1] 'Edit with PlutarchPages' 'PDF context menu label'
 Assert-Equal $pdfMenu[2] 'PdfcraftPdfContextMenu' 'PDF context menu component'
