@@ -73,7 +73,7 @@ pub(crate) fn preferences(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &theme::T
     egui::Frame::new().fill(t.hover).corner_radius(egui::CornerRadius::same(6)).inner_margin(egui::Margin::same(10)).show(ui, |ui| {
         ui.set_width(ui.available_width());
         let mut c = app.session.external_converters().clone();
-        if ui.checkbox(&mut c.enabled, tl!("Convert Office files, HTML files and web pages with installed programs")).changed() {
+        if ui.add(crate::widgets::checkbox(&mut c.enabled, tl!("Convert Office files, HTML files and web pages with installed programs"))).changed() {
             app.session.set_external_converters(c);
         }
         ui.label(
@@ -188,9 +188,9 @@ impl PdfCraftApp {
         };
         match self.external.speech.start(&backend, text) {
             Ok(()) if truncated => {
-                self.notify_tr("Reading aloud the first part only: the text is too long to read in one go. View ▸ Stop reading stops it.")
+                self.notify_tr("Reading aloud the first part only: the text is too long to read in one go. View > Stop reading stops it.")
             }
-            Ok(()) => self.notify_tr("Reading aloud. View ▸ Stop reading stops it."),
+            Ok(()) => self.notify_tr("Reading aloud. View > Stop reading stops it."),
             Err(e) => self.notify(e.to_string()),
         }
     }

@@ -4,7 +4,8 @@
 //! numbers (`1234.5`, `-7`, `1,234.50`) of at most 15 significant digits are written as numbers;
 //! everything else is text.
 
-use crate::{Item, Page, Zip, esc, items};
+use crate::layout::{Item, items};
+use crate::{Page, Zip, esc};
 
 /// Excel's limits: 1,048,576 rows and 16,384 columns per sheet, 32,767 characters per cell.
 const MAX_ROWS: usize = 1_048_576;
@@ -123,7 +124,10 @@ fn sheet_for(page: &Page) -> Sheet {
     let mut sheet = Sheet::new();
     for it in items(std::slice::from_ref(page)) {
         match it {
-            Item::Para(b, _) => sheet.row(&[(0, b.text.as_str(), b.bold, 1)]),
+            Item::Para(runs, _) => {
+                let text: String = runs.iter().map(|r| r.text.as_str()).collect();
+                sheet.row(&[(0, text.as_str(), runs.first().is_some_and(|r| r.block.bold), 1)]);
+            }
             Item::Table(t) => {
                 sheet.blank();
                 for row in &t.rows {
@@ -250,6 +254,8 @@ mod tests {
             bold: false,
             italic: false,
             color: [0.0; 3],
+            rotation: 0.0,
+            space_around: [false; 2],
         };
         let mut blocks = vec![b("Quarterly report", 72.0, 720.0)];
         for (i, row) in [["Item", "Qty", "Price"], ["Apples", "12", "3.50"], ["Pears", "7", "1,200.00"]].iter().enumerate() {
@@ -257,7 +263,7 @@ mod tests {
                 blocks.push(b(cell, 72.0 + 120.0 * j as f64, 680.0 - 18.0 * i as f64));
             }
         }
-        let page = Page { width: 612.0, height: 792.0, blocks, images: vec![] };
+        let page = Page { width: 612.0, height: 792.0, background: None, blocks, images: vec![] };
         let xml = sheet_for(&page).xml();
         assert!(xml.contains("Quarterly report"), "{xml}");
         assert!(xml.contains("<v>12</v>") && xml.contains("<v>1200</v>"), "numbers are numbers: {xml}");

@@ -16,7 +16,11 @@ Layer L4. Create a PDF (Acrobat's Create a PDF tool), execution plan M10.2:
   resolution (1–1200 dpi), without resampling or recompressing image pixels. Use 72 dpi
   for one point per pixel, or `ImageResolution::Embedded` for the same behavior as
   `from_images`. The largest page side is still capped at 14,400 points;
-- `from_text(text, …)`: plain text set in Helvetica, wrapped and paginated.
+- `from_text(text, …)`: plain text set in Helvetica, wrapped and paginated. Text Helvetica
+  can't draw is refused, naming the line and the character, never set as `?`.
+- `from_text_escaped(text, …)`: the same for reports PdfCraft generates from documents
+  (comment summaries, compare reports): such characters are written as `[U+XXXX]` and the first
+  line says so (`ESCAPED_NOTE`).
 - `from_markdown(title, text, page)`: CommonMark (tables, strikethrough, task lists) through
   pulldown-cmark, laid out by `flow`: headings, emphasis, inline and block code, quotes, nested
   lists, rules, tables and link annotations (http, https and mailto only). Images are never
@@ -32,3 +36,11 @@ Layer L4. Create a PDF (Acrobat's Create a PDF tool), execution plan M10.2:
 as `?`; every flow-based function reports how many, so callers can say so.
 
 Every function returns a `pdfcraft_cos::Document`; the caller writes it.
+
+Image export and Save Image As apply each lossless image's Decode pair before converting its color components.
+Indexed Decode values select palette entries after rounding and clipping. Color-key masks compare the original samples.
+Missing, null or malformed Decode arrays keep the default mapping.
+Soft-mask Decode intervals map samples to opacity before the mask is resized, including reversed ranges and indirect entries.
+The existing 16-bit path still uses each sample's high byte.
+JPEG image Decode handling remains limited.
+ICC transforms and calibrated color conversion remain outside this export path.
