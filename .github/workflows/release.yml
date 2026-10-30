@@ -1,8 +1,11 @@
 name: Release
 
+# Builds unsigned Windows, Linux and macOS packages. A push to `release` also drafts the GitHub
+# release; publishing the draft is a person's decision. A push to `ryan/release-*` is a dry run:
+# it builds and tests the same packages and drafts nothing.
 on:
   push:
-    branches: [release]
+    branches: [release, "ryan/release-*"]
   workflow_dispatch:
     inputs:
       version:
@@ -11,33 +14,263 @@ on:
         default: ""
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
 
+env:
+  CRAFT_FONTS_REF: b076417b5880bd4154bd22f00695b1d28c6bea83
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+  RUST_BACKTRACE: 1
+
 jobs:
-  release:
-    # Pinned: a mutable reference to another repository can change what CI runs. Move it deliberately.
-    uses: storytold/craft-common-actions/.github/workflows/release.yml@2b3fb9dc05036f73c77d18f753a3aa9da55fa386 # main, 31 October 2026
-    with:
-      app-name: pdfcraft
-      app-title: PlutarchPages
-      craft-fonts-ref: b076417b5880bd4154bd22f00695b1d28c6bea83
-      version: ${{ inputs.version }}
-    secrets:
-      APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-      APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-      KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
-      APPLE_ID: ${{ secrets.APPLE_ID }}
-      APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-      WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
-      WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
-      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-      AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
-      AZURE_SIGNING_ENDPOINT: ${{ secrets.AZURE_SIGNING_ENDPOINT }}
-      AZURE_SIGNING_ACCOUNT: ${{ secrets.AZURE_SIGNING_ACCOUNT }}
-      AZURE_CERT_PROFILE: ${{ secrets.AZURE_CERT_PROFILE }}
+  version:
+    name: version
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.resolve.outputs.version }}
+      date: ${{ steps.resolve.outputs.date }}
+      prerelease: ${{ steps.resolve.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: resolve
+        shell: bash
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          . packaging/env.sh
+          v="${INPUT_VERSION#v}"
+          v="${v:-$VERSION}"
+          semver='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$'
+          if [[ ! "$v" =~ $semver ]]; then
+            echo "::error::'$v' is not a version like 1.2.3 or 1.2.3-rc.1"
+            exit 1
+          fi
+          case "$v" in *-*) pre=true ;; *) pre=false ;; esac
+          {
+            echo "version=$v"
+            echo "date=$(date -u +%Y-%m-%d)"
+            echo "prerelease=$pre"
+          } >>"$GITHUB_OUTPUT"
+
+  windows:
+    name: Windows ${{ matrix.arch }}
+    needs: [version]
+    runs-on: windows-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: x64, target: x86_64-pc-windows-msvc }
+          - { arch: x86, target: i686-pc-windows-msvc }
+          - { arch: arm64, target: aarch64-pc-windows-msvc }
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      INPUT_VERSION: ${{ inputs.version }}
+      PDFCRAFT_VERSION: ${{ needs.version.outputs.version }}
+      PDFCRAFT_BUILD_DATE: ${{ needs.version.outputs.date }}
+      PDFCRAFT_BUILD_SHA: ${{ github.sha }}
+      CRAFT_FONTS_DIR: ${{ github.workspace }}/craft-fonts
+      CRAFT_FONTS_REQUIRED: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: storytold/craft-fonts
+          ref: ${{ env.CRAFT_FONTS_REF }}
+          path: craft-fonts
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
+        with:
+          toolchain: stable
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          key: release-windows-${{ matrix.arch }}
+      - name: Apply version override
+        if: env.INPUT_VERSION != ''
+        shell: bash
+        run: cargo xtask version set "$VERSION"
+      - name: Install WiX
+        shell: pwsh
+        run: |
+          dotnet tool install --global wix --version 5.0.2
+          if ($LASTEXITCODE -ne 0) { throw 'WiX installation failed.' }
+          wix extension add -g WixToolset.UI.wixext/5.0.2 WixToolset.Util.wixext/5.0.2
+          if ($LASTEXITCODE -ne 0) { throw 'WiX extension installation failed.' }
+      - name: Build and package, unsigned
+        shell: pwsh
+        run: ./packaging/windows/package.ps1 -Arch ${{ matrix.arch }}
+      - name: Install, run and uninstall the MSI
+        if: matrix.arch == 'x64'
+        shell: pwsh
+        run: ./packaging/windows/test-install.ps1 -Path "dist/release/pdfcraft-$env:VERSION-windows-x64.msi" -ExpectedVersion $env:VERSION
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-windows-${{ matrix.arch }}
+          path: dist/release/*
+          if-no-files-found: error
+
+  linux:
+    name: Linux ${{ matrix.arch }}
+    needs: [version]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: x86_64, runner: ubuntu-22.04, deb: amd64, nfpm_sha256: 787af76e172dd5fc7cedf4d7c5a090a2f62be9001557a4db1103e270f90ddefd }
+          - { arch: aarch64, runner: ubuntu-22.04-arm, deb: arm64, nfpm_sha256: 8e9cd8b4ed372a5e8af555a997dfe5e111cb6c7d4d757fd0a0368a35ad84a9b0 }
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      INPUT_VERSION: ${{ inputs.version }}
+      PDFCRAFT_VERSION: ${{ needs.version.outputs.version }}
+      PDFCRAFT_BUILD_DATE: ${{ needs.version.outputs.date }}
+      PDFCRAFT_BUILD_SHA: ${{ github.sha }}
+      CRAFT_FONTS_DIR: ${{ github.workspace }}/craft-fonts
+      CRAFT_FONTS_REQUIRED: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: storytold/craft-fonts
+          ref: ${{ env.CRAFT_FONTS_REF }}
+          path: craft-fonts
+          persist-credentials: false
+      - name: Install build and packaging tools
+        env:
+          DEB_ARCH: ${{ matrix.deb }}
+          NFPM_SHA256: ${{ matrix.nfpm_sha256 }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libxkbcommon-dev libwayland-dev libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev \
+            libasound2-dev pkg-config desktop-file-utils appstream python3-yaml zsync
+          curl --proto '=https' --proto-redir =https -fsSL -o "$RUNNER_TEMP/nfpm.deb" \
+            "https://github.com/goreleaser/nfpm/releases/download/v2.48.0/nfpm_2.48.0_${DEB_ARCH}.deb"
+          echo "$NFPM_SHA256  $RUNNER_TEMP/nfpm.deb" | sha256sum -c -
+          sudo dpkg -i "$RUNNER_TEMP/nfpm.deb"
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          key: release-linux-${{ matrix.arch }}
+      - name: Apply version override
+        if: env.INPUT_VERSION != ''
+        run: cargo xtask version set "$VERSION"
+      - name: Build and package (AppImage, deb, rpm, tar.gz)
+        run: packaging/linux/package.sh
+      - name: Check the packages
+        run: |
+          dpkg-deb --info dist/release/*.deb
+          dpkg-deb --contents dist/release/*.deb | grep -E 'usr/bin/|metainfo|applications'
+          chmod +x dist/release/*.AppImage
+          for appimage in dist/release/*.AppImage; do
+            APPIMAGE_EXTRACT_AND_RUN=1 "$appimage" --version
+          done
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-linux-${{ matrix.arch }}
+          path: dist/release/*
+          if-no-files-found: error
+
+  macos:
+    name: macOS universal
+    needs: [version]
+    runs-on: macos-15
+    timeout-minutes: 120
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      INPUT_VERSION: ${{ inputs.version }}
+      PDFCRAFT_VERSION: ${{ needs.version.outputs.version }}
+      PDFCRAFT_BUILD_DATE: ${{ needs.version.outputs.date }}
+      PDFCRAFT_BUILD_SHA: ${{ github.sha }}
+      CRAFT_FONTS_DIR: ${{ github.workspace }}/craft-fonts
+      CRAFT_FONTS_REQUIRED: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: storytold/craft-fonts
+          ref: ${{ env.CRAFT_FONTS_REF }}
+          path: craft-fonts
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
+        with:
+          toolchain: stable
+          targets: aarch64-apple-darwin, x86_64-apple-darwin
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          key: release-macos-universal
+      - name: Apply version override
+        if: env.INPUT_VERSION != ''
+        run: cargo xtask version set "$VERSION"
+      - name: Build and package, ad-hoc signed
+        run: packaging/macos/package.sh --arch universal
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-macos
+          path: dist/release/*
+          if-no-files-found: error
+
+  draft:
+    name: Draft GitHub release
+    if: github.event_name == 'push' && github.ref == 'refs/heads/release'
+    needs: [version, windows, linux, macos]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: release-*
+          path: artifacts
+          merge-multiple: true
+      - name: Create or replace the draft
+        working-directory: artifacts
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ needs.version.outputs.version }}
+          PRERELEASE: ${{ needs.version.outputs.prerelease }}
+        run: |
+          sha256sum -- * | tee SHA256SUMS.txt
+          tag="v$VERSION"
+          # GitHub keeps an existing tag's commit and ignores --target, so the release would point
+          # at other source than these packages were built from.
+          # A failed lookup stops the job here: only a listing without the tag means it's absent.
+          found="$(gh api "repos/$GH_REPO/git/matching-refs/tags/$tag" --jq "map(select(.ref == \"refs/tags/$tag\")) | length")"
+          if [ "$found" != 0 ]; then
+            tagged="$(gh api "repos/$GH_REPO/commits/refs/tags/$tag" --jq .sha)"
+            if [ "$tagged" != "$GITHUB_SHA" ]; then
+              echo "::error::Tag $tag is at $tagged, not this commit. Bump the version before pushing to release."
+              exit 1
+            fi
+          fi
+          if draft="$(gh release view "$tag" --json isDraft --jq .isDraft 2>/dev/null)"; then
+            if [ "$draft" != "true" ]; then
+              echo "::error::$tag is already published. Bump the version before pushing to release."
+              exit 1
+            fi
+            gh release delete "$tag" --yes
+          fi
+          pre=()
+          if [ "$PRERELEASE" = "true" ]; then pre=(--prerelease); fi
+          gh release create "$tag" --draft "${pre[@]}" --target "$GITHUB_SHA" \
+            --title "PlutarchPages v$VERSION" --generate-notes -- *

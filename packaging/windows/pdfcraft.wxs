@@ -80,10 +80,10 @@
       <ComponentGroupRef Id="PdfcraftFiles" />
       <ComponentGroupRef Id="PdfcraftModels" />
     </Feature>
-  <Property Id="CRAFT_OPTION_1_M" Secure="yes"><RegistrySearch Id="CRAFT_OPTION_1_MSearch" Root="HKLM" Key="Software\Classes\SystemFileAssociations\.pdf\shell\PdfCraft.Edit" Type="raw" />
-    </Property><SetProperty Id="EXISTINGPDFCONTEXTMENU" Action="CraftLoadOption1M" Value="[CRAFT_OPTION_1_M]" After="LaunchConditions" Sequence="both" Condition="ALLUSERS = 1" /><Property Id="CRAFT_OPTION_1_U" Secure="yes"><RegistrySearch Id="CRAFT_OPTION_1_USearch" Root="HKCU" Key="Software\Classes\SystemFileAssociations\.pdf\shell\PdfCraft.Edit" Type="raw" />
-    </Property><SetProperty Id="EXISTINGPDFCONTEXTMENU" Action="CraftLoadOption1U" Value="[CRAFT_OPTION_1_U]" After="CraftLoadOption1M" Sequence="both" Condition="ALLUSERS &lt;&gt; 1" /><Property Id="CRAFT_OPTION_2_M" Secure="yes"><RegistrySearch Id="CRAFT_OPTION_2_MSearch" Root="HKLM" Key="Software\Classes\SystemFileAssociations\.png\shell\PdfCraft.CreatePdf" Type="raw" />
-    </Property><SetProperty Id="EXISTINGIMAGECONTEXTMENU" Action="CraftLoadOption2M" Value="[CRAFT_OPTION_2_M]" After="CraftLoadOption1U" Sequence="both" Condition="ALLUSERS = 1" /><Property Id="CRAFT_OPTION_2_U" Secure="yes"><RegistrySearch Id="CRAFT_OPTION_2_USearch" Root="HKCU" Key="Software\Classes\SystemFileAssociations\.png\shell\PdfCraft.CreatePdf" Type="raw" />
+  <Property Id="CRAFT_OPTION_1_M" Secure="yes"><RegistrySearch Id="CRAFT_OPTION_1_MSearch" Root="HKLM" Key="Software\Classes\SystemFileAssociations\.pdf\shell\PlutarchPages.Edit" Type="raw" />
+    </Property><SetProperty Id="EXISTINGPDFCONTEXTMENU" Action="CraftLoadOption1M" Value="[CRAFT_OPTION_1_M]" After="LaunchConditions" Sequence="both" Condition="ALLUSERS = 1" /><Property Id="CRAFT_OPTION_1_U" Secure="yes"><RegistrySearch Id="CRAFT_OPTION_1_USearch" Root="HKCU" Key="Software\Classes\SystemFileAssociations\.pdf\shell\PlutarchPages.Edit" Type="raw" />
+    </Property><SetProperty Id="EXISTINGPDFCONTEXTMENU" Action="CraftLoadOption1U" Value="[CRAFT_OPTION_1_U]" After="CraftLoadOption1M" Sequence="both" Condition="ALLUSERS &lt;&gt; 1" /><Property Id="CRAFT_OPTION_2_M" Secure="yes"><RegistrySearch Id="CRAFT_OPTION_2_MSearch" Root="HKLM" Key="Software\Classes\SystemFileAssociations\.png\shell\PlutarchPages.CreatePdf" Type="raw" />
+    </Property><SetProperty Id="EXISTINGIMAGECONTEXTMENU" Action="CraftLoadOption2M" Value="[CRAFT_OPTION_2_M]" After="CraftLoadOption1U" Sequence="both" Condition="ALLUSERS = 1" /><Property Id="CRAFT_OPTION_2_U" Secure="yes"><RegistrySearch Id="CRAFT_OPTION_2_USearch" Root="HKCU" Key="Software\Classes\SystemFileAssociations\.png\shell\PlutarchPages.CreatePdf" Type="raw" />
     </Property><SetProperty Id="EXISTINGIMAGECONTEXTMENU" Action="CraftLoadOption2U" Value="[CRAFT_OPTION_2_U]" After="CraftLoadOption2M" Sequence="both" Condition="ALLUSERS &lt;&gt; 1" /></Package>
 
   <Fragment>
@@ -94,7 +94,7 @@
     <?endif?>
     <ComponentGroup Id="PdfcraftFiles" Directory="INSTALLFOLDER">
       <!-- PlutarchPages installs into its own folder with its own shortcut names, so its fixed
-           component GUIDs differ from upstream PlutarchPages's: a component whose key path or resources
+           component GUIDs differ from upstream PdfCraft's: a component whose key path or resources
            differ must not share another product's GUID. -->
       <Component Id="PdfcraftApp" Guid="191AC0E5-483C-4DE7-B229-FEABFF3C7014">
         <File Id="PdfcraftExe" Source="$(var.BinDir)\pdfcraft.exe" KeyPath="yes" />
@@ -107,17 +107,17 @@
              .pdf's own default value is left alone, and the user chooses. Without this, the only
              PlutarchPages entry to pick was the advertised Start Menu shortcut, which Windows can't
              run as a file handler ("This app can't run on your PC"). -->
-        <RegistryValue Root="HKMU" Key="Software\Classes\PdfCraft.Document" Value="PDF Document" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\Classes\PlutarchPages.Document" Value="PDF Document" Type="string" />
         <!-- A negative index selects the stable icon resource ID, rather than its position.
              Resource 1 is the app's lion; resource 2 is the PDF document (build.rs). -->
-        <RegistryValue Root="HKMU" Key="Software\Classes\PdfCraft.Document\DefaultIcon" Value="&quot;[#PdfcraftExe]&quot;,-2" Type="string" />
-        <RegistryValue Root="HKMU" Key="Software\Classes\PdfCraft.Document\shell\open\command" Value="&quot;[#PdfcraftExe]&quot; &quot;%1&quot;" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\Classes\PlutarchPages.Document\DefaultIcon" Value="&quot;[#PdfcraftExe]&quot;,-2" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\Classes\PlutarchPages.Document\shell\open\command" Value="&quot;[#PdfcraftExe]&quot; &quot;%1&quot;" Type="string" />
         <!-- No overlay on thumbnails and in the preview pane: without TypeOverlay, Windows paints
              the default program's icon (the lion) over the lower-right corner of every PDF
              thumbnail, covering part of the page. An empty string means none ("Thumbnail
              Handlers", Microsoft Learn). -->
-        <RegistryValue Root="HKMU" Key="Software\Classes\PdfCraft.Document" Name="TypeOverlay" Value="" Type="string" />
-        <RegistryValue Root="HKMU" Key="Software\Classes\.pdf\OpenWithProgids" Name="PdfCraft.Document" Value="" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\Classes\PlutarchPages.Document" Name="TypeOverlay" Value="" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\Classes\.pdf\OpenWithProgids" Name="PlutarchPages.Document" Value="" Type="string" />
         <RegistryValue Root="HKMU" Key="Software\Classes\Applications\pdfcraft.exe" Name="FriendlyAppName" Value="PlutarchPages" Type="string" />
         <RegistryValue Root="HKMU" Key="Software\Classes\Applications\pdfcraft.exe\DefaultIcon" Value="&quot;[#PdfcraftExe]&quot;,-2" Type="string" />
         <RegistryValue Root="HKMU" Key="Software\Classes\Applications\pdfcraft.exe\SupportedTypes" Name=".pdf" Value="" Type="string" />
@@ -125,8 +125,8 @@
         <RegistryValue Root="HKMU" Key="Software\PlutarchPages\Capabilities" Name="ApplicationName" Value="PlutarchPages" Type="string" />
         <RegistryValue Root="HKMU" Key="Software\PlutarchPages\Capabilities" Name="ApplicationDescription" Value="Open-source PDF workbench" Type="string" />
         <RegistryValue Root="HKMU" Key="Software\PlutarchPages\Capabilities" Name="ApplicationIcon" Value="[#PdfcraftExe],0" Type="string" />
-        <RegistryValue Root="HKMU" Key="Software\PlutarchPages\Capabilities\FileAssociations" Name=".pdf" Value="PdfCraft.Document" Type="string" />
-        <RegistryValue Root="HKMU" Key="Software\RegisteredApplications" Name="PdfCraft" Value="Software\PlutarchPages\Capabilities" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\PlutarchPages\Capabilities\FileAssociations" Name=".pdf" Value="PlutarchPages.Document" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\RegisteredApplications" Name="PlutarchPages" Value="Software\PlutarchPages\Capabilities" Type="string" />
       <RegistryValue Root="HKMU" Key="Software\PlutarchPages" Name="InstallDir" Value="[INSTALLFOLDER]" Type="string" />
       </Component>
 
@@ -152,11 +152,11 @@
            Windows 11 the entry is under "Show more options": the first-level menu only takes
            packaged apps' (IExplorerCommand) entries. Its own component with an HKLM key path, so
            INSTALLPDFCONTEXTMENU=0 leaves it out and uninstall removes it. -->
-      <Component Id="PdfcraftPdfContextMenu" Guid="439F084F-657D-4AC2-A4CC-F099C518D71F" Condition="INSTALLPDFCONTEXTMENU = 1">
-        <RegistryValue Root="HKMU" Key="Software\Classes\SystemFileAssociations\.pdf\shell\PdfCraft.Edit" Value="Edit with PlutarchPages" Type="string" KeyPath="yes" />
-        <RegistryValue Root="HKMU" Key="Software\Classes\SystemFileAssociations\.pdf\shell\PdfCraft.Edit" Name="Icon" Value="&quot;[#PdfcraftExe]&quot;,0" Type="string" />
-        <RegistryValue Root="HKMU" Key="Software\Classes\SystemFileAssociations\.pdf\shell\PdfCraft.Edit" Name="MultiSelectModel" Value="Document" Type="string" />
-        <RegistryValue Root="HKMU" Key="Software\Classes\SystemFileAssociations\.pdf\shell\PdfCraft.Edit\command" Value="&quot;[#PdfcraftExe]&quot; &quot;%1&quot;" Type="string" />
+      <Component Id="PdfcraftPdfContextMenu" Guid="A3CFB232-33BB-4B0B-9530-28C412700EA7" Condition="INSTALLPDFCONTEXTMENU = 1">
+        <RegistryValue Root="HKMU" Key="Software\Classes\SystemFileAssociations\.pdf\shell\PlutarchPages.Edit" Value="Edit with PlutarchPages" Type="string" KeyPath="yes" />
+        <RegistryValue Root="HKMU" Key="Software\Classes\SystemFileAssociations\.pdf\shell\PlutarchPages.Edit" Name="Icon" Value="&quot;[#PdfcraftExe]&quot;,0" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\Classes\SystemFileAssociations\.pdf\shell\PlutarchPages.Edit" Name="MultiSelectModel" Value="Document" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\Classes\SystemFileAssociations\.pdf\shell\PlutarchPages.Edit\command" Value="&quot;[#PdfcraftExe]&quot; &quot;%1&quot;" Type="string" />
       </Component>
 
       <!-- Image context menu (#190): "Create PDF with PlutarchPages…" opens the DPI chooser, without
@@ -164,37 +164,37 @@
            INSTALLIMAGECONTEXTMENU=0 leaves it out and uninstall removes it. These rows were in
            PdfcraftApp up to 0.7.1; moving them is safe because MajorUpgrade removes the old version
            before installing (afterInstallValidate), so no old row is left behind. -->
-      <Component Id="PdfcraftImageContextMenu" Guid="1B783BF3-12DF-4588-AF80-E2CEA8BC1E5A" Condition="INSTALLIMAGECONTEXTMENU = 1">
-        <RegistryValue Root="HKMU" Key="Software\Classes\SystemFileAssociations\.png\shell\PdfCraft.CreatePdf" Value="Create PDF with PlutarchPages…" Type="string" KeyPath="yes" />
-        <RegistryValue Root="HKMU" Key="Software\Classes\SystemFileAssociations\.png\shell\PdfCraft.CreatePdf" Name="MultiSelectModel" Value="Single" Type="string" />
-        <RegistryValue Root="HKMU" Key="Software\Classes\SystemFileAssociations\.png\shell\PdfCraft.CreatePdf\command" Value="&quot;[#PdfcraftExe]&quot; --create-images &quot;%1&quot;" Type="string" />
-        <RegistryValue Root="HKMU" Key="Software\Classes\SystemFileAssociations\.jpg\shell\PdfCraft.CreatePdf" Value="Create PDF with PlutarchPages…" Type="string" />
-        <RegistryValue Root="HKMU" Key="Software\Classes\SystemFileAssociations\.jpg\shell\PdfCraft.CreatePdf" Name="MultiSelectModel" Value="Single" Type="string" />
-        <RegistryValue Root="HKMU" Key="Software\Classes\SystemFileAssociations\.jpg\shell\PdfCraft.CreatePdf\command" Value="&quot;[#PdfcraftExe]&quot; --create-images &quot;%1&quot;" Type="string" />
-        <RegistryValue Root="HKMU" Key="Software\Classes\SystemFileAssociations\.jpeg\shell\PdfCraft.CreatePdf" Value="Create PDF with PlutarchPages…" Type="string" />
-        <RegistryValue Root="HKMU" Key="Software\Classes\SystemFileAssociations\.jpeg\shell\PdfCraft.CreatePdf" Name="MultiSelectModel" Value="Single" Type="string" />
-        <RegistryValue Root="HKMU" Key="Software\Classes\SystemFileAssociations\.jpeg\shell\PdfCraft.CreatePdf\command" Value="&quot;[#PdfcraftExe]&quot; --create-images &quot;%1&quot;" Type="string" />
-        <RegistryValue Root="HKMU" Key="Software\Classes\SystemFileAssociations\.tif\shell\PdfCraft.CreatePdf" Value="Create PDF with PlutarchPages…" Type="string" />
-        <RegistryValue Root="HKMU" Key="Software\Classes\SystemFileAssociations\.tif\shell\PdfCraft.CreatePdf" Name="MultiSelectModel" Value="Single" Type="string" />
-        <RegistryValue Root="HKMU" Key="Software\Classes\SystemFileAssociations\.tif\shell\PdfCraft.CreatePdf\command" Value="&quot;[#PdfcraftExe]&quot; --create-images &quot;%1&quot;" Type="string" />
-        <RegistryValue Root="HKMU" Key="Software\Classes\SystemFileAssociations\.tiff\shell\PdfCraft.CreatePdf" Value="Create PDF with PlutarchPages…" Type="string" />
-        <RegistryValue Root="HKMU" Key="Software\Classes\SystemFileAssociations\.tiff\shell\PdfCraft.CreatePdf" Name="MultiSelectModel" Value="Single" Type="string" />
-        <RegistryValue Root="HKMU" Key="Software\Classes\SystemFileAssociations\.tiff\shell\PdfCraft.CreatePdf\command" Value="&quot;[#PdfcraftExe]&quot; --create-images &quot;%1&quot;" Type="string" />
-        <RegistryValue Root="HKMU" Key="Software\Classes\SystemFileAssociations\.gif\shell\PdfCraft.CreatePdf" Value="Create PDF with PlutarchPages…" Type="string" />
-        <RegistryValue Root="HKMU" Key="Software\Classes\SystemFileAssociations\.gif\shell\PdfCraft.CreatePdf" Name="MultiSelectModel" Value="Single" Type="string" />
-        <RegistryValue Root="HKMU" Key="Software\Classes\SystemFileAssociations\.gif\shell\PdfCraft.CreatePdf\command" Value="&quot;[#PdfcraftExe]&quot; --create-images &quot;%1&quot;" Type="string" />
-        <RegistryValue Root="HKMU" Key="Software\Classes\SystemFileAssociations\.bmp\shell\PdfCraft.CreatePdf" Value="Create PDF with PlutarchPages…" Type="string" />
-        <RegistryValue Root="HKMU" Key="Software\Classes\SystemFileAssociations\.bmp\shell\PdfCraft.CreatePdf" Name="MultiSelectModel" Value="Single" Type="string" />
-        <RegistryValue Root="HKMU" Key="Software\Classes\SystemFileAssociations\.bmp\shell\PdfCraft.CreatePdf\command" Value="&quot;[#PdfcraftExe]&quot; --create-images &quot;%1&quot;" Type="string" />
-        <RegistryValue Root="HKMU" Key="Software\Classes\SystemFileAssociations\.jp2\shell\PdfCraft.CreatePdf" Value="Create PDF with PlutarchPages…" Type="string" />
-        <RegistryValue Root="HKMU" Key="Software\Classes\SystemFileAssociations\.jp2\shell\PdfCraft.CreatePdf" Name="MultiSelectModel" Value="Single" Type="string" />
-        <RegistryValue Root="HKMU" Key="Software\Classes\SystemFileAssociations\.jp2\shell\PdfCraft.CreatePdf\command" Value="&quot;[#PdfcraftExe]&quot; --create-images &quot;%1&quot;" Type="string" />
-        <RegistryValue Root="HKMU" Key="Software\Classes\SystemFileAssociations\.j2k\shell\PdfCraft.CreatePdf" Value="Create PDF with PlutarchPages…" Type="string" />
-        <RegistryValue Root="HKMU" Key="Software\Classes\SystemFileAssociations\.j2k\shell\PdfCraft.CreatePdf" Name="MultiSelectModel" Value="Single" Type="string" />
-        <RegistryValue Root="HKMU" Key="Software\Classes\SystemFileAssociations\.j2k\shell\PdfCraft.CreatePdf\command" Value="&quot;[#PdfcraftExe]&quot; --create-images &quot;%1&quot;" Type="string" />
-        <RegistryValue Root="HKMU" Key="Software\Classes\SystemFileAssociations\.jpx\shell\PdfCraft.CreatePdf" Value="Create PDF with PlutarchPages…" Type="string" />
-        <RegistryValue Root="HKMU" Key="Software\Classes\SystemFileAssociations\.jpx\shell\PdfCraft.CreatePdf" Name="MultiSelectModel" Value="Single" Type="string" />
-        <RegistryValue Root="HKMU" Key="Software\Classes\SystemFileAssociations\.jpx\shell\PdfCraft.CreatePdf\command" Value="&quot;[#PdfcraftExe]&quot; --create-images &quot;%1&quot;" Type="string" />
+      <Component Id="PdfcraftImageContextMenu" Guid="DFFBE61D-E361-422D-9B52-8025AE2B5AE9" Condition="INSTALLIMAGECONTEXTMENU = 1">
+        <RegistryValue Root="HKMU" Key="Software\Classes\SystemFileAssociations\.png\shell\PlutarchPages.CreatePdf" Value="Create PDF with PlutarchPages…" Type="string" KeyPath="yes" />
+        <RegistryValue Root="HKMU" Key="Software\Classes\SystemFileAssociations\.png\shell\PlutarchPages.CreatePdf" Name="MultiSelectModel" Value="Single" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\Classes\SystemFileAssociations\.png\shell\PlutarchPages.CreatePdf\command" Value="&quot;[#PdfcraftExe]&quot; --create-images &quot;%1&quot;" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\Classes\SystemFileAssociations\.jpg\shell\PlutarchPages.CreatePdf" Value="Create PDF with PlutarchPages…" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\Classes\SystemFileAssociations\.jpg\shell\PlutarchPages.CreatePdf" Name="MultiSelectModel" Value="Single" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\Classes\SystemFileAssociations\.jpg\shell\PlutarchPages.CreatePdf\command" Value="&quot;[#PdfcraftExe]&quot; --create-images &quot;%1&quot;" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\Classes\SystemFileAssociations\.jpeg\shell\PlutarchPages.CreatePdf" Value="Create PDF with PlutarchPages…" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\Classes\SystemFileAssociations\.jpeg\shell\PlutarchPages.CreatePdf" Name="MultiSelectModel" Value="Single" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\Classes\SystemFileAssociations\.jpeg\shell\PlutarchPages.CreatePdf\command" Value="&quot;[#PdfcraftExe]&quot; --create-images &quot;%1&quot;" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\Classes\SystemFileAssociations\.tif\shell\PlutarchPages.CreatePdf" Value="Create PDF with PlutarchPages…" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\Classes\SystemFileAssociations\.tif\shell\PlutarchPages.CreatePdf" Name="MultiSelectModel" Value="Single" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\Classes\SystemFileAssociations\.tif\shell\PlutarchPages.CreatePdf\command" Value="&quot;[#PdfcraftExe]&quot; --create-images &quot;%1&quot;" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\Classes\SystemFileAssociations\.tiff\shell\PlutarchPages.CreatePdf" Value="Create PDF with PlutarchPages…" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\Classes\SystemFileAssociations\.tiff\shell\PlutarchPages.CreatePdf" Name="MultiSelectModel" Value="Single" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\Classes\SystemFileAssociations\.tiff\shell\PlutarchPages.CreatePdf\command" Value="&quot;[#PdfcraftExe]&quot; --create-images &quot;%1&quot;" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\Classes\SystemFileAssociations\.gif\shell\PlutarchPages.CreatePdf" Value="Create PDF with PlutarchPages…" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\Classes\SystemFileAssociations\.gif\shell\PlutarchPages.CreatePdf" Name="MultiSelectModel" Value="Single" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\Classes\SystemFileAssociations\.gif\shell\PlutarchPages.CreatePdf\command" Value="&quot;[#PdfcraftExe]&quot; --create-images &quot;%1&quot;" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\Classes\SystemFileAssociations\.bmp\shell\PlutarchPages.CreatePdf" Value="Create PDF with PlutarchPages…" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\Classes\SystemFileAssociations\.bmp\shell\PlutarchPages.CreatePdf" Name="MultiSelectModel" Value="Single" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\Classes\SystemFileAssociations\.bmp\shell\PlutarchPages.CreatePdf\command" Value="&quot;[#PdfcraftExe]&quot; --create-images &quot;%1&quot;" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\Classes\SystemFileAssociations\.jp2\shell\PlutarchPages.CreatePdf" Value="Create PDF with PlutarchPages…" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\Classes\SystemFileAssociations\.jp2\shell\PlutarchPages.CreatePdf" Name="MultiSelectModel" Value="Single" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\Classes\SystemFileAssociations\.jp2\shell\PlutarchPages.CreatePdf\command" Value="&quot;[#PdfcraftExe]&quot; --create-images &quot;%1&quot;" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\Classes\SystemFileAssociations\.j2k\shell\PlutarchPages.CreatePdf" Value="Create PDF with PlutarchPages…" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\Classes\SystemFileAssociations\.j2k\shell\PlutarchPages.CreatePdf" Name="MultiSelectModel" Value="Single" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\Classes\SystemFileAssociations\.j2k\shell\PlutarchPages.CreatePdf\command" Value="&quot;[#PdfcraftExe]&quot; --create-images &quot;%1&quot;" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\Classes\SystemFileAssociations\.jpx\shell\PlutarchPages.CreatePdf" Value="Create PDF with PlutarchPages…" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\Classes\SystemFileAssociations\.jpx\shell\PlutarchPages.CreatePdf" Name="MultiSelectModel" Value="Single" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\Classes\SystemFileAssociations\.jpx\shell\PlutarchPages.CreatePdf\command" Value="&quot;[#PdfcraftExe]&quot; --create-images &quot;%1&quot;" Type="string" />
       </Component>
 
       <Component Id="PdfcraftCli">

@@ -26,32 +26,32 @@
     ],
     [
       "-1",
-      "Software\\Classes\\PdfCraft.Document",
+      "Software\\Classes\\PlutarchPages.Document",
       "",
       "PDF Document"
     ],
     [
       "-1",
-      "Software\\Classes\\PdfCraft.Document\\DefaultIcon",
+      "Software\\Classes\\PlutarchPages.Document\\DefaultIcon",
       "",
       "\"[#PdfcraftExe]\",-2"
     ],
     [
       "-1",
-      "Software\\Classes\\PdfCraft.Document\\shell\\open\\command",
+      "Software\\Classes\\PlutarchPages.Document\\shell\\open\\command",
       "",
       "\"[#PdfcraftExe]\" \"%1\""
     ],
     [
       "-1",
-      "Software\\Classes\\PdfCraft.Document",
+      "Software\\Classes\\PlutarchPages.Document",
       "TypeOverlay",
       ""
     ],
     [
       "-1",
       "Software\\Classes\\.pdf\\OpenWithProgids",
-      "PdfCraft.Document",
+      "PlutarchPages.Document",
       ""
     ],
     [
@@ -100,12 +100,12 @@
       "-1",
       "Software\\PlutarchPages\\Capabilities\\FileAssociations",
       ".pdf",
-      "PdfCraft.Document"
+      "PlutarchPages.Document"
     ],
     [
       "-1",
       "Software\\RegisteredApplications",
-      "PdfCraft",
+      "PlutarchPages",
       "Software\\PlutarchPages\\Capabilities"
     ],
     [
@@ -122,205 +122,205 @@
     ],
     [
       "-1",
-      "Software\\Classes\\SystemFileAssociations\\.pdf\\shell\\PdfCraft.Edit",
+      "Software\\Classes\\SystemFileAssociations\\.pdf\\shell\\PlutarchPages.Edit",
       "",
       "Edit with PlutarchPages"
     ],
     [
       "-1",
-      "Software\\Classes\\SystemFileAssociations\\.pdf\\shell\\PdfCraft.Edit",
+      "Software\\Classes\\SystemFileAssociations\\.pdf\\shell\\PlutarchPages.Edit",
       "Icon",
       "\"[#PdfcraftExe]\",0"
     ],
     [
       "-1",
-      "Software\\Classes\\SystemFileAssociations\\.pdf\\shell\\PdfCraft.Edit",
+      "Software\\Classes\\SystemFileAssociations\\.pdf\\shell\\PlutarchPages.Edit",
       "MultiSelectModel",
       "Document"
     ],
     [
       "-1",
-      "Software\\Classes\\SystemFileAssociations\\.pdf\\shell\\PdfCraft.Edit\\command",
+      "Software\\Classes\\SystemFileAssociations\\.pdf\\shell\\PlutarchPages.Edit\\command",
       "",
       "\"[#PdfcraftExe]\" \"%1\""
     ],
     [
       "-1",
-      "Software\\Classes\\SystemFileAssociations\\.png\\shell\\PdfCraft.CreatePdf",
+      "Software\\Classes\\SystemFileAssociations\\.png\\shell\\PlutarchPages.CreatePdf",
       "",
       "Create PDF with PlutarchPages\u2026"
     ],
     [
       "-1",
-      "Software\\Classes\\SystemFileAssociations\\.png\\shell\\PdfCraft.CreatePdf",
+      "Software\\Classes\\SystemFileAssociations\\.png\\shell\\PlutarchPages.CreatePdf",
       "MultiSelectModel",
       "Single"
     ],
     [
       "-1",
-      "Software\\Classes\\SystemFileAssociations\\.png\\shell\\PdfCraft.CreatePdf\\command",
+      "Software\\Classes\\SystemFileAssociations\\.png\\shell\\PlutarchPages.CreatePdf\\command",
       "",
       "\"[#PdfcraftExe]\" --create-images \"%1\""
     ],
     [
       "-1",
-      "Software\\Classes\\SystemFileAssociations\\.jpg\\shell\\PdfCraft.CreatePdf",
+      "Software\\Classes\\SystemFileAssociations\\.jpg\\shell\\PlutarchPages.CreatePdf",
       "",
       "Create PDF with PlutarchPages\u2026"
     ],
     [
       "-1",
-      "Software\\Classes\\SystemFileAssociations\\.jpg\\shell\\PdfCraft.CreatePdf",
+      "Software\\Classes\\SystemFileAssociations\\.jpg\\shell\\PlutarchPages.CreatePdf",
       "MultiSelectModel",
       "Single"
     ],
     [
       "-1",
-      "Software\\Classes\\SystemFileAssociations\\.jpg\\shell\\PdfCraft.CreatePdf\\command",
+      "Software\\Classes\\SystemFileAssociations\\.jpg\\shell\\PlutarchPages.CreatePdf\\command",
       "",
       "\"[#PdfcraftExe]\" --create-images \"%1\""
     ],
     [
       "-1",
-      "Software\\Classes\\SystemFileAssociations\\.jpeg\\shell\\PdfCraft.CreatePdf",
+      "Software\\Classes\\SystemFileAssociations\\.jpeg\\shell\\PlutarchPages.CreatePdf",
       "",
       "Create PDF with PlutarchPages\u2026"
     ],
     [
       "-1",
-      "Software\\Classes\\SystemFileAssociations\\.jpeg\\shell\\PdfCraft.CreatePdf",
+      "Software\\Classes\\SystemFileAssociations\\.jpeg\\shell\\PlutarchPages.CreatePdf",
       "MultiSelectModel",
       "Single"
     ],
     [
       "-1",
-      "Software\\Classes\\SystemFileAssociations\\.jpeg\\shell\\PdfCraft.CreatePdf\\command",
+      "Software\\Classes\\SystemFileAssociations\\.jpeg\\shell\\PlutarchPages.CreatePdf\\command",
       "",
       "\"[#PdfcraftExe]\" --create-images \"%1\""
     ],
     [
       "-1",
-      "Software\\Classes\\SystemFileAssociations\\.tif\\shell\\PdfCraft.CreatePdf",
+      "Software\\Classes\\SystemFileAssociations\\.tif\\shell\\PlutarchPages.CreatePdf",
       "",
       "Create PDF with PlutarchPages\u2026"
     ],
     [
       "-1",
-      "Software\\Classes\\SystemFileAssociations\\.tif\\shell\\PdfCraft.CreatePdf",
+      "Software\\Classes\\SystemFileAssociations\\.tif\\shell\\PlutarchPages.CreatePdf",
       "MultiSelectModel",
       "Single"
     ],
     [
       "-1",
-      "Software\\Classes\\SystemFileAssociations\\.tif\\shell\\PdfCraft.CreatePdf\\command",
+      "Software\\Classes\\SystemFileAssociations\\.tif\\shell\\PlutarchPages.CreatePdf\\command",
       "",
       "\"[#PdfcraftExe]\" --create-images \"%1\""
     ],
     [
       "-1",
-      "Software\\Classes\\SystemFileAssociations\\.tiff\\shell\\PdfCraft.CreatePdf",
+      "Software\\Classes\\SystemFileAssociations\\.tiff\\shell\\PlutarchPages.CreatePdf",
       "",
       "Create PDF with PlutarchPages\u2026"
     ],
     [
       "-1",
-      "Software\\Classes\\SystemFileAssociations\\.tiff\\shell\\PdfCraft.CreatePdf",
+      "Software\\Classes\\SystemFileAssociations\\.tiff\\shell\\PlutarchPages.CreatePdf",
       "MultiSelectModel",
       "Single"
     ],
     [
       "-1",
-      "Software\\Classes\\SystemFileAssociations\\.tiff\\shell\\PdfCraft.CreatePdf\\command",
+      "Software\\Classes\\SystemFileAssociations\\.tiff\\shell\\PlutarchPages.CreatePdf\\command",
       "",
       "\"[#PdfcraftExe]\" --create-images \"%1\""
     ],
     [
       "-1",
-      "Software\\Classes\\SystemFileAssociations\\.gif\\shell\\PdfCraft.CreatePdf",
+      "Software\\Classes\\SystemFileAssociations\\.gif\\shell\\PlutarchPages.CreatePdf",
       "",
       "Create PDF with PlutarchPages\u2026"
     ],
     [
       "-1",
-      "Software\\Classes\\SystemFileAssociations\\.gif\\shell\\PdfCraft.CreatePdf",
+      "Software\\Classes\\SystemFileAssociations\\.gif\\shell\\PlutarchPages.CreatePdf",
       "MultiSelectModel",
       "Single"
     ],
     [
       "-1",
-      "Software\\Classes\\SystemFileAssociations\\.gif\\shell\\PdfCraft.CreatePdf\\command",
+      "Software\\Classes\\SystemFileAssociations\\.gif\\shell\\PlutarchPages.CreatePdf\\command",
       "",
       "\"[#PdfcraftExe]\" --create-images \"%1\""
     ],
     [
       "-1",
-      "Software\\Classes\\SystemFileAssociations\\.bmp\\shell\\PdfCraft.CreatePdf",
+      "Software\\Classes\\SystemFileAssociations\\.bmp\\shell\\PlutarchPages.CreatePdf",
       "",
       "Create PDF with PlutarchPages\u2026"
     ],
     [
       "-1",
-      "Software\\Classes\\SystemFileAssociations\\.bmp\\shell\\PdfCraft.CreatePdf",
+      "Software\\Classes\\SystemFileAssociations\\.bmp\\shell\\PlutarchPages.CreatePdf",
       "MultiSelectModel",
       "Single"
     ],
     [
       "-1",
-      "Software\\Classes\\SystemFileAssociations\\.bmp\\shell\\PdfCraft.CreatePdf\\command",
+      "Software\\Classes\\SystemFileAssociations\\.bmp\\shell\\PlutarchPages.CreatePdf\\command",
       "",
       "\"[#PdfcraftExe]\" --create-images \"%1\""
     ],
     [
       "-1",
-      "Software\\Classes\\SystemFileAssociations\\.jp2\\shell\\PdfCraft.CreatePdf",
+      "Software\\Classes\\SystemFileAssociations\\.jp2\\shell\\PlutarchPages.CreatePdf",
       "",
       "Create PDF with PlutarchPages\u2026"
     ],
     [
       "-1",
-      "Software\\Classes\\SystemFileAssociations\\.jp2\\shell\\PdfCraft.CreatePdf",
+      "Software\\Classes\\SystemFileAssociations\\.jp2\\shell\\PlutarchPages.CreatePdf",
       "MultiSelectModel",
       "Single"
     ],
     [
       "-1",
-      "Software\\Classes\\SystemFileAssociations\\.jp2\\shell\\PdfCraft.CreatePdf\\command",
+      "Software\\Classes\\SystemFileAssociations\\.jp2\\shell\\PlutarchPages.CreatePdf\\command",
       "",
       "\"[#PdfcraftExe]\" --create-images \"%1\""
     ],
     [
       "-1",
-      "Software\\Classes\\SystemFileAssociations\\.j2k\\shell\\PdfCraft.CreatePdf",
+      "Software\\Classes\\SystemFileAssociations\\.j2k\\shell\\PlutarchPages.CreatePdf",
       "",
       "Create PDF with PlutarchPages\u2026"
     ],
     [
       "-1",
-      "Software\\Classes\\SystemFileAssociations\\.j2k\\shell\\PdfCraft.CreatePdf",
+      "Software\\Classes\\SystemFileAssociations\\.j2k\\shell\\PlutarchPages.CreatePdf",
       "MultiSelectModel",
       "Single"
     ],
     [
       "-1",
-      "Software\\Classes\\SystemFileAssociations\\.j2k\\shell\\PdfCraft.CreatePdf\\command",
+      "Software\\Classes\\SystemFileAssociations\\.j2k\\shell\\PlutarchPages.CreatePdf\\command",
       "",
       "\"[#PdfcraftExe]\" --create-images \"%1\""
     ],
     [
       "-1",
-      "Software\\Classes\\SystemFileAssociations\\.jpx\\shell\\PdfCraft.CreatePdf",
+      "Software\\Classes\\SystemFileAssociations\\.jpx\\shell\\PlutarchPages.CreatePdf",
       "",
       "Create PDF with PlutarchPages\u2026"
     ],
     [
       "-1",
-      "Software\\Classes\\SystemFileAssociations\\.jpx\\shell\\PdfCraft.CreatePdf",
+      "Software\\Classes\\SystemFileAssociations\\.jpx\\shell\\PlutarchPages.CreatePdf",
       "MultiSelectModel",
       "Single"
     ],
     [
       "-1",
-      "Software\\Classes\\SystemFileAssociations\\.jpx\\shell\\PdfCraft.CreatePdf\\command",
+      "Software\\Classes\\SystemFileAssociations\\.jpx\\shell\\PlutarchPages.CreatePdf\\command",
       "",
       "\"[#PdfcraftExe]\" --create-images \"%1\""
     ]
