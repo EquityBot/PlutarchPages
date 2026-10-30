@@ -144,7 +144,7 @@ pub(super) fn pages(ui: &mut egui::Ui, t: &Tokens, info: &DocInfo, view: &mut cr
             let press = theme::Press::track(ui, &resp);
             press.wash(ui, rect, 8, selected || picked);
             if picked {
-                ui.painter().rect_stroke(rect, CornerRadius::same(8), Stroke::new(1.5, t.accent), egui::StrokeKind::Inside);
+                ui.painter().rect_stroke(rect, CornerRadius::same(8), Stroke::new(1.5, t.accent_text), egui::StrokeKind::Inside);
             }
             let pr = rect.translate(press.offset()).shrink(8.0);
             ui.painter().rect_filled(pr, CornerRadius::ZERO, Color32::WHITE);
@@ -239,10 +239,10 @@ fn file_drop(ui: &mut egui::Ui, t: &Tokens, view: &mut crate::DocView, rows: &[R
         return;
     }
     let painter = ui.painter().with_clip_rect(clip);
-    painter.rect_stroke(clip.shrink(2.0), CornerRadius::same(6), Stroke::new(2.0, t.accent), egui::StrokeKind::Inside);
+    painter.rect_stroke(clip.shrink(2.0), CornerRadius::same(6), Stroke::new(2.0, t.accent_text), egui::StrokeKind::Inside);
     if let (Some(gap), Some(first), Some(last)) = (view.panel_gap, rows.first(), rows.last()) {
         let y = rows.get(gap).map_or(last.bottom() + 2.0, |r| r.top() - 3.0);
-        painter.line_segment([pos2(first.left(), y), pos2(first.right(), y)], Stroke::new(3.0, t.accent));
+        painter.line_segment([pos2(first.left(), y), pos2(first.right(), y)], Stroke::new(3.0, t.accent_text));
     }
 }
 
@@ -295,7 +295,7 @@ fn page_drag(ui: &mut egui::Ui, t: &Tokens, view: &mut crate::DocView, rows: &[R
     let gap = pointer.and_then(|p| panel_gap(rows, p.y));
     if let (Some(gap), Some(first), Some(last)) = (gap, rows.first(), rows.last()) {
         let y = rows.get(gap).map_or(last.bottom() + 20.0, |r| r.top() - 3.0);
-        ui.painter().line_segment([pos2(first.left(), y), pos2(first.right(), y)], Stroke::new(3.0, t.accent));
+        ui.painter().line_segment([pos2(first.left(), y), pos2(first.right(), y)], Stroke::new(3.0, t.accent_text));
     }
     if let Some(p) = pointer {
         let n = moving.len();

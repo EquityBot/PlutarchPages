@@ -3396,7 +3396,7 @@ licence = "MIT OR Apache-2.0"
 licence_file = "LICENSE-MIT"
 kind = "image"
 usage = "README: themes. Shows only PdfCraft UI, Lucide icons and the showcase PDF built from the [[fetched]] OFL fonts"
-sha256 = "7b8fdf0722c1f568233aea25ed1c906a70aa1bbca7717bcbe403f3a1715e2a54"
+sha256 = "014303098d27cd866010bd75976ddae147301eb5bd5c535a264f0f0a715e96e0"
 
 [[asset]]
 path = "docs/images/pdfcraft-find.png"
@@ -3418,7 +3418,7 @@ licence = "MIT OR Apache-2.0"
 licence_file = "LICENSE-MIT"
 kind = "image"
 usage = "README: forms. Shows only PdfCraft UI, Lucide icons and the showcase PDF built from the [[fetched]] OFL fonts"
-sha256 = "521b252bbebeed6eab74519e325473c237a60aec8c2a1ee838b1e42a7f09dc5c"
+sha256 = "aec8c79bb95ac97bbd63bdd65c1b4b26046fb43897cae76af40540dead0afa0d"
 
 [[asset]]
 path = "docs/images/pdfcraft-layers.png"
@@ -3506,7 +3506,7 @@ licence = "MIT OR Apache-2.0"
 licence_file = "LICENSE-MIT"
 kind = "image"
 usage = "README: layouts. Shows only PdfCraft UI, Lucide icons and the showcase PDF built from the [[fetched]] OFL fonts"
-sha256 = "c63f40ff133e38fc52a6225e8c61d8a7113064b68cadbf8579e3d6f294acc70b"
+sha256 = "6264fe79427a83b481325c621b820e1e023335e9f236f18c964f5a3969118721"
 
 [[asset]]
 path = "docs/images/pdfcraft-viewer.png"

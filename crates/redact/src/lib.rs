@@ -477,10 +477,28 @@ fn without_retired(doc: &Document, res: &Dict, retired: &HashSet<ObjRef>) -> Opt
     Some(res)
 }
 
-/// What a removed annotation may hold as separate objects that must go with it. Appearance
-/// streams are left out: identical icons commonly share one, and a kept annotation sharing it
-/// draws it outside the marks.
+/// What a removed annotation may hold as separate objects that must go with it.
 const PAYLOAD_KEYS: [&[u8]; 4] = [b"Contents", b"RC", b"A", b"Popup"];
+
+/// The separate objects a removed annotation holds: [`PAYLOAD_KEYS`] and its appearance streams.
+/// A kept annotation sharing an appearance would draw the redacted content outside the marks, so
+/// this makes apply refuse and name its pages, as it does for an image drawn elsewhere. The cost is
+/// a refusal when identical icons share one, until every use is marked.
+fn annotation_payloads(doc: &Document, d: &Dict) -> Vec<ObjRef> {
+    let mut held: Vec<ObjRef> = PAYLOAD_KEYS.iter().filter_map(|k| d.reference(k)).collect();
+    let ap = d.get(b"AP").and_then(|ap| doc.resolve(ap).as_dict().cloned()).unwrap_or_default();
+    for (_, state) in ap.iter() {
+        held.extend(state.as_ref());
+        // One stream per appearance state (/N << /On 5 0 R /Off 6 0 R >>).
+        let states = doc.resolve(state);
+        if !matches!(*states, Object::Stream(_))
+            && let Some(states) = states.as_dict()
+        {
+            held.extend(states.iter().filter_map(|(_, s)| s.as_ref()));
+        }
+    }
+    held
+}
 
 /// Fail closed when an original that redaction replaced or removed (an image, a form, a content
 /// stream) could still be saved with the file: a page draws it outside the marks (those pages
@@ -766,7 +784,7 @@ fn apply_to(doc: &mut Document, pages: Option<&[usize]>) -> Result<Report, Redac
     // one, apply fails closed, as it does for a redacted image drawn elsewhere.
     for r in &gone {
         let Some(d) = doc.get(*r).as_dict().cloned() else { continue };
-        gone_payloads.extend(PAYLOAD_KEYS.iter().filter_map(|k| d.reference(k)));
+        gone_payloads.extend(annotation_payloads(doc, &d));
     }
     retired.extend(&doomed_xobjects);
     retired.extend(&gone);
@@ -1002,7 +1020,7 @@ fn remove_page_annotations(
     report.annotations += dropped.iter().filter(|a| a.as_ref().is_none()).count();
     for a in &dropped {
         let d = a.as_ref().map_or_else(|| a.as_dict().cloned(), |r| doc.get(r).as_dict().cloned());
-        gone_payloads.extend(d.iter().flat_map(|d| PAYLOAD_KEYS.iter().filter_map(|k| d.reference(k))));
+        gone_payloads.extend(d.iter().flat_map(|d| annotation_payloads(doc, d)));
     }
     removed_everywhere.extend(dropped.iter().filter_map(Object::as_ref));
     doc.update_dict(page.obj, |d| {

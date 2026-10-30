@@ -49,6 +49,17 @@ fn status_colours_stay_readable_on_every_surface() {
     assert_eq!(Tokens::for_kind(ThemeKind::Light).success, RHODESIAN_GREEN);
 }
 
+/// Overlays sit on page content, so they need 3:1 against white paper and a black photograph.
+#[test]
+fn on_page_colours_read_on_white_and_black_pages() {
+    for (name, c) in [("select", ON_PAGE_SELECT), ("hint", ON_PAGE_HINT), ("alert", ON_PAGE_ALERT)] {
+        for page in [Color32::WHITE, Color32::BLACK] {
+            let r = contrast(c, page);
+            assert!(r >= 3.0, "{name} on {page:?}: {r:.2}:1");
+        }
+    }
+}
+
 /// Interface colours live in this file, so an upstream merge can't bring its blue back
 /// unnoticed. Colours a document or the user chose arrive as variables, not hex literals.
 #[test]

@@ -20,11 +20,11 @@ pub const CRIMSON: Color32 = Color32::from_rgb(0x99, 0x00, 0x24);
 /// Passed results only.
 pub const RHODESIAN_GREEN: Color32 = Color32::from_rgb(0x0F, 0x4B, 0x32);
 
-/// Selection, handles and guides drawn over a page. Pages stay white in both themes, so these
-/// don't change with the theme.
-pub const ON_PAGE_SELECT: Color32 = TYRIAN_PURPLE;
+/// Selection, handles and guides drawn over a page. Pages can hold anything from white paper to
+/// a black photograph, whatever the theme, so these are the colours that read on both.
+pub const ON_PAGE_SELECT: Color32 = LAVENDER;
 /// A second on-page mark that has to read apart from the selection (hover, text under the pointer).
-pub const ON_PAGE_HINT: Color32 = LAVENDER;
+pub const ON_PAGE_HINT: Color32 = DARK_GOLD;
 /// Errors and redaction marks over a page.
 pub const ON_PAGE_ALERT: Color32 = RED;
 
@@ -482,7 +482,7 @@ pub fn apply(ctx: &egui::Context, kind: ThemeKind) {
     v.extreme_bg_color = t.field;
     v.faint_bg_color = t.hover;
     v.selection.bg_fill = t.accent_soft;
-    v.selection.stroke = Stroke::new(1.0, t.accent);
+    v.selection.stroke = Stroke::new(1.0, t.accent_text);
     v.hyperlink_color = t.accent_text;
     v.override_text_color = Some(t.text);
     v.window_corner_radius = CornerRadius::same(10);

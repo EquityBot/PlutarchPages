@@ -67,7 +67,7 @@ impl Card {
             painter.rect_filled(c.shrink(6.0), CornerRadius::same(8), if self.selected { t.accent_soft } else { t.hover });
         }
         if self.selected {
-            painter.rect_stroke(c.shrink(6.0), CornerRadius::same(8), Stroke::new(1.5, t.accent), egui::StrokeKind::Inside);
+            painter.rect_stroke(c.shrink(6.0), CornerRadius::same(8), Stroke::new(1.5, t.accent_text), egui::StrokeKind::Inside);
         }
 
         // The page, fitted in the paper box (top-aligned, room above for the stack).

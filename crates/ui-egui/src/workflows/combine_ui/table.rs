@@ -129,7 +129,7 @@ fn heading(ui: &mut egui::Ui, t: &Tokens, key: SortKey, sort: Option<(SortKey, b
         && dragged.0 != key
     {
         let x = if after(&response) { rect.right() } else { rect.left() };
-        ui.painter().with_clip_rect(rect.expand(3.0)).vline(x, rect.y_range(), Stroke::new(2.5, t.accent));
+        ui.painter().with_clip_rect(rect.expand(3.0)).vline(x, rect.y_range(), Stroke::new(2.5, t.accent_text));
     }
     let mut event = None;
     if let Some(dragged) = response.dnd_release_payload::<HeadingDrag>()
@@ -173,7 +173,7 @@ fn table_body(ui: &mut egui::Ui, context: TableBody<'_>) {
         let painter = ui.ctx().layer_painter(egui::LayerId::new(egui::Order::Tooltip, egui::Id::unique("combine-heading-drag")));
         let galley = painter.layout_no_wrap(dragged.0.label().to_owned(), theme::medium(12.5), t.text);
         let r = Rect::from_min_size(pos + vec2(10.0, 8.0), galley.size() + vec2(16.0, 8.0));
-        painter.rect(r, CornerRadius::same(4), t.card, Stroke::new(1.0, t.accent), egui::StrokeKind::Inside);
+        painter.rect(r, CornerRadius::same(4), t.card, Stroke::new(1.0, t.accent_text), egui::StrokeKind::Inside);
         painter.galley(r.min + vec2(8.0, 4.0), galley, t.text);
     }
     let mut builder = TableBuilder::new(ui)
@@ -302,11 +302,12 @@ fn table_body(ui: &mut egui::Ui, context: TableBody<'_>) {
                                 let all = errors.iter().chain(&warnings).cloned().collect::<Vec<_>>().join("\n");
                                 ui.add(icons::image(icon, 15.0, colour));
                                 if f.lock.is_some() {
-                                    let link =
-                                        ui.add(egui::Link::new(egui::RichText::new(tl!("Unlock…")).color(t.accent))).on_hover_text(match f.lock {
+                                    let link = ui.add(egui::Link::new(egui::RichText::new(tl!("Unlock…")).color(t.accent_text))).on_hover_text(
+                                        match f.lock {
                                             Some(Lock::Permissions) => tl!("Enter the permissions password to allow combining"),
                                             _ => tl!("Enter the password that opens it"),
-                                        });
+                                        },
+                                    );
                                     if link.clicked() {
                                         events.action = Some(RowAction::Unlock(Some(i), link.rect.left_bottom() + vec2(0.0, 6.0)));
                                     }
@@ -345,7 +346,7 @@ fn table_body(ui: &mut egui::Ui, context: TableBody<'_>) {
                             response.ctx.layer_painter(egui::LayerId::new(egui::Order::Foreground, egui::Id::unique("combine-drop-line"))).hline(
                                 r.x_range(),
                                 y,
-                                Stroke::new(2.0, t.accent),
+                                Stroke::new(2.0, t.accent_text),
                             );
                         }
                     }

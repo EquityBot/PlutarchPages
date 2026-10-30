@@ -185,7 +185,7 @@ pub(crate) fn page(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
         // The list, in a card that highlights while files are dragged over the window.
         let footer_h = 34.0;
         let card_h = (ui.available_height() - footer_h).max(120.0);
-        let stroke = if files_hovering { Stroke::new(2.0, t.accent) } else { Stroke::new(1.0, t.border) };
+        let stroke = if files_hovering { Stroke::new(2.0, t.accent_text) } else { Stroke::new(1.0, t.border) };
         egui::Frame::NONE.fill(t.card).stroke(stroke).corner_radius(CornerRadius::same(t.radius)).inner_margin(egui::Margin::symmetric(8, 6)).show(
             ui,
             |ui| {
@@ -581,7 +581,7 @@ fn zoom_controls(app: &mut PdfCraftApp, ui: &mut egui::Ui, t: &Tokens, edge: f32
 fn empty_state(app: &mut PdfCraftApp, ui: &mut egui::Ui, t: &Tokens, files_hovering: bool) {
     ui.vertical_centered(|ui| {
         ui.add_space((ui.available_height() / 2.0 - 70.0).max(16.0));
-        ui.add(icons::image("files", 40.0, if files_hovering { t.accent } else { t.text_faint }));
+        ui.add(icons::image("files", 40.0, if files_hovering { t.accent_text } else { t.text_faint }));
         ui.add_space(10.0);
         ui.label(egui::RichText::new(tl!("Add the files to combine")).font(theme::medium(15.0)));
         ui.add_space(4.0);

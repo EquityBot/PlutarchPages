@@ -201,7 +201,7 @@ pub fn tab_strip(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
                                         // clip rect (#2225): keep the whole line inside it.
                                         let clip = ui.clip_rect();
                                         let marker = marker.clamp(clip.left() + 1.0, (clip.right() - 1.0).max(clip.left() + 1.0));
-                                        ui.painter().vline(marker, span.shrink(4.0), Stroke::new(2.0, t.accent));
+                                        ui.painter().vline(marker, span.shrink(4.0), Stroke::new(2.0, t.accent_text));
                                     }
                                 }
                             }
@@ -434,25 +434,26 @@ fn tab(ui: &mut egui::Ui, spec: TabSpec<'_>, close: &mut Option<usize>) -> egui:
     let (rect, _) = ui.allocate_exact_size(vec2(width, height), Sense::hover());
     let a11y = if dirty { format!("{name} (edited)") } else { name.to_string() };
     let sense = if draggable { Sense::click_and_drag() } else { Sense::click() };
-    let resp = craft_ui::tabs::Tab::new(id, &a11y, active).sense(sense).focus_stroke(Stroke::new(1.0, t.accent)).show_at(ui, rect, |ui, resp| {
-        let press = theme::Press::track(ui, resp);
-        let bg = if active {
-            press.fill(t.chrome, t.chrome.lerp_to_gamma(t.hover, 0.65), t.hover)
-        } else {
-            press.fill(Color32::TRANSPARENT, t.hover, t.pressed)
-        };
-        if bg.a() > 0 {
-            ui.painter().rect_filled(rect, CornerRadius { nw: 7, ne: 7, sw: 0, se: 0 }, bg);
-        }
-        icons::paint(
-            ui,
-            Rect::from_min_size(rect.min + vec2(6.0, (height - 16.0) / 2.0), vec2(16.0, 16.0)),
-            icon,
-            15.0,
-            if active { t.accent_text } else { t.text_muted },
-        );
-        ui.painter().galley(rect.min + vec2(28.0, (rect.height() - label_galley.size().y) / 2.0), label_galley.clone(), label_color);
-    });
+    let resp =
+        craft_ui::tabs::Tab::new(id, &a11y, active).sense(sense).focus_stroke(Stroke::new(1.0, t.accent_text)).show_at(ui, rect, |ui, resp| {
+            let press = theme::Press::track(ui, resp);
+            let bg = if active {
+                press.fill(t.chrome, t.chrome.lerp_to_gamma(t.hover, 0.65), t.hover)
+            } else {
+                press.fill(Color32::TRANSPARENT, t.hover, t.pressed)
+            };
+            if bg.a() > 0 {
+                ui.painter().rect_filled(rect, CornerRadius { nw: 7, ne: 7, sw: 0, se: 0 }, bg);
+            }
+            icons::paint(
+                ui,
+                Rect::from_min_size(rect.min + vec2(6.0, (height - 16.0) / 2.0), vec2(16.0, 16.0)),
+                icon,
+                15.0,
+                if active { t.accent_text } else { t.text_muted },
+            );
+            ui.painter().galley(rect.min + vec2(28.0, (rect.height() - label_galley.size().y) / 2.0), label_galley.clone(), label_color);
+        });
     let x_rect = Rect::from_center_size(rect.right_center() - vec2(16.0, 0.0), vec2(20.0, 20.0));
     let x = ui.interact(x_rect, id.with("close"), Sense::click());
     let x_press = theme::Press::track(ui, &x);

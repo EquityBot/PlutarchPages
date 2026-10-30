@@ -125,7 +125,7 @@ fn paint(painter: &egui::Painter, rect: Rect, button: Button, maximized: bool, t
     };
     painter.circle_filled(rect.center(), BUTTON / 2.0, t.text.gamma_multiply(alpha));
     if response.has_focus() {
-        painter.circle_stroke(rect.center(), BUTTON / 2.0 - 0.5, Stroke::new(1.0, t.accent));
+        painter.circle_stroke(rect.center(), BUTTON / 2.0 - 0.5, Stroke::new(1.0, t.accent_text));
     }
     let stroke = Stroke::new(1.25, t.text);
     // The glyph's 16-point square, its corners on pixel centres so lines stay crisp.

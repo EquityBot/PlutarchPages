@@ -61,7 +61,7 @@ pub fn begin_dialog(ui: &mut egui::Ui) {
     for state in [&mut w.inactive, &mut w.hovered, &mut w.active, &mut w.open] {
         state.corner_radius = CornerRadius::same(4);
     }
-    ui.visuals_mut().selection.stroke = Stroke::new(1.5, t.accent);
+    ui.visuals_mut().selection.stroke = Stroke::new(1.5, t.accent_text);
     ui.spacing_mut().interact_size.y = FIELD_MIN_HEIGHT;
 }
 
@@ -159,7 +159,7 @@ pub fn pill_button_marked(ui: &mut egui::Ui, label: &str, primary: bool, marked:
     ui.painter().rect(rect, CornerRadius::same(14), fill, stroke, egui::StrokeKind::Inside);
     if marked {
         resp.request_focus();
-        ui.painter().rect_stroke(rect.expand(2.0), CornerRadius::same(16), Stroke::new(2.0, t.accent), egui::StrokeKind::Outside);
+        ui.painter().rect_stroke(rect.expand(2.0), CornerRadius::same(16), Stroke::new(2.0, t.accent_text), egui::StrokeKind::Outside);
     }
     let body = rect.translate(press.offset());
     ui.painter().galley(body.center() - label_galley.size() / 2.0, label_galley, text_color);

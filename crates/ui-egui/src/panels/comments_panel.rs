@@ -348,7 +348,7 @@ fn card(ui: &mut egui::Ui, view: &mut DocView, context: CardContext<'_>) -> Opti
                             edit = Some(Edit::MarkAnnotation { page: a.page, index: a.index, marked: !marked, author: prefs.author.clone() });
                         }
                     } else if marked {
-                        ui.add(icons::image("circle-check", 14.0, t.accent)).on_hover_text(tl!("Marked"));
+                        ui.add(icons::image("circle-check", 14.0, t.accent_text)).on_hover_text(tl!("Marked"));
                     }
                     if a.locked {
                         ui.add(icons::image("lock", 13.0, t.text_faint)).on_hover_text(tl!("Locked"));

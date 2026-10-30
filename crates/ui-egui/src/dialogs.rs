@@ -1429,7 +1429,7 @@ fn dialog_number_pages(ui: &mut egui::Ui, app: &mut PdfCraftApp, req: &mut Pendi
 fn dialog_recovery(ui: &mut egui::Ui, app: &mut PdfCraftApp) -> bool {
     let t = Tokens::get(ui.ctx());
     ui.horizontal(|ui| {
-        ui.add(crate::icons::image("clock-3", 22.0, t.accent));
+        ui.add(crate::icons::image("clock-3", 22.0, t.accent_text));
         ui.label(egui::RichText::new(tl!("Recover unsaved documents?")).font(theme::semibold(18.0)));
     });
     ui.add_space(6.0);

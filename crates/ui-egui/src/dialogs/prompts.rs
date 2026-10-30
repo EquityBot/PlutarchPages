@@ -91,7 +91,7 @@ pub(super) fn save_prompt(app: &mut PdfCraftApp, ctx: &egui::Context) {
     let modal = widgets::show_modal(ctx, "save_prompt", |ui| {
         ui.set_width(420.0);
         ui.horizontal(|ui| {
-            ui.add(crate::icons::image("save", 22.0, t.accent));
+            ui.add(crate::icons::image("save", 22.0, t.accent_text));
             let title = ui.add(
                 egui::Label::new(
                     egui::RichText::new(crate::i18n::fmt(tl!("Save changes to “{name}” before closing?"), &[("name", &shown)]))
@@ -153,7 +153,7 @@ pub(super) fn link_prompt(app: &mut PdfCraftApp, ctx: &egui::Context) {
     let modal = widgets::show_modal(ctx, "link_prompt", |ui| {
         ui.set_width(460.0);
         ui.horizontal(|ui| {
-            ui.add(crate::icons::image("external-link", 22.0, t.accent));
+            ui.add(crate::icons::image("external-link", 22.0, t.accent_text));
             ui.label(egui::RichText::new(title).font(theme::semibold(16.0)));
         });
         ui.add_space(6.0);
@@ -220,7 +220,7 @@ pub(super) fn full_screen_prompt(app: &mut PdfCraftApp, ctx: &egui::Context) {
     let modal = widgets::show_modal(ctx, "full_screen_prompt", |ui| {
         ui.set_width(460.0);
         ui.horizontal(|ui| {
-            ui.add(crate::icons::image("maximize", 22.0, t.accent));
+            ui.add(crate::icons::image("maximize", 22.0, t.accent_text));
             ui.label(egui::RichText::new(tl!("Open in Full Screen mode?")).font(theme::semibold(16.0)));
         });
         ui.add_space(6.0);
@@ -310,7 +310,7 @@ fn password_modal(
     let modal = widgets::show_modal(ctx, id, |ui| {
         ui.set_width(400.0);
         ui.horizontal(|ui| {
-            ui.add(crate::icons::image("lock", 22.0, t.accent));
+            ui.add(crate::icons::image("lock", 22.0, t.accent_text));
             ui.label(egui::RichText::new(title).font(theme::semibold(17.0)));
         });
         ui.add_space(6.0);

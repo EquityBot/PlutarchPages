@@ -204,7 +204,7 @@ fn gap_button(ui: &mut egui::Ui, gap: usize, at: Pos2, height: f32, label: Strin
     resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, label.clone()));
     let hot = resp.hovered();
     if hot {
-        ui.painter().line_segment([pos2(at.x, at.y - height / 2.0), pos2(at.x, at.y + height / 2.0)], Stroke::new(3.0, t.accent));
+        ui.painter().line_segment([pos2(at.x, at.y - height / 2.0), pos2(at.x, at.y + height / 2.0)], Stroke::new(3.0, t.accent_text));
     }
     ui.painter().circle(at, 9.0, if hot { t.accent } else { t.chrome }, Stroke::new(1.0, if hot { t.accent } else { t.border }));
     let ink = Stroke::new(1.5, if hot { crate::theme::IVORY } else { t.text_muted });
@@ -327,7 +327,7 @@ pub(super) fn organize_grid(view: &mut DocView, info: &DocInfo, editable: bool, 
                     ui.painter().rect_filled(c.shrink(6.0), CornerRadius::same(8), if selected { t.accent_soft } else { t.hover });
                 }
                 if view.selected.contains(&i) {
-                    ui.painter().rect_stroke(c.shrink(6.0), CornerRadius::same(8), Stroke::new(1.5, t.accent), egui::StrokeKind::Inside);
+                    ui.painter().rect_stroke(c.shrink(6.0), CornerRadius::same(8), Stroke::new(1.5, t.accent_text), egui::StrokeKind::Inside);
                 }
                 ui.painter().rect_filled(pr.translate(vec2(0.0, 1.5)), CornerRadius::same(1), t.page_shadow);
                 ui.painter().rect_filled(pr, CornerRadius::ZERO, Color32::WHITE);
@@ -465,12 +465,12 @@ pub(super) fn organize_grid(view: &mut DocView, info: &DocInfo, editable: bool, 
                     None => cells.last().map_or(0.0, |(_, r)| r.right() - 3.0),
                 };
                 let row = cells.iter().find(|(i, _)| *i == gap).or(cells.last()).map(|(_, r)| r.y_range()).unwrap_or(egui::Rangef::new(0.0, 0.0));
-                ui.painter().line_segment([pos2(x, row.min + 10.0), pos2(x, row.max - 10.0)], Stroke::new(3.0, t.accent));
+                ui.painter().line_segment([pos2(x, row.min + 10.0), pos2(x, row.max - 10.0)], Stroke::new(3.0, t.accent_text));
                 let mut text_at = p + vec2(14.0, 14.0);
                 if copying {
                     // A "+" by the pointer: this drop copies the pages, it doesn't move them.
                     let badge = p + vec2(12.0, 12.0);
-                    ui.painter().circle(badge, 9.0, t.accent, Stroke::new(1.0, t.accent));
+                    ui.painter().circle(badge, 9.0, t.accent, Stroke::new(1.0, t.accent_text));
                     let ink = Stroke::new(1.5, crate::theme::IVORY);
                     ui.painter().line_segment([badge - vec2(4.0, 0.0), badge + vec2(4.0, 0.0)], ink);
                     ui.painter().line_segment([badge - vec2(0.0, 4.0), badge + vec2(0.0, 4.0)], ink);
@@ -513,11 +513,11 @@ pub(super) fn organize_grid(view: &mut DocView, info: &DocInfo, editable: bool, 
     view.grid_gap = pointer.filter(|_| editable && view.org_drag.is_none()).and_then(|p| drop_gap(&cells, p));
     if editable && ui.input(|i| !i.raw.hovered_files.is_empty()) {
         let painter = ui.painter().with_clip_rect(viewport);
-        painter.rect_stroke(viewport.shrink(2.0), CornerRadius::same(6), Stroke::new(2.0, t.accent), egui::StrokeKind::Inside);
+        painter.rect_stroke(viewport.shrink(2.0), CornerRadius::same(6), Stroke::new(2.0, t.accent_text), egui::StrokeKind::Inside);
         if let Some(gap) = view.grid_gap {
             let at = cells.iter().find(|(i, _)| *i == gap).map(|(_, r)| (r.left() + 3.0, r.y_range()));
             if let Some((x, row)) = at.or(cells.last().map(|(_, r)| (r.right() - 3.0, r.y_range()))) {
-                painter.line_segment([pos2(x, row.min + 10.0), pos2(x, row.max - 10.0)], Stroke::new(3.0, t.accent));
+                painter.line_segment([pos2(x, row.min + 10.0), pos2(x, row.max - 10.0)], Stroke::new(3.0, t.accent_text));
             }
         }
         // A "+" that follows the pointer.

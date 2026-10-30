@@ -227,7 +227,7 @@ fn tool_detail(app: &mut PdfCraftApp, ui: &mut egui::Ui, t: &Tokens, g: &'static
                     if ready { hue(g, t) } else { t.text_faint },
                 );
                 let (chip, fill, cfg) = match item.availability {
-                    Availability::Ready => (tl!("Ready"), theme::RHODESIAN_GREEN, theme::IVORY),
+                    Availability::Ready => (tl!("Ready"), t.accent_soft, t.accent_text),
                     Availability::Planned(m) => (m, t.pressed, t.text_muted),
                     Availability::Provider => ("AI", t.pressed, t.text_muted),
                 };

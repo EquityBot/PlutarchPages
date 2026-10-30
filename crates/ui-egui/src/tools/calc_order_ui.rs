@@ -654,7 +654,7 @@ pub(crate) fn panel(app: &mut PdfCraftApp, ui: &mut egui::Ui, t: &Tokens) {
                     && from != k
                 {
                     let y = if from > k { rect.top() } else { rect.bottom() };
-                    ui.painter().hline(rect.x_range(), y, Stroke::new(2.0, t.accent));
+                    ui.painter().hline(rect.x_range(), y, Stroke::new(2.0, t.accent_text));
                 }
                 if let Some(from) = resp.dnd_release_payload::<Dragged>().map(|d| d.0)
                     && let Some(a) = moved(from, k)

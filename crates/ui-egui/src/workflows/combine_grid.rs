@@ -336,7 +336,7 @@ pub(crate) fn grid(
             let nearest = cells.iter().min_by(|(_, a), (_, b)| a.distance_sq_to_pos(p).total_cmp(&b.distance_sq_to_pos(p)));
             if let Some((_, r)) = nearest {
                 let x = if p.x < r.center().x { r.left() + 2.0 } else { r.right() - 2.0 };
-                ui.painter().line_segment([pos2(x, r.top() + 10.0), pos2(x, r.bottom() - 30.0)], Stroke::new(3.0, t.accent));
+                ui.painter().line_segment([pos2(x, r.top() + 10.0), pos2(x, r.bottom() - 30.0)], Stroke::new(3.0, t.accent_text));
             }
             let moving = if picked_pages.contains(&page) { picked_pages.len() } else { 1 };
             let label = if moving == 1 { tl!("1 page").to_string() } else { crate::i18n::fmt(tl!("{n} pages"), &[("n", &moving.to_string())]) };
@@ -368,7 +368,7 @@ pub(crate) fn grid(
                 });
                 if let Some((x, at)) = nearest {
                     let r = cell_rect(at);
-                    ui.painter().line_segment([pos2(x, r.top() + 10.0), pos2(x, r.bottom() - 30.0)], Stroke::new(3.0, t.accent));
+                    ui.painter().line_segment([pos2(x, r.top() + 10.0), pos2(x, r.bottom() - 30.0)], Stroke::new(3.0, t.accent_text));
                 }
             }
             let moving = files
