@@ -9,8 +9,8 @@
 
 <div align="center">
 
-[![tests](https://img.shields.io/github/actions/workflow/status/EquityBot/PlutarchPages/ci.yml?branch=main&label=tests&labelColor=000000&style=flat)](https://github.com/EquityBot/PlutarchPages/actions/workflows/ci.yml) [![CodeQL](https://img.shields.io/github/actions/workflow/status/EquityBot/PlutarchPages/codeql.yml?branch=main&label=CodeQL&labelColor=000000&style=flat)](https://github.com/EquityBot/PlutarchPages/actions/workflows/codeql.yml)<br>
-[![rust: 1.90+](https://img.shields.io/badge/rust-1.90%2B-66023C?labelColor=000000&style=flat&color=66023C)](https://www.rust-lang.org/) [![licence: MIT OR Apache-2.0](https://img.shields.io/badge/licence-MIT%20OR%20Apache--2.0-66023C?labelColor=000000&style=flat&color=66023C)](#license-and-credits) [![fork of: PdfCraft](https://img.shields.io/badge/fork%20of-PdfCraft-66023C?labelColor=000000&style=flat&color=66023C)](https://github.com/storytold/pdfcraft)
+[![tests](https://github.com/EquityBot/PlutarchPages/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/EquityBot/PlutarchPages/actions/workflows/ci.yml) [![CodeQL](https://github.com/EquityBot/PlutarchPages/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/EquityBot/PlutarchPages/actions/workflows/codeql.yml)<br>
+[![rust: 1.90+](.github/assets/badges/rust.svg)](https://www.rust-lang.org/) [![licence: MIT OR Apache-2.0](.github/assets/badges/licence.svg)](#license-and-credits) [![fork of: PdfCraft](.github/assets/badges/fork-of.svg)](https://github.com/storytold/pdfcraft)
 
 </div>
 
