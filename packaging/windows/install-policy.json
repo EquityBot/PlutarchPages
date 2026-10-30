@@ -80,25 +80,25 @@
     ],
     [
       "-1",
-      "Software\\PdfCraft\\Capabilities",
+      "Software\\PlutarchPages\\Capabilities",
       "ApplicationName",
       "PlutarchPages"
     ],
     [
       "-1",
-      "Software\\PdfCraft\\Capabilities",
+      "Software\\PlutarchPages\\Capabilities",
       "ApplicationDescription",
       "Open-source PDF workbench"
     ],
     [
       "-1",
-      "Software\\PdfCraft\\Capabilities",
+      "Software\\PlutarchPages\\Capabilities",
       "ApplicationIcon",
       "[#PdfcraftExe],0"
     ],
     [
       "-1",
-      "Software\\PdfCraft\\Capabilities\\FileAssociations",
+      "Software\\PlutarchPages\\Capabilities\\FileAssociations",
       ".pdf",
       "PdfCraft.Document"
     ],
@@ -106,17 +106,17 @@
       "-1",
       "Software\\RegisteredApplications",
       "PdfCraft",
-      "Software\\PdfCraft\\Capabilities"
+      "Software\\PlutarchPages\\Capabilities"
     ],
     [
       "-1",
-      "Software\\PdfCraft\\Shortcuts",
+      "Software\\PlutarchPages\\Shortcuts",
       "StartMenu",
       "#1"
     ],
     [
       "-1",
-      "Software\\PdfCraft\\Shortcuts",
+      "Software\\PlutarchPages\\Shortcuts",
       "Desktop",
       "#1"
     ],
