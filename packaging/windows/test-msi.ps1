@@ -44,7 +44,7 @@ function Assert-NoRow([string] $Sql, [string] $What) {
 if ($LASTEXITCODE -ne 0) { throw 'Dual-scope installer contract failed.' }
 $Installer.UILevel = 2
 $manufacturer = Read-Row 'SELECT `Value` FROM `Property` WHERE `Property` = ''Manufacturer''' 1
-Assert-Equal $manufacturer[0] 'Learning Machines LLC' 'MSI manufacturer'
+Assert-Equal $manufacturer[0] 'PlutarchPages contributors' 'MSI manufacturer'
 
 # Embedded craft-fonts must ship their OFL notices; a build without them must not claim any.
 # Check the compiled File table, not only the WiX source, so a staging or component-group mistake
