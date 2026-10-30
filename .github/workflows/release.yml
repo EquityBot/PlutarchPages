@@ -230,7 +230,7 @@ jobs:
 
   draft:
     name: Draft GitHub release
-    if: github.ref == 'refs/heads/release'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/release'
     needs: [version, windows, linux, macos]
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -252,6 +252,12 @@ jobs:
         run: |
           sha256sum -- * | tee SHA256SUMS.txt
           tag="v$VERSION"
+          # GitHub keeps an existing tag's commit and ignores --target, so the release would point
+          # at other source than these packages were built from.
+          if tagged="$(gh api "repos/$GH_REPO/commits/refs/tags/$tag" --jq .sha 2>/dev/null)" && [ "$tagged" != "$GITHUB_SHA" ]; then
+            echo "::error::Tag $tag is at $tagged, not this commit. Bump the version before pushing to release."
+            exit 1
+          fi
           if draft="$(gh release view "$tag" --json isDraft --jq .isDraft 2>/dev/null)"; then
             if [ "$draft" != "true" ]; then
               echo "::error::$tag is already published. Bump the version before pushing to release."

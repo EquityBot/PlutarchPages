@@ -35,7 +35,7 @@ Upstream's tests for these were changed to assert the fork's behaviour. Keep the
   Arch, FreeBSD, riscv64 and web packages aren't built yet.
 - Windows registration: `PlutarchPages.*` names and its own context-menu component GUIDs, so it doesn't
   share registry state with an upstream install. `pdfcraft.exe` stays, so `App Paths\pdfcraft.exe` and
-  `Applications\pdfcraft.exe` are still shared if both are installed.
+  `Applications\pdfcraft.exe` are still shared: installing it alongside upstream isn't supported.
 
 ## Merging upstream
 
