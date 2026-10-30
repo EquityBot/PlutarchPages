@@ -24,6 +24,11 @@ pub struct ToolItem {
     pub icon: &'static str,
     pub command: &'static str,
     pub availability: Availability,
+    /// Further commands of the same tool, shown as a drop-down beside the entry: Acrobat's
+    /// Watermark control offers Add, Update and Remove. The first is `command` itself. A UI
+    /// enables each one by its own command's needs, so Update and Remove stay greyed out until
+    /// the document has that kind of mark. Empty for a plain entry.
+    pub actions: &'static [&'static str],
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -45,25 +50,32 @@ pub struct ToolGroup {
 }
 
 const fn item(label: &'static str, icon: &'static str, command: &'static str, availability: Availability) -> ToolItem {
-    ToolItem { label, icon, command, availability }
+    ToolItem { label, icon, command, availability, actions: &[] }
+}
+
+/// An entry that opens a menu of `actions` (the first one is its `command`).
+const fn menu_item(label: &'static str, icon: &'static str, actions: &'static [&'static str]) -> ToolItem {
+    let command = match actions {
+        [first, ..] => *first,
+        [] => "",
+    };
+    ToolItem { label, icon, command, availability: Ready, actions }
 }
 
 use Availability::{Planned, Provider, Ready};
 
-const RED: [u8; 3] = [0xE0, 0x3E, 0x3E];
-const PURPLE: [u8; 3] = [0x8E, 0x4E, 0xE6];
-const BLUE: [u8; 3] = [0x3A, 0x6F, 0xE8];
-const GREEN: [u8; 3] = [0x2D, 0x9D, 0x5B];
-const ORANGE: [u8; 3] = [0xE8, 0x8A, 0x1A];
-const TEAL: [u8; 3] = [0x14, 0x9C, 0xA8];
-const PINK: [u8; 3] = [0xD6, 0x3B, 0x8F];
+const RED: [u8; 3] = [0xE7, 0x16, 0x2F];
+const CRIMSON: [u8; 3] = [0x99, 0x00, 0x24];
+const TYRIAN_PURPLE: [u8; 3] = [0x66, 0x02, 0x3C];
+const LAVENDER: [u8; 3] = [0x74, 0x5E, 0xB1];
+const DARK_GOLD: [u8; 3] = [0x9B, 0x77, 0x35];
 
 pub static TOOL_GROUPS: &[ToolGroup] = &[
     ToolGroup {
         id: "export",
         label: "Export a PDF",
         icon: "file-output",
-        hue: BLUE,
+        hue: LAVENDER,
         badge: None,
         availability: Ready,
         sections: &[ToolSection {
@@ -71,7 +83,7 @@ pub static TOOL_GROUPS: &[ToolGroup] = &[
             items: &[
                 item("Microsoft Word (.docx)", "file-text", "export.docx", Ready),
                 item("Spreadsheet (.xlsx)", "grid-3x3", "export.xlsx", Planned("M10")),
-                item("Presentation (.pptx)", "presentation", "export.pptx", Planned("M10")),
+                item("Presentation (.pptx)", "presentation", "export.pptx", Ready),
                 item("Image (PNG)", "image", "export.image", Ready),
                 item("Export all images", "image", "export.all_images", Ready),
                 item("HTML web page", "file-symlink", "export.html", Ready),
@@ -85,7 +97,7 @@ pub static TOOL_GROUPS: &[ToolGroup] = &[
         id: "fill_sign",
         label: "Fill & Sign",
         icon: "pen-line",
-        hue: PURPLE,
+        hue: TYRIAN_PURPLE,
         badge: None,
         availability: Ready,
         sections: &[ToolSection {
@@ -108,13 +120,14 @@ pub static TOOL_GROUPS: &[ToolGroup] = &[
         id: "edit",
         label: "Edit a PDF",
         icon: "file-pen-line",
-        hue: PINK,
+        hue: CRIMSON,
         badge: None,
         availability: Planned("M7"),
         sections: &[
             ToolSection {
                 title: "Modify page",
                 items: &[
+                    item("Edit text & images", "text-cursor-input", "edit.edit_text", Ready),
                     item("Rotate pages", "rotate-cw", "page.rotate", Ready),
                     item("Insert pages", "file-plus-2", "page.insert", Ready),
                     item("Delete pages", "trash-2", "page.delete", Ready),
@@ -125,15 +138,14 @@ pub static TOOL_GROUPS: &[ToolGroup] = &[
             ToolSection {
                 title: "Add content",
                 items: &[
-                    item("Edit text & images", "text-cursor-input", "edit.edit_text", Ready),
                     item("Text", "type", "edit.text", Ready),
                     item("Image", "image-plus", "edit.image", Ready),
-                    item("Header and footer", "heading", "edit.header_footer", Ready),
-                    item("Watermark", "stamp", "edit.watermark", Ready),
+                    menu_item("Header and footer", "heading", &["edit.header_footer", "edit.header_footer.update", "edit.header_footer.remove"]),
+                    menu_item("Watermark", "stamp", &["edit.watermark", "edit.watermark.update", "edit.watermark.remove"]),
                     item("Link", "link-2", "edit.link", Ready),
                     item("Bates numbering", "hash", "edit.bates", Ready),
-                    item("Background", "palette", "edit.background", Ready),
-                    item("Attach file", "paperclip", "edit.attach", Planned("M12")),
+                    menu_item("Background", "palette", &["edit.background", "edit.background.update", "edit.background.remove"]),
+                    item("Attach file", "paperclip", "edit.attach", Ready),
                 ],
             },
         ],
@@ -150,6 +162,7 @@ pub static TOOL_GROUPS: &[ToolGroup] = &[
             items: &[
                 item("Single file", "file-input", "create.file", Ready),
                 item("Multiple files", "files", "create.multiple", Ready),
+                item("Separate PDFs", "files", "create.multiple_separate", Ready),
                 item("Images", "image", "create.images", Ready),
                 item("Clipboard", "copy-plus", "create.clipboard", Ready),
                 item("Web page", "globe", "create.web_page", Ready),
@@ -161,7 +174,7 @@ pub static TOOL_GROUPS: &[ToolGroup] = &[
         id: "combine",
         label: "Combine files",
         icon: "files",
-        hue: BLUE,
+        hue: LAVENDER,
         badge: None,
         availability: Ready,
         sections: &[ToolSection { title: "Combine", items: &[item("Add files to combine", "files", "page.combine", Ready)] }],
@@ -170,7 +183,7 @@ pub static TOOL_GROUPS: &[ToolGroup] = &[
         id: "organize",
         label: "Organize pages",
         icon: "layout-grid",
-        hue: GREEN,
+        hue: DARK_GOLD,
         badge: None,
         availability: Ready,
         sections: &[
@@ -192,6 +205,7 @@ pub static TOOL_GROUPS: &[ToolGroup] = &[
                     item("Set page boxes", "square-dashed-mouse-pointer", "page.boxes", Ready),
                     item("Crop pages", "crop", "page.crop", Ready),
                     item("Duplicate pages", "copy-plus", "page.duplicate", Ready),
+                    item("Reverse pages", "arrow-up-down", "page.reverse", Ready),
                     item("Page labels", "tag", "page.number", Ready),
                     item("Page transitions", "presentation", "page.transitions", Planned("M4")),
                 ],
@@ -202,7 +216,7 @@ pub static TOOL_GROUPS: &[ToolGroup] = &[
         id: "comment",
         label: "Add comments",
         icon: "message-square-text",
-        hue: ORANGE,
+        hue: DARK_GOLD,
         badge: None,
         availability: Ready,
         sections: &[
@@ -242,7 +256,7 @@ pub static TOOL_GROUPS: &[ToolGroup] = &[
         id: "scan",
         label: "Scan & OCR",
         icon: "scan-text",
-        hue: GREEN,
+        hue: DARK_GOLD,
         badge: None,
         availability: Ready,
         sections: &[ToolSection {
@@ -251,6 +265,7 @@ pub static TOOL_GROUPS: &[ToolGroup] = &[
                 item("In this file", "scan-text", "ocr.recognize", Ready),
                 item("In multiple files", "files", "ocr.recognize_batch", Ready),
                 item("Enhance scanned file", "sparkles", "ocr.enhance", Planned("M10")),
+                item("Enhance camera image", "camera", "ocr.enhance_camera", Ready),
                 item("Correct recognized text", "text-select", "ocr.correct", Planned("M10")),
             ],
         }],
@@ -259,7 +274,7 @@ pub static TOOL_GROUPS: &[ToolGroup] = &[
         id: "protect",
         label: "Protect a PDF",
         icon: "shield-check",
-        hue: BLUE,
+        hue: LAVENDER,
         badge: None,
         availability: Planned("M8"),
         sections: &[
@@ -318,7 +333,7 @@ pub static TOOL_GROUPS: &[ToolGroup] = &[
         id: "form",
         label: "Prepare a form",
         icon: "text-cursor-input",
-        hue: PURPLE,
+        hue: TYRIAN_PURPLE,
         badge: None,
         availability: Ready,
         sections: &[
@@ -331,6 +346,7 @@ pub static TOOL_GROUPS: &[ToolGroup] = &[
                     item("Field properties", "settings-2", "form.field.properties", Ready),
                     item("Tab order by rows", "rows-3", "form.tab_order.row", Ready),
                     item("Tab order by columns", "columns-3", "form.tab_order.column", Ready),
+                    item("Calculation order", "list-ordered", "form.calculation_order", Ready),
                     item("Flatten form fields", "layers", "form.flatten", Ready),
                     item("Import data", "file-input", "form.import_data", Ready),
                     item("Export data", "file-output", "form.export_data", Ready),
@@ -340,6 +356,7 @@ pub static TOOL_GROUPS: &[ToolGroup] = &[
                 title: "Add form components",
                 items: &[
                     item("Text field", "text-cursor-input", "form.add.text", Ready),
+                    item("Text field table", "grid-3x3", "form.add.text_table", Ready),
                     item("Checkbox", "check-circle-2", "form.add.checkbox", Ready),
                     item("Radio button", "circle", "form.add.radio", Ready),
                     item("Drop-down list", "chevron-down", "form.add.combo", Ready),
@@ -356,7 +373,7 @@ pub static TOOL_GROUPS: &[ToolGroup] = &[
         id: "stamp",
         label: "Add a stamp",
         icon: "stamp",
-        hue: PURPLE,
+        hue: TYRIAN_PURPLE,
         badge: None,
         availability: Ready,
         sections: &[ToolSection { title: "Stamps", items: &[item("Stamp palette", "stamp", "comment.stamp", Ready)] }],
@@ -365,7 +382,7 @@ pub static TOOL_GROUPS: &[ToolGroup] = &[
         id: "certificate",
         label: "Use a certificate",
         icon: "badge-check",
-        hue: TEAL,
+        hue: LAVENDER,
         badge: None,
         availability: Ready,
         sections: &[ToolSection {
@@ -383,7 +400,7 @@ pub static TOOL_GROUPS: &[ToolGroup] = &[
         id: "print_production",
         label: "Use print production",
         icon: "printer",
-        hue: PURPLE,
+        hue: TYRIAN_PURPLE,
         badge: None,
         availability: Planned("M11"),
         sections: &[ToolSection {
@@ -402,7 +419,7 @@ pub static TOOL_GROUPS: &[ToolGroup] = &[
         id: "measure",
         label: "Measure objects",
         icon: "ruler",
-        hue: PINK,
+        hue: CRIMSON,
         badge: None,
         availability: Ready,
         sections: &[ToolSection {
@@ -423,7 +440,7 @@ pub static TOOL_GROUPS: &[ToolGroup] = &[
         id: "compare",
         label: "Compare files",
         icon: "git-compare",
-        hue: PINK,
+        hue: CRIMSON,
         badge: None,
         availability: Ready,
         sections: &[ToolSection { title: "Compare", items: &[item("Select files to compare", "git-compare", "doc.compare", Ready)] }],
@@ -432,7 +449,7 @@ pub static TOOL_GROUPS: &[ToolGroup] = &[
         id: "actions",
         label: "Use guided actions",
         icon: "list-checks",
-        hue: PURPLE,
+        hue: TYRIAN_PURPLE,
         badge: None,
         availability: Ready,
         sections: &[ToolSection {
@@ -450,17 +467,20 @@ pub static TOOL_GROUPS: &[ToolGroup] = &[
         id: "accessibility",
         label: "Prepare for accessibility",
         icon: "accessibility",
-        hue: PURPLE,
+        hue: TYRIAN_PURPLE,
         badge: None,
         availability: Ready,
         sections: &[ToolSection {
             title: "Accessibility",
             items: &[
-                item("Automatically tag PDF", "tag", "a11y.autotag", Planned("M12")),
+                item("Automatically tag PDF", "tag", "a11y.autotag", Ready),
+                item("Tag form fields", "tag", "a11y.autotag_fields", Ready),
                 item("Change reading options", "book-open", "a11y.reading_options", Ready),
                 item("Check for accessibility", "accessibility", "a11y.check", Ready),
+                item("Find untagged content", "search", "a11y.find_untagged", Ready),
                 item("Open accessibility report", "file-text", "a11y.report", Ready),
                 item("Add alternate text", "image", "a11y.alt_text", Ready),
+                item("Tags panel", "tag", "a11y.tags", Ready),
                 item("Fix reading order", "list-ordered", "a11y.reading_order", Planned("M12")),
             ],
         }],
@@ -486,7 +506,7 @@ pub static TOOL_GROUPS: &[ToolGroup] = &[
         id: "search_index",
         label: "Add search index",
         icon: "file-search",
-        hue: GREEN,
+        hue: DARK_GOLD,
         badge: None,
         availability: Planned("M12"),
         sections: &[ToolSection { title: "Index", items: &[item("Manage embedded index", "file-search", "search.index", Planned("M12"))] }],
@@ -495,7 +515,7 @@ pub static TOOL_GROUPS: &[ToolGroup] = &[
         id: "javascript",
         label: "Use JavaScript",
         icon: "braces",
-        hue: BLUE,
+        hue: LAVENDER,
         badge: None,
         availability: Planned("M6"),
         sections: &[ToolSection {
@@ -511,7 +531,7 @@ pub static TOOL_GROUPS: &[ToolGroup] = &[
         id: "ai",
         label: "AI assistant",
         icon: "sparkles",
-        hue: PINK,
+        hue: CRIMSON,
         badge: Some("Optional"),
         availability: Provider,
         sections: &[ToolSection {
@@ -529,6 +549,23 @@ pub fn group(id: &str) -> Option<&'static ToolGroup> {
     TOOL_GROUPS.iter().find(|g| g.id == id)
 }
 
+/// A heading of the expanded All tools view, as Acrobat files its tools under "Create & Edit",
+/// "Forms & Signatures" and so on. Every group belongs to exactly one category.
+#[derive(Clone, Copy, Debug)]
+pub struct ToolCategory {
+    pub label: &'static str,
+    /// [`ToolGroup::id`]s, in display order.
+    pub groups: &'static [&'static str],
+}
+
+pub static TOOL_CATEGORIES: &[ToolCategory] = &[
+    ToolCategory { label: "Create & Edit", groups: &["create", "edit", "export", "combine", "organize", "scan", "compress"] },
+    ToolCategory { label: "Review & Compare", groups: &["comment", "stamp", "compare", "measure"] },
+    ToolCategory { label: "Forms & Signatures", groups: &["fill_sign", "form", "certificate"] },
+    ToolCategory { label: "Protect & Standardize", groups: &["protect", "redact", "accessibility", "standards", "print_production"] },
+    ToolCategory { label: "Customize & Automate", groups: &["actions", "javascript", "search_index", "ai"] },
+];
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -544,6 +581,18 @@ mod tests {
     }
 
     #[test]
+    fn every_group_is_in_exactly_one_category() {
+        let mut seen = HashSet::new();
+        for c in TOOL_CATEGORIES {
+            for id in c.groups {
+                assert!(group(id).is_some(), "{} lists unknown group {id}", c.label);
+                assert!(seen.insert(*id), "{id} is in two categories");
+            }
+        }
+        assert_eq!(seen.len(), TOOL_GROUPS.len(), "a group is in no category");
+    }
+
+    #[test]
     fn commands_are_namespaced() {
         for g in TOOL_GROUPS {
             for s in g.sections {
@@ -551,6 +600,53 @@ mod tests {
                     assert!(i.command.contains('.'), "{} lacks a namespace", i.command);
                 }
             }
+        }
+    }
+
+    #[test]
+    fn menu_entries_list_registered_commands_starting_with_their_own() {
+        let mut menus = 0;
+        for g in TOOL_GROUPS {
+            for s in g.sections {
+                for i in s.items {
+                    if i.actions.is_empty() {
+                        continue;
+                    }
+                    menus += 1;
+                    assert_eq!(i.actions[0], i.command, "{}: the first action is the entry's command", i.label);
+                    for id in i.actions {
+                        assert!(crate::commands::command(id).is_some(), "{id} is not a registered command");
+                    }
+                }
+            }
+        }
+        // Watermark, Header and footer, Background: Add / Update / Remove each (Acrobat's menu).
+        assert!(menus >= 3);
+    }
+
+    // Regression test for #2028: Edit text & images sat under "Add content", though it changes
+    // what is already on the page; it belongs first under "Modify page".
+    #[test]
+    fn edit_text_and_images_is_the_first_item_under_modify_page() {
+        let edit = group("edit").expect("the Edit a PDF tool");
+        let section_of = |command: &str| edit.sections.iter().find(|s| s.items.iter().any(|i| i.command == command)).map(|s| s.title);
+        assert_eq!(section_of("edit.edit_text"), Some("Modify page"), "Edit text & images is a Modify page tool");
+        let modify = edit.sections.iter().find(|s| s.title == "Modify page").expect("a Modify page section");
+        assert_eq!(modify.items.first().map(|i| i.command), Some("edit.edit_text"), "and the first one, so it is not below the fold");
+        let add = edit.sections.iter().find(|s| s.title == "Add content").expect("an Add content section");
+        assert!(add.items.iter().all(|i| i.command != "edit.edit_text"), "it adds nothing, so it is not listed under Add content");
+    }
+
+    #[test]
+    fn every_update_and_remove_command_is_reachable_from_a_tool_entry() {
+        let reachable: HashSet<&str> =
+            TOOL_GROUPS.iter().flat_map(|g| g.sections.iter().flat_map(|s| s.items.iter())).flat_map(|i| i.actions.iter().copied()).collect();
+        for id in crate::commands::COMMANDS
+            .iter()
+            .map(|c| c.id)
+            .filter(|id| id.starts_with("edit.") && (id.ends_with(".update") || id.ends_with(".remove")))
+        {
+            assert!(reachable.contains(id), "{id} is in no tool menu");
         }
     }
 }

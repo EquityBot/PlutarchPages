@@ -57,7 +57,7 @@ pub struct ExternalConverters {
 fn off(name: &str, what: &str) -> EditError {
     EditError::Source(format!(
         "{name}: {what} can't be converted while External converters are off. They use programs installed on this computer \
-         (LibreOffice, or Chrome or Edge); turn them on in Preferences ▸ External converters, or set {ENABLE_VAR}=1 for the command line"
+         (LibreOffice, or Chrome or Edge); turn them on in Preferences > External converters, or set {ENABLE_VAR}=1 for the command line"
     ))
 }
 
@@ -192,9 +192,10 @@ impl Session {
         }
         let config = RenderConfig { password: doc.password.as_deref().map(Arc::from), ..Default::default() };
         let bytes = doc.bytes.clone();
-        let out =
-            guard(move || PageRenderer::new(bytes, config).render(RenderRequest { page, kind: RequestKind::Text, tile: None, scale: 1.0, tag: 0 }))
-                .map_err(|_| EditError::Source(format!("page {}: the text could not be read", page + 1)))?;
+        let out = guard(move || {
+            PageRenderer::new(bytes, config).render(RenderRequest { page, kind: RequestKind::Text, preview: false, tile: None, scale: 1.0, tag: 0 })
+        })
+        .map_err(|_| EditError::Source(format!("page {}: the text could not be read", page + 1)))?;
         match out.error {
             Some(e) => Err(EditError::Source(format!("page {}: {e}", page + 1))),
             None => Ok(out.text.map(|t| t.plain_text()).unwrap_or_default()),
@@ -238,7 +239,7 @@ mod tests {
         let bytes = Arc::new(pdfcraft_cos::write_full(&doc, &Default::default()).unwrap());
         let mut s = Session::new();
         let id = s.open("locked.pdf", None, bytes, None).unwrap();
-        assert!(!s.get(id).unwrap().allows_copy());
+        assert!(!s.get(id).unwrap().allows_copying());
         assert_eq!(s.speech_text(id, 0).unwrap().trim(), "Page 1", "assistive reading is allowed");
         assert!(s.speech_text(id, 5).is_err());
     }

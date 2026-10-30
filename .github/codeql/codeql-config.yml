@@ -1,0 +1,12 @@
+# Tests hold known passwords and crypto vectors on purpose. Vendored crates are patched copies of
+# third-party code, whose PDF encryption code flags the formats' own constants. Excluding them keeps
+# real findings in the app's code visible, but CodeQL no longer looks for bugs in these folders.
+paths-ignore:
+  - "vendor/**"
+  - "xtask/**"
+  - "**/tests/**"
+  - "**/tests.rs"
+  - "**/*_tests.rs"
+  - "**/benches/**"
+  - "**/examples/**"
+  - "**/fuzz/**"

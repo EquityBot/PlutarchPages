@@ -219,7 +219,7 @@ fn convert_image(doc: &Document, s: &Stream) -> Option<Stream> {
     if w == 0 || h == 0 || w.saturating_mul(h) > MAX_PIXELS {
         return None;
     }
-    let px = pixels(s, 3)?;
+    let px = pixels(doc, s, 3)?;
     let gray: Vec<u8> = px
         .as_chunks::<3>()
         .0

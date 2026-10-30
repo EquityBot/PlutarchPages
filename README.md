@@ -10,12 +10,12 @@
 <div align="center">
 
 [![tests](https://github.com/EquityBot/PlutarchPages/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/EquityBot/PlutarchPages/actions/workflows/ci.yml) [![CodeQL](https://github.com/EquityBot/PlutarchPages/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/EquityBot/PlutarchPages/actions/workflows/codeql.yml)<br>
-[![rust: 1.90+](.github/assets/badges/rust.svg)](https://www.rust-lang.org/) [![licence: MIT OR Apache-2.0](.github/assets/badges/licence.svg)](#license-and-credits) [![fork of: PdfCraft](.github/assets/badges/fork-of.svg)](https://github.com/storytold/pdfcraft)
+[![rust: 1.95+](.github/assets/badges/rust.svg)](https://www.rust-lang.org/) [![licence: MIT OR Apache-2.0](.github/assets/badges/licence.svg)](#license-and-credits) [![fork of: PdfCraft](.github/assets/badges/fork-of.svg)](https://github.com/storytold/pdfcraft)
 
 </div>
 
 <p align="center">
-  <b>The PDF workbench; an open-source, clean-room reimplementation of Adobe Acrobat, rebuilt in pure Rust.</b><br>
+  <b>The PDF workbench; an open-source, modern PDF reader and editor, built in pure Rust.</b><br>
   Read, organize, combine, split and secure PDFs in a fast, native app, written in Rust from the ground up.<br>
   macOS · Windows · Linux · FreeBSD · the web
 </p>
@@ -30,9 +30,9 @@
 <br>
 
 <p align="center">
-  <img src="docs/images/pdfcraft-viewer.png" alt="PdfCraft with the PdfCraft Showcase cover page open, the All tools panel on the left and 20 threaded comments on the right" width="100%">
+  <img src="docs/images/pdfcraft-viewer.png" alt="PlutarchPages with the PlutarchPages Showcase cover page open, the All tools panel on the left and 20 threaded comments on the right" width="100%">
   <br>
-  <sub>The PdfCraft Showcase, a 13-page specimen PDF, open with the All tools panel and threaded comments.</sub>
+  <sub>The PlutarchPages Showcase, a 13-page specimen PDF, open with the All tools panel and threaded comments.</sub>
 </p>
 
 <p align="center">
@@ -48,8 +48,7 @@
   <a href="#how-its-built">How it's built</a> ·
   <a href="#get-started">Get started</a> ·
   <a href="#whats-next">What's next</a> ·
-  <a href="#downloads">Downloads</a> ·
-  <a href="#the-crafting-apps">Crafting Apps</a>
+  <a href="#downloads">Downloads</a>
 </p>
 
 ---
@@ -101,7 +100,7 @@ PdfCraft renders PDFs with care for the details that make a page feel right: ker
 - **Deep zoom stays sharp.** Large pages render in tiles, so text stays crisp at any magnification.
 - **Built to survive bad files.** Every page renders in isolation and damaged documents are repaired. Across the 983-file pdf.js test corpus the result is 0 crashes.
 - **Layouts for every task:** continuous, single page, two-up, view rotation, full screen and a distraction-free Read mode.
-- **Light and dark themes** in black, ivory, Tyrian purple and crimson: ivory chrome in the light theme, and a true black dark theme for OLED screens. Pages stay white.
+- **Light and dark themes** in one colour scheme: ivory chrome or true black for OLED screens, crimson and Tyrian purple accents, gold frames and links. Pages stay white.
 
 <table>
 <tr>
@@ -120,7 +119,11 @@ Search the whole document as you type, step through matches with <kbd>⌘G</kbd>
 
 ## Navigate long documents
 
+Right-click a PDF tab to close it, reopen the last closed file-backed tab, or reveal its file. Closing still asks about unsaved changes. Reopening reads the saved file from disk; it does not restore discarded edits. Reveal selects the file in Explorer or Finder. On Linux and FreeBSD it requests `org.freedesktop.FileManager1.ShowItems`, falling back to opening the containing directory with `xdg-open` when that service is unavailable. Reopen and Reveal are unavailable on the web; Reveal is also unavailable for pathless documents.
+
 Bookmarks, page thumbnails and the document's own page labels (i, ii, 1, 2…) keep you oriented in long documents. Search bookmark titles in the Bookmarks panel to find nested entries even when their parents are collapsed. Matches keep their ancestors for context; Clear restores the unfiltered tree without changing its expansion state.
+
+In **Inspector > Pages**, use **Thumbnail size** and the smaller/larger buttons to show more pages or inspect larger previews (50–150%). This changes only the thumbnails, keeping multi-page selection and the current page in view. The size belongs to the open document view and survives reloading its file; it is not remembered after restarting. Agents can set it with `ui.set {"key":"thumbnail-zoom","value":"75"}` and read `active.thumbnail_zoom` from `ui.state`.
 
 <table>
 <tr>
@@ -157,7 +160,7 @@ Open **Organize pages** to see every page at once:
 **Saves you can trust:**
 - *Incremental:* the original bytes stay byte-for-byte intact.
 - *Atomic:* the file is written to a temporary copy, then swapped in.
-- *Verified:* independently checked with qpdf.
+- *Verified:* independently checked with qpdf, on every CI run.
 
 When open documents exceed the window width, scroll over the tab strip with the mouse wheel or trackpad, or use its horizontal scrollbar. Opening or switching to a document brings its tab into view.
 
@@ -184,7 +187,7 @@ Every page of a combined document renders pixel-identical to its source.
 
 ```sh
 pdfcraft-cli combine report.pdf appendix.pdf --out combined.pdf
-pdfcraft-cli extract report.pdf --pages 1,3,5 --out highlights.pdf
+pdfcraft-cli extract report.pdf --pages 1,3,5-8 --out highlights.pdf
 pdfcraft-cli split   report.pdf --every 10 --out-dir parts/
 ```
 
@@ -265,6 +268,7 @@ Every engine feature is reachable without the GUI, through one table of JSON-Sch
   pdfcraft-cli run text_find doc=1 query=invoice            # key=value; values parse as JSON
   pdfcraft-cli run --script review.json                     # e.g. comment_add {"type": "highlight", "find": "total due"}
   pdfcraft-cli run --script steps.json --root ./work        # several steps in one session
+  pdfcraft-cli run --script steps.json --report             # one JSON document: per step its number, tool, status, result or error
   ```
 
   With `--root`, every file the script's steps read or write stays in that directory, including the PNG a step saves with `"out"` (the script itself is read from wherever you name it).
@@ -302,15 +306,13 @@ pdfcraft-cli ui --control ~/.pdfcraft-control.json inspect focused=true
 pdfcraft-cli ui --control ~/.pdfcraft-control.json quit
 ```
 
-`ui.dock` arranges the `tools` and `inspector` panels; `canvas` is the protected document view.
-Each per-panel request requires a `panel` ID and an `operation`: `open`, `close`,
-`activate`, `float` with `rect: [x, y, width, height]`, or `move` with `target` and
-`zone: center|left|right|top|bottom`. For example,
-`{"operation":"float","panel":"tools","rect":[100,100,320,440]}` floats Tools.
-`ui.dock.reset` restores the default
-arrangement. The control channel accepts these methods directly; `ui.command` also accepts
-`{"id":"ui.dock","params":{...}}`. Saved preferences retain groups, active tabs, visibility
-and floating geometry. Invalid requests return an error without changing the document or layout.
+`ui.panel` opens, closes or sizes a side panel: `{"panel":"tools"|"side","open":true|false,"width":320}`.
+`tools` is the Tools panel and `side` the panel the rail opens (reopening it shows the one open last).
+`width` is clamped to the panel's limits (Tools 240–520, side panel 260–520 points). `ui.dock.reset`
+resets the side panels: Tools open on the left, default widths. The control channel accepts these
+methods directly; `ui.command` also accepts `{"id":"ui.panel","params":{...}}`. Saved preferences keep
+the Tools side, the open panels and their widths. Invalid requests return an error without changing
+the document or the panels.
 
 
 `resize` requests a native inner-window size in logical points (each dimension must be between 320 and 8192); the window manager may constrain it. `state` reports the observed `window.width`, `window.height` and `window.pixels_per_point`. `focus` accepts exactly one widget `id` or unique enabled, focusable `label`; subsequent `key` requests traverse or activate the actual widgets. `inspect` includes focusability and accepts a `focused` filter. `quit` takes no parameters: clean documents exit normally, while unsaved edits or typing open the existing Save/Don't save/Cancel prompt and return `quitting: false, needs_confirmation: true`. It never silently discards work. Window resizing and application quit are native-only.
@@ -345,15 +347,19 @@ On top of those, two corpus sweeps run over real-world files:
 - **Opening and rendering:** of the 983 pdf.js test files, 963 open and render cleanly, with 0 crashes.
 - **Open, edit and save round trips:** 958 succeed.
 
-The output is verified with independent tools: hayro, qpdf and poppler.
+The output is verified against independent implementations: hayro and qpdf on every CI run, and
+poppler over the corpus on demand (`cargo xtask text-oracle`).
 
 PdfCraft is a clean-room implementation. Its behaviour comes from the ISO 32000 specification and black-box observation, never from anyone else's code. Every icon, font and image is openly licensed and listed in [ATTRIBUTION.md](ATTRIBUTION.md).
 
 ## Get started
 
+Building needs Rust 1.95 or later.
+
 ```sh
-git clone https://github.com/storytold/pdfcraft
-cd pdfcraft
+git clone https://github.com/EquityBot/PlutarchPages
+cd PlutarchPages
+cargo xtask models                                # fetch the OCR models Scan & OCR needs (release builds include them)
 cargo run --release -p pdfcraft -- some.pdf     # desktop app
 cargo xtask demo-pdf                              # build the showcase PDF used in these screenshots
 cargo xtask screenshots                           # regenerate every screenshot in this README
@@ -375,33 +381,20 @@ git clone https://github.com/storytold/craft-fonts ../craft-fonts
 CRAFT_FONTS_DIR=../craft-fonts cargo run --release -p pdfcraft -- some.pdf
 ```
 
-Each [GitHub release](https://github.com/storytold/pdfcraft/releases) has ready-made builds for macOS,
-Windows, Linux (AppImage, Flatpak, `.deb`, `.rpm` and a tarball), FreeBSD and the web; see
-[Downloads](#downloads). On Gentoo, the community [::snakebyte
-overlay](https://github.com/switch87/snakebyte-overlay) packages the Linux release as
-`app-text/pdfcraft-bin` (not maintained by the PdfCraft team):
-
-```sh
-eselect repository add snakebyte git https://github.com/switch87/snakebyte-overlay.git
-emaint sync -r snakebyte
-echo 'app-text/pdfcraft-bin ~amd64' >> /etc/portage/package.accept_keywords/pdfcraft
-emerge --ask app-text/pdfcraft-bin
-```
-
 Logs, environment variables and other development notes are in [docs/development.md](docs/development.md).
 
 ## What's next
 
-PdfCraft is young and moving fast. The aim is a workbench where you can view, organize, annotate, fill, sign and edit PDFs, at parity with Acrobat Pro.
+PdfCraft is young and moving fast. The aim is a workbench where you can view, organize, annotate, fill, sign and edit PDFs, for professional and everyday workflows.
 
-**Where it stands (October 2026), honestly:** PdfCraft is **alpha**. Most of Acrobat Pro's offline features exist in some form (57% of all tracked features, 94% of the must-haves). For everyday work (viewing, commenting, filling and signing forms, organizing pages) it is about 55% of the way to replacing Acrobat; against all of Acrobat Pro, about 49%; for someone who only needs the essentials, about 66%. Every everyday workflow can be completed, but converting and sharing is weak: password-protected files Acrobat can't open, no Office-to-PDF, and Word export that loses layout.
+**Where it stands (October 2026), honestly:** PdfCraft is **alpha**. Most essential offline PDF features exist in some form (57% of the features tracked in [docs/target-app-parity.md](docs/target-app-parity.md), 94% of core essentials). For everyday work (viewing, commenting, filling and signing forms, organizing pages) readiness is about 55%; across all professional workflows, about 49%; for someone who only needs the essentials, about 66%. Every everyday workflow can be completed, but converting and sharing is weak: no office-document-to-PDF, and .docx export that loses layout.
 
 - **Good today:** viewing and search; organizing, combining and splitting; most kinds of comment; filling and authoring forms (with sandboxed JavaScript); passwords, redaction and sanitizing; basic digital signatures; printing; the Accessibility Checker; agent control through the CLI and MCP.
 - **Still borrowed:** pages are drawn by the `hayro` crate while our own renderer is built.
-- **Thin or missing:** reliable editing of existing text (especially CJK and right-to-left), OCR beyond Latin script, Office import/export, signature tokens and online long-term validation, Preflight and PDF/X/UA, printing on Windows, and full XFA forms.
-- **Hardening:** fuzzing still turns up crashes and hangs on hostile files; each one is fixed with a regression test. Quality has not yet been compared with Acrobat side by side.
+- **Thin or missing:** reliable editing of existing text (especially CJK and right-to-left), OCR beyond Latin script, office document import/export, signature tokens and online long-term validation, Preflight and PDF/X/UA, printing from the web build, physical printer fidelity, and full XFA forms.
+- **Hardening:** fuzzing still turns up crashes and hangs on hostile files; each one is fixed with a regression test. Quality has not yet been benchmarked side by side.
 
-**Next, in order:** encrypted files that Acrobat opens, the reported bugs and Windows printing, a fidelity harness against Acrobat and the renderer, editing existing content, then the Pro workflows (OCR, Office, Preflight, signatures, accessibility tagging) and 1.0 polish.
+**Next, in order:** office-document-to-PDF and a .docx export that keeps layout, the reported bugs and the Chinese interface font, a fidelity harness against a reference renderer, editing existing content, then professional workflows (OCR, office formats, Preflight, signatures, accessibility tagging) and 1.0 polish.
 
 The summary is in **[ROADMAP.md](ROADMAP.md)**; the full assessment by dimension and area is in [docs/target-app-parity.md](docs/target-app-parity.md), the ranked gaps in [docs/gaps.md](docs/gaps.md), and the milestones in [docs/roadmap.md](docs/roadmap.md).
 
@@ -410,63 +403,6 @@ The summary is in **[ROADMAP.md](ROADMAP.md)**; the full assessment by dimension
 ## Downloads
 
 This fork publishes no builds of its own yet; build it from source (see [Development](docs/development.md)). Upstream PdfCraft builds are on the [latest release](https://github.com/storytold/pdfcraft/releases/latest) has every build listed below, and [all releases](https://github.com/storytold/pdfcraft/releases) has earlier versions and their notes. `<ver>` in the file names is the version number, and `SHA256SUMS.txt` lists a checksum for every file.
-
-### Windows
-
-| Build | Installer | Portable |
-|---|---|---|
-| x64 (64-bit Intel/AMD) | `pdfcraft-<ver>-windows-x64.msi` | `pdfcraft-<ver>-windows-x64-portable.zip` |
-| arm64 (Snapdragon and other ARM PCs) | `pdfcraft-<ver>-windows-arm64.msi` | `pdfcraft-<ver>-windows-arm64-portable.zip` |
-| x86 (32-bit) | `pdfcraft-<ver>-windows-x86.msi` | `pdfcraft-<ver>-windows-x86-portable.zip` |
-
-Installers and executables are code-signed.
-
-The portable zip runs from any folder, a USB stick included. Its `portable.txt` keeps the settings,
-logs and crash recovery in a `PdfCraftData` folder next to `pdfcraft.exe`, so nothing is written to
-`%APPDATA%`; delete that file to use the normal per-user folders.
-
-The MSI installs for all users and requires administrator privileges. For unattended deployment
-without a desktop shortcut, run from an elevated terminal:
-
-```powershell
-msiexec /i "pdfcraft-<ver>-windows-x64.msi" /qn /norestart INSTALLDESKTOPSHORTCUT=0
-```
-
-Use the MSI for your architecture. Per-user installation overrides are not supported.
-
-### macOS
-
-| Build | File | Notes |
-|---|---|---|
-| App, universal (Apple silicon + Intel) | `pdfcraft-<ver>-macos-universal.dmg` | Signed and notarized |
-| Command-line tool, universal | `pdfcraft-cli-<ver>-macos-universal.zip` | Signed and notarized |
-
-### Linux
-
-| Format | x86_64 | aarch64 (ARM64) | Notes |
-|---|---|---|---|
-| AppImage | `pdfcraft-<ver>-linux-x86_64.AppImage` | `pdfcraft-<ver>-linux-aarch64.AppImage` | Runs anywhere; updates itself with [AppImageUpdate](https://github.com/AppImageCommunity/AppImageUpdate) (`.zsync` files) |
-| Flatpak | `pdfcraft-<ver>-linux-x86_64.flatpak` | `pdfcraft-<ver>-linux-aarch64.flatpak` | Sandboxed; `flatpak install --user <file>` |
-| Debian/Ubuntu | `pdfcraft-<ver>-linux-x86_64.deb` | `pdfcraft-<ver>-linux-aarch64.deb` | |
-| Fedora/RHEL/openSUSE | `pdfcraft-<ver>-linux-x86_64.rpm` | `pdfcraft-<ver>-linux-aarch64.rpm` | |
-| Tarball | `pdfcraft-<ver>-linux-x86_64.tar.gz` | `pdfcraft-<ver>-linux-aarch64.tar.gz` | Unpack anywhere |
-| Command-line tool | `pdfcraft-cli-<ver>-linux-x86_64.tar.gz` | `pdfcraft-cli-<ver>-linux-aarch64.tar.gz` | `pdfcraft-cli` alone (and its opt-in MCP server), for servers, CI and agents |
-
-RISC-V (riscv64) builds come as tarballs only: `pdfcraft-<ver>-linux-riscv64.tar.gz` and `pdfcraft-cli-<ver>-linux-riscv64.tar.gz`. They are cross-compiled and need glibc 2.39 or newer (Ubuntu 24.04+, Debian 13+).
-
-Every other Linux build needs glibc 2.35 or newer (Ubuntu 22.04+, Debian 12+, Fedora 36+, RHEL 10).
-
-### FreeBSD
-
-| Build | File |
-|---|---|
-| x86_64 | `pdfcraft-<ver>-freebsd-x86_64.tar.gz` |
-
-### Web (WebAssembly)
-
-| Build | File | Notes |
-|---|---|---|
-| Static site | `pdfcraft-web-<ver>.zip` | Runs in a modern browser; host it on any static server |
 
 ---
 
@@ -540,13 +476,4 @@ The banner's lettering and emblem are drawn from Cascadia Mono glyphs (SIL OFL 1
 <sub>Adobe, Photoshop, Illustrator, Premiere Pro, Lightroom, Acrobat, After Effects and InDesign are trademarks or registered trademarks of Adobe Inc. in the United States and/or other countries. PdfCraft is an independent, open-source project and is not affiliated with, sponsored by or endorsed by Adobe Inc.; these names are used only to describe the workflows it is compatible with.</sub>
 
 
-Tools and Inspector panels can be dragged into tab groups, split beside the PDF, or floated within the app window. Read and full-screen modes keep their existing focused document view. Drag a panel header to a target edge or another header. Its context menu offers Float panel, Move to group, and Close panel. Existing panel toggles reopen panels at their saved location; Reset Panel Layout restores the app layout. Floating panels remain inside the current app window.
-
-Advanced `ui.dock` operations use the same validated transaction as pointer gestures:
-`moveFloating` updates `rect`, `resizeSplit` accepts a boolean child `path` and
-`size` (`{"Ratio":0.5}`, `{"FixedFirst":280}`, or `{"FixedSecond":280}`),
-`setStackOpen` takes `open`, and `resizeStack` takes a point `height` or null.
-A center `move` can include `before` (panel ID or null to append) for tab order.
-The equivalent `{"action": ...}` form accepts a serialized shared docking action;
-this is also the form emitted by the renderer. Protected-canvas and app-specific panel
-rules apply equally to both forms.
+The Tools panel sits on the left, or on the right with Preferences ▸ Tools panel side. The rail stays at the right edge and opens one side panel beside it. Drag a panel's inner edge to resize it; widths are remembered. F4 shows or hides the side panel and Shift+F4 the Tools panel (also in the View menu); View ▸ Reset side panels restores the default arrangement.

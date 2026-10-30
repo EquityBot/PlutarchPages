@@ -11,6 +11,7 @@ mod flow;
 mod markdown;
 pub use csv::{CsvReport, from_csv};
 pub use email::{EmailReport, from_email};
+mod upright_image;
 pub use extract::{ExtractedImage, ImageExport, extract_images, image_file};
 pub use markdown::from_markdown;
 use pdfcraft_fonts::{literal, win_ansi, wrap};
@@ -275,7 +276,7 @@ fn jpeg(name: &str, bytes: &[u8]) -> Result<Embedded, CreateError> {
             0xEE if seg.starts_with(b"Adobe") => adobe = true,
             // APP2 ICC profile, possibly split over several chunks.
             0xE2 => {
-                if let Some(([seq, count], data)) = seg.strip_prefix(b"ICC_PROFILE\0").and_then(|r| r.split_first_chunk::<2>()) {
+                if let Some(([seq, count], data)) = seg.strip_prefix(b"ICC_PROFILE\0").and_then(<[u8]>::split_first_chunk::<2>) {
                     icc_chunks.push((*seq, *count, data));
                 }
             }
@@ -321,7 +322,13 @@ fn png_image(name: &str, bytes: &[u8]) -> Result<Embedded, CreateError> {
         _ => (72.0, 72.0),
     };
     let icc = reader.info().icc_profile.as_ref().map(|p| p.to_vec());
-    let mut buf = vec![0; reader.output_buffer_size().ok_or_else(|| bad("image too large".into()))?];
+    // The decoded size comes from the header alone, so a file of a few bytes can claim any
+    // size: keep the ceiling, and ask for the memory fallibly (a failed allocation would abort
+    // the whole app, and no `catch_unwind` stops that).
+    let size = reader.output_buffer_size().filter(|n| *n <= MAX_DECODED_BYTES).ok_or_else(|| bad("image too large".into()))?;
+    let mut buf = Vec::new();
+    buf.try_reserve_exact(size).map_err(|_| bad("not enough memory for this image".into()))?;
+    buf.resize(size, 0);
     let frame = reader.next_frame(&mut buf).map_err(|e| bad(e.to_string()))?;
     let (w, h) = (frame.width, frame.height);
     let data = &buf[..frame.buffer_size()];
@@ -334,8 +341,14 @@ fn png_image(name: &str, bytes: &[u8]) -> Result<Embedded, CreateError> {
     };
     let has_alpha = channels == 2 || channels == 4;
     let colour_n = if has_alpha { channels - 1 } else { channels };
-    let mut colour = Vec::with_capacity(w as usize * h as usize * colour_n);
+    let mut colour = Vec::new();
+    colour
+        .try_reserve_exact((w as usize).saturating_mul(h as usize).saturating_mul(colour_n))
+        .map_err(|_| bad("not enough memory for this image".into()))?;
     let mut alpha = Vec::new();
+    if has_alpha {
+        alpha.try_reserve_exact((w as usize).saturating_mul(h as usize)).map_err(|_| bad("not enough memory for this image".into()))?;
+    }
     for px in data.chunks_exact(channels) {
         colour.extend_from_slice(&px[..colour_n]);
         if has_alpha {
@@ -387,16 +400,38 @@ fn rgba_image(rgba: &[u8], (w, h): (u32, u32), dpi: (f64, f64)) -> Embedded {
 /// BMP and GIF (the first frame), through the `image` decoders. Their resolution is not read:
 /// 72 dpi, as for images without one.
 fn decoded(name: &str, bytes: &[u8], format: image::ImageFormat) -> Result<Embedded, CreateError> {
+    // A GIF's first frame is painted on a canvas the size of its logical screen, however small
+    // the frame: a few bytes can ask for hundreds of MB.
+    if format == image::ImageFormat::Gif
+        && let Some(&[w0, w1, h0, h1]) = bytes.get(6..10)
+        && u64::from(u16::from_le_bytes([w0, w1])) * u64::from(u16::from_le_bytes([h0, h1])) > MAX_GIF_PIXELS
+    {
+        return Err(CreateError::Image(name.into(), "the GIF's screen is larger than 4096×4096 pixels".into()));
+    }
     let img = image::load_from_memory_with_format(bytes, format).map_err(|e| CreateError::Image(name.into(), e.to_string()))?;
-    let rgba = img.to_rgba8();
+    let rgba = img.into_rgba8();
     Ok(rgba_image(rgba.as_raw(), rgba.dimensions(), (72.0, 72.0)))
 }
 
-/// Most decoded bytes one TIFF page may take: room for the 768 MiB CMYK poster in #665, twice over.
-const MAX_TIFF_DECODED_BYTES: usize = 2 << 30;
+/// Largest GIF logical screen, in pixels (4096×4096).
+const MAX_GIF_PIXELS: u64 = 1 << 24;
 
-/// Every page of a TIFF (multi-page scans become multi-page PDFs).
-fn tiff_pages(name: &str, bytes: &[u8]) -> Result<Vec<Embedded>, CreateError> {
+/// Most decoded bytes one TIFF page or PNG may take: room for the 768 MiB CMYK poster in #665,
+/// twice over.
+const MAX_DECODED_BYTES: usize = 2 << 30;
+
+/// Most decoded bytes all the pages of one TIFF may take together: its pages stay in memory until
+/// they are embedded, and many small directories can share one compressed strip. Saturates to the
+/// whole address space on 32-bit targets (wasm32), where 4 GiB doesn't fit in `usize`.
+const MAX_DECODED_TOTAL: usize = MAX_DECODED_BYTES.saturating_mul(2);
+
+/// The first `wanted` pages of a TIFF (multi-page scans become multi-page PDFs).
+fn tiff_pages(name: &str, bytes: &[u8], wanted: usize) -> Result<Vec<Embedded>, CreateError> {
+    tiff_pages_within(name, bytes, wanted, MAX_DECODED_TOTAL)
+}
+
+/// [`tiff_pages`], refused once the pages kept take more than `budget` bytes.
+fn tiff_pages_within(name: &str, bytes: &[u8], wanted: usize, budget: usize) -> Result<Vec<Embedded>, CreateError> {
     use tiff::ColorType as C;
     use tiff::decoder::{Decoder, DecodingResult, Limits};
     use tiff::tags::Tag;
@@ -405,9 +440,10 @@ fn tiff_pages(name: &str, bytes: &[u8]) -> Result<Vec<Embedded>, CreateError> {
     // 12000x16000 CMYK is 768 MiB. Raise it, but keep a ceiling so a tiny file claiming
     // enormous dimensions can't ask for unbounded memory.
     let mut limits = Limits::default();
-    limits.decoding_buffer_size = MAX_TIFF_DECODED_BYTES;
+    limits.decoding_buffer_size = MAX_DECODED_BYTES;
     let mut dec = Decoder::new(std::io::Cursor::new(bytes)).map_err(|e| bad(e.to_string()))?.with_limits(limits);
     let mut out = Vec::new();
+    let mut kept = 0usize;
     loop {
         let (w, h) = dec.dimensions().map_err(|e| bad(e.to_string()))?;
         let ct = dec.colortype().map_err(|e| bad(e.to_string()))?;
@@ -462,8 +498,12 @@ fn tiff_pages(name: &str, bytes: &[u8]) -> Result<Vec<Embedded>, CreateError> {
             }
             other => return Err(bad(format!("{other:?} TIFF images aren't supported yet"))),
         };
+        kept = kept.saturating_add(page.data.len()).saturating_add(page.smask.as_ref().map_or(0, |(_, alpha)| alpha.len()));
+        if kept > budget {
+            return Err(bad(format!("the TIFF's pages take more than {} MiB together", budget >> 20)));
+        }
         out.push(page);
-        if !dec.more_images() {
+        if out.len() >= wanted || !dec.more_images() {
             break;
         }
         dec.next_image().map_err(|e| bad(e.to_string()))?;
@@ -502,12 +542,21 @@ pub const CONVERTIBLE: [&str; 30] = [
     "xhtml", "doc", "docx", "odt", "rtf", "xls", "xlsx", "ods", "ppt", "pptx", "odp",
 ];
 
+/// A classic TIFF or a BigTIFF (version 43), in either byte order.
+fn is_tiff(bytes: &[u8]) -> bool {
+    [b"II*\0", b"MM\0*", b"II+\0", b"MM\0+"].iter().any(|m| bytes.starts_with(*m))
+}
+
+/// The GIF headers `embed` decodes, so detection and conversion agree.
+fn is_gif(bytes: &[u8]) -> bool {
+    bytes.starts_with(b"GIF87a") || bytes.starts_with(b"GIF89a")
+}
+
 fn is_image(bytes: &[u8]) -> bool {
     bytes.starts_with(&[0xFF, 0xD8])
         || bytes.starts_with(b"\x89PNG\r\n\x1a\n")
-        || bytes.starts_with(b"II*\0")
-        || bytes.starts_with(b"MM\0*")
-        || bytes.starts_with(b"GIF8")
+        || is_tiff(bytes)
+        || is_gif(bytes)
         // JPEG 2000: a JP2 file or a raw codestream.
         || bytes.starts_with(JP2_SIGNATURE)
         || bytes.starts_with(&[0xFF, 0x4F, 0xFF, 0x51])
@@ -540,17 +589,18 @@ pub fn source_kind(name: &str, bytes: &[u8]) -> Option<SourceKind> {
     }
 }
 
-/// Detect the image format from its bytes; a TIFF may hold several pages.
-fn embed(name: &str, bytes: &[u8]) -> Result<Vec<Embedded>, CreateError> {
+/// Detect the image format from its bytes; a TIFF may hold several pages, of which the first
+/// `wanted` are read.
+fn embed(name: &str, bytes: &[u8], wanted: usize) -> Result<Vec<Embedded>, CreateError> {
     if bytes.starts_with(&[0xFF, 0xD8]) {
-        Ok(vec![jpeg(name, bytes)?])
+        Ok(vec![jpeg(name, &upright_image::upright(bytes))?])
     } else if bytes.starts_with(b"\x89PNG\r\n\x1a\n") {
         Ok(vec![png_image(name, bytes)?])
-    } else if bytes.starts_with(b"II*\0") || bytes.starts_with(b"MM\0*") {
-        tiff_pages(name, bytes)
+    } else if is_tiff(bytes) {
+        tiff_pages(name, bytes, wanted)
     } else if bytes.starts_with(b"BM") {
-        Ok(vec![decoded(name, bytes, image::ImageFormat::Bmp)?])
-    } else if bytes.starts_with(b"GIF87a") || bytes.starts_with(b"GIF89a") {
+        Ok(vec![decoded(name, &pdfcraft_xfa::image::bmp_with_pixel_offset(bytes), image::ImageFormat::Bmp)?])
+    } else if is_gif(bytes) {
         Ok(vec![decoded(name, bytes, image::ImageFormat::Gif)?])
     } else if bytes.starts_with(JP2_SIGNATURE) || bytes.starts_with(&[0xFF, 0x4F, 0xFF, 0x51]) {
         Ok(vec![jpx(name, bytes)?])
@@ -562,7 +612,7 @@ fn embed(name: &str, bytes: &[u8]) -> Result<Vec<Embedded>, CreateError> {
 /// Embed an image file (its first page, for TIFFs) as an image XObject in `doc`. Returns the
 /// object and the image's natural size in points (from its resolution).
 pub fn image_xobject(doc: &mut Document, name: &str, bytes: &[u8]) -> Result<(ObjRef, (f64, f64)), CreateError> {
-    let img = embed(name, bytes)?.into_iter().next().ok_or_else(|| CreateError::Image(name.into(), "the file has no image".into()))?;
+    let img = embed(name, bytes, 1)?.into_iter().next().ok_or_else(|| CreateError::Image(name.into(), "the file has no image".into()))?;
     let size = (img.px.0 as f64 * 72.0 / img.dpi.0, img.px.1 as f64 * 72.0 / img.dpi.1);
     Ok((add_image(doc, img, &mut Vec::new()), size))
 }
@@ -594,7 +644,7 @@ pub fn from_images_with_resolution(images: &[(String, Vec<u8>)], resolution: Ima
     }
     let mut doc = Document::new_empty();
     let mut profiles = Vec::new();
-    for img in images.iter().map(|(name, bytes)| embed(name, bytes)).collect::<Result<Vec<_>, _>>()?.into_iter().flatten() {
+    for img in images.iter().map(|(name, bytes)| embed(name, bytes, usize::MAX)).collect::<Result<Vec<_>, _>>()?.into_iter().flatten() {
         let dpi = match resolution {
             ImageResolution::Embedded => img.dpi,
             ImageResolution::Dpi(dpi) => (dpi, dpi),
@@ -642,8 +692,50 @@ fn turkish_code_page(bytes: &[u8]) -> bool {
         && !bytes.iter().any(|b| matches!(b, 0xC1 | 0xCD | 0xD3 | 0xDA | 0xE1 | 0xED | 0xF3 | 0xFA))
 }
 
-/// Plain text set in Helvetica on pages of `page` size with 1-inch margins.
+/// Plain text set in Helvetica on pages of `page` size with 1-inch margins. Text Helvetica can't
+/// draw (outside Western European) is refused with [`CreateError::Invalid`] naming the line and
+/// the character; text PdfCraft generates goes through [`from_text_escaped`] instead.
 pub fn from_text(title: &str, text: &str, page: (f64, f64), font_size: f64) -> Result<Document, CreateError> {
+    // Helvetica in WinAnsiEncoding: text it can't draw is refused with where it is, not set as `?`.
+    if let Some((line, c)) = first_undrawable_line(text) {
+        return Err(CreateError::Invalid(pdfcraft_fonts::undrawable_message(&format!("the text (line {line})"), c)));
+    }
+    set_text(title, text, page, font_size)
+}
+
+/// The line (1-based) and character of the first one Helvetica can't draw. Line breaks, tabs and
+/// form feeds (new pages) are layout, not drawn.
+fn first_undrawable_line(text: &str) -> Option<(usize, char)> {
+    text.split('\n').enumerate().find_map(|(i, l)| pdfcraft_fonts::first_undrawable(&l.replace('\u{c}', "")).map(|c| (i + 1, c)))
+}
+
+/// What a PDF made from text PdfCraft generated says, in its first line, about characters it
+/// wrote as `[U+XXXX]`.
+pub const ESCAPED_NOTE: &str = "Characters Helvetica can't draw are written as [U+XXXX] code points.";
+
+/// [`from_text`] for text PdfCraft generates from documents (a comment summary, a compare
+/// report), which may quote any language. Each character Helvetica can't draw is written as
+/// `[U+XXXX]` instead of being refused or set as `?`, so nothing is lost, and the first line says
+/// so ([`ESCAPED_NOTE`]). Returns the document and how many characters were written that way.
+pub fn from_text_escaped(title: &str, text: &str, page: (f64, f64), font_size: f64) -> Result<(Document, usize), CreateError> {
+    let mut escaped = 0usize;
+    let mut out = String::with_capacity(text.len());
+    for c in text.chars() {
+        if matches!(c, '\n' | '\r' | '\u{c}') || pdfcraft_fonts::first_undrawable(c.encode_utf8(&mut [0; 4])).is_none() {
+            out.push(c);
+        } else {
+            escaped = escaped.saturating_add(1);
+            out.push_str(&format!("[U+{:04X}]", u32::from(c)));
+        }
+    }
+    if escaped > 0 {
+        out = format!("{ESCAPED_NOTE}\n\n{out}");
+    }
+    // The title is a text string in /Info, which holds any character.
+    Ok((set_text(title, &out, page, font_size)?, escaped))
+}
+
+fn set_text(title: &str, text: &str, page: (f64, f64), font_size: f64) -> Result<Document, CreateError> {
     let size = if font_size.is_finite() && font_size > 0.0 { font_size.clamp(4.0, 72.0) } else { 11.0 };
     let (w, h) = page;
     let margin = 72.0;
