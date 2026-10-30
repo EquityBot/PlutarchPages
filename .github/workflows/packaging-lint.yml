@@ -19,8 +19,8 @@ concurrency:
 
 jobs:
   lint:
-    # Intentionally tracked at @main (not SHA-pinned) so org-wide CI improvements, security fixes, and build optimizations propagate without PR churn across all craftapp repos.
-    uses: storytold/craft-common-actions/.github/workflows/packaging-lint.yml@main
+    # Pinned: a mutable reference to another repository can change what CI runs. Move it deliberately.
+    uses: storytold/craft-common-actions/.github/workflows/packaging-lint.yml@2b3fb9dc05036f73c77d18f753a3aa9da55fa386 # main, 31 October 2026
 
   windows-install-policy:
     timeout-minutes: 10

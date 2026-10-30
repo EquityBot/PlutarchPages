@@ -27,6 +27,8 @@ Upstream's tests for these were changed to assert the fork's behaviour. Keep the
 - Brand: no ArtCraft name or logos (`AGENTS.md` section 1.2). Upstream merges add them back, in new
   files too, so search for them after every merge.
 - Update check and repository links point at EquityBot.
+- Shared CI: workflows from `storytold/craft-common-actions` are pinned to a commit, and SonarCloud
+  receives only `SONAR_TOKEN`. Upstream merges restore `@main` and `secrets: inherit`, so reapply both.
 
 ## Merging upstream
 

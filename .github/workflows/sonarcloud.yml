@@ -16,6 +16,6 @@ concurrency:
 
 jobs:
   sonarcloud:
-    # Tracked at @main so org-wide CI improvements propagate without PR churn.
-    uses: storytold/craft-common-actions/.github/workflows/sonarcloud.yml@main
-    secrets: inherit
+    uses: storytold/craft-common-actions/.github/workflows/sonarcloud.yml@2b3fb9dc05036f73c77d18f753a3aa9da55fa386 # main, 31 October 2026
+    secrets:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
