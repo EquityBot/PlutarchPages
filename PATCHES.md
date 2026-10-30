@@ -36,6 +36,7 @@ Upstream's tests for these were changed to assert the fork's behaviour. Keep the
 - Windows registration: `PlutarchPages.*` names and its own context-menu component GUIDs, so it doesn't
   share registry state with an upstream install. `pdfcraft.exe` stays, so `App Paths\pdfcraft.exe` and
   `Applications\pdfcraft.exe` are still shared: installing it alongside upstream isn't supported.
+- CodeQL: `.github/codeql/codeql-config.yml` excludes tests and `vendor/`.
 
 ## Merging upstream
 
