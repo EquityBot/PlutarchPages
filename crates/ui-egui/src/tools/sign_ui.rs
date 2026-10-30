@@ -187,8 +187,9 @@ pub(crate) fn page_input(
     {
         let end = Pos2::new(end.x.clamp(xf.rect.left(), xf.rect.right()), end.y.clamp(xf.rect.top(), xf.rect.bottom()));
         let r = Rect::from_two_pos(start, end);
-        ui.painter().rect_filled(r, CornerRadius::ZERO, Color32::from_rgba_unmultiplied(0x14, 0x73, 0xE6, 28));
-        ui.painter().rect_stroke(r, CornerRadius::ZERO, Stroke::new(1.0, Color32::from_rgb(0x14, 0x73, 0xE6)), egui::StrokeKind::Middle);
+        let c = theme::ON_PAGE_SELECT;
+        ui.painter().rect_filled(r, CornerRadius::ZERO, Color32::from_rgba_unmultiplied(c.r(), c.g(), c.b(), 28));
+        ui.painter().rect_stroke(r, CornerRadius::ZERO, Stroke::new(1.0, c), egui::StrokeKind::Middle);
         if resp.drag_stopped() {
             view.sign.drag = None;
             if r.width() >= 8.0 && r.height() >= 8.0 {
@@ -713,9 +714,10 @@ mod tests {
 
     #[test]
     fn signature_status_style_gives_each_verdict_its_panel_icon() {
-        assert_eq!(signature_status_style(SignatureStatus::Valid).0, "circle-check");
-        assert_eq!(signature_status_style(SignatureStatus::Unknown).0, "triangle-alert");
-        assert_eq!(signature_status_style(SignatureStatus::Invalid).0, "circle-x");
+        let t = Tokens::for_kind(theme::ThemeKind::Light);
+        assert_eq!(signature_status_style(&t, SignatureStatus::Valid).0, "circle-check");
+        assert_eq!(signature_status_style(&t, SignatureStatus::Unknown).0, "triangle-alert");
+        assert_eq!(signature_status_style(&t, SignatureStatus::Invalid).0, "circle-x");
     }
 
     #[test]
@@ -887,7 +889,8 @@ mod tests {
     #[test]
     fn the_message_bar_puts_a_signature_problem_before_the_certification() {
         use SignatureStatus::{Invalid, Unknown, Valid};
-        let bar = |sigs: &[SignatureInfo]| banner(sigs).map(|b| (b.0, b.2));
+        let t = Tokens::for_kind(theme::ThemeKind::Light);
+        let bar = |sigs: &[SignatureInfo]| banner(sigs, &t).map(|b| (b.0, b.2));
         let certified = signature(Some(2), Valid);
         assert_eq!(bar(std::slice::from_ref(&certified)), Some(("badge-check", "Certified by {by}")));
         assert_eq!(bar(&[certified.clone(), signature(None, Valid)]), Some(("badge-check", "Certified by {by}")));

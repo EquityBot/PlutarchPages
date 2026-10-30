@@ -207,7 +207,7 @@ fn gap_button(ui: &mut egui::Ui, gap: usize, at: Pos2, height: f32, label: Strin
         ui.painter().line_segment([pos2(at.x, at.y - height / 2.0), pos2(at.x, at.y + height / 2.0)], Stroke::new(3.0, t.accent));
     }
     ui.painter().circle(at, 9.0, if hot { t.accent } else { t.chrome }, Stroke::new(1.0, if hot { t.accent } else { t.border }));
-    let ink = Stroke::new(1.5, if hot { Color32::WHITE } else { t.text_muted });
+    let ink = Stroke::new(1.5, if hot { crate::theme::IVORY } else { t.text_muted });
     ui.painter().line_segment([at - vec2(4.0, 0.0), at + vec2(4.0, 0.0)], ink);
     ui.painter().line_segment([at - vec2(0.0, 4.0), at + vec2(0.0, 4.0)], ink);
     resp.on_hover_text(label).clicked()
@@ -471,7 +471,7 @@ pub(super) fn organize_grid(view: &mut DocView, info: &DocInfo, editable: bool, 
                     // A "+" by the pointer: this drop copies the pages, it doesn't move them.
                     let badge = p + vec2(12.0, 12.0);
                     ui.painter().circle(badge, 9.0, t.accent, Stroke::new(1.0, t.accent));
-                    let ink = Stroke::new(1.5, Color32::WHITE);
+                    let ink = Stroke::new(1.5, crate::theme::IVORY);
                     ui.painter().line_segment([badge - vec2(4.0, 0.0), badge + vec2(4.0, 0.0)], ink);
                     ui.painter().line_segment([badge - vec2(0.0, 4.0), badge + vec2(0.0, 4.0)], ink);
                     text_at.x += 18.0;
@@ -524,8 +524,8 @@ pub(super) fn organize_grid(view: &mut DocView, info: &DocInfo, editable: bool, 
         if let Some(p) = pointer {
             let at = p + vec2(16.0, 16.0);
             painter.circle_filled(at, 9.0, t.accent);
-            painter.line_segment([at - vec2(4.0, 0.0), at + vec2(4.0, 0.0)], Stroke::new(1.5, Color32::WHITE));
-            painter.line_segment([at - vec2(0.0, 4.0), at + vec2(0.0, 4.0)], Stroke::new(1.5, Color32::WHITE));
+            painter.line_segment([at - vec2(4.0, 0.0), at + vec2(4.0, 0.0)], Stroke::new(1.5, crate::theme::IVORY));
+            painter.line_segment([at - vec2(0.0, 4.0), at + vec2(0.0, 4.0)], Stroke::new(1.5, crate::theme::IVORY));
         }
     }
     view.auto_scroll.paint(ui, viewport);

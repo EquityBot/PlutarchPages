@@ -21,10 +21,10 @@ use pdfcraft_engine::form_scripts::{CalcOp, Calculate, format_value};
 use pdfcraft_engine::{CalculatedField, CalculationIssue, CalculationOrder, Edit, FormField, FormFieldKind};
 
 /// Links and steps on the page, which is paper white in either theme.
-const LINK_OK: Color32 = Color32::from_rgb(0x1B, 0x63, 0xE0);
-const LINK_LATE: Color32 = Color32::from_rgb(0xA8, 0x64, 0x00);
-const LINK_LOOP: Color32 = Color32::from_rgb(0xC2, 0x26, 0x2E);
-const STEP: Color32 = Color32::from_rgb(0x3A, 0x3A, 0x42);
+const LINK_OK: Color32 = crate::theme::ON_PAGE_SELECT;
+const LINK_LATE: Color32 = crate::theme::DARK_GOLD;
+const LINK_LOOP: Color32 = crate::theme::RED;
+const STEP: Color32 = Color32::BLACK;
 const ROW: f32 = 46.0;
 /// Links kept at most: a formula reading a group reads every field under it.
 const MAX_LINKS: usize = 20_000;
@@ -785,8 +785,8 @@ pub(crate) fn paint_page(
         // No bigger than the field, so a small one keeps its contents in view.
         let radius = (8.0 * zoom).clamp(6.5, 10.0).min((r.height() * 0.6).max(5.0));
         let c = r.left_top();
-        painter.circle(c, radius, fill, Stroke::new(1.5, Color32::WHITE));
-        painter.text(c, Align2::CENTER_CENTER, (k + 1).to_string(), theme::semibold(radius * 1.1), Color32::WHITE);
+        painter.circle(c, radius, fill, Stroke::new(1.5, theme::IVORY));
+        painter.text(c, Align2::CENTER_CENTER, (k + 1).to_string(), theme::semibold(radius * 1.1), theme::IVORY);
     }
     hovered
 }
@@ -864,7 +864,7 @@ pub(crate) fn paint_trace(ui: &egui::Ui, painter: &egui::Painter, viewport: Rect
     let w = widgets::text_width(ui, &shown, &font) + 46.0;
     let pill = Rect::from_center_size(pos2(viewport.center().x, viewport.top() + 26.0), vec2(w, 30.0));
     painter.rect(pill, CornerRadius::same(15), t.card, Stroke::new(1.0, t.border), egui::StrokeKind::Inside);
-    icons::paint(ui, Rect::from_center_size(pill.left_center() + vec2(18.0, 0.0), vec2(14.0, 14.0)), "move-right", 13.0, LINK_OK);
+    icons::paint(ui, Rect::from_center_size(pill.left_center() + vec2(18.0, 0.0), vec2(14.0, 14.0)), "move-right", 13.0, t.accent_text);
     painter.text(pill.left_center() + vec2(32.0, 0.0), Align2::LEFT_CENTER, shown, font, t.text);
 }
 

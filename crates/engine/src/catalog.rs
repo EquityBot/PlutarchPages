@@ -64,20 +64,18 @@ const fn menu_item(label: &'static str, icon: &'static str, actions: &'static [&
 
 use Availability::{Planned, Provider, Ready};
 
-const RED: [u8; 3] = [0xE0, 0x3E, 0x3E];
-const PURPLE: [u8; 3] = [0x8E, 0x4E, 0xE6];
-const BLUE: [u8; 3] = [0x3A, 0x6F, 0xE8];
-const GREEN: [u8; 3] = [0x2D, 0x9D, 0x5B];
-const ORANGE: [u8; 3] = [0xE8, 0x8A, 0x1A];
-const TEAL: [u8; 3] = [0x14, 0x9C, 0xA8];
-const PINK: [u8; 3] = [0xD6, 0x3B, 0x8F];
+const RED: [u8; 3] = [0xE7, 0x16, 0x2F];
+const CRIMSON: [u8; 3] = [0x99, 0x00, 0x24];
+const TYRIAN_PURPLE: [u8; 3] = [0x66, 0x02, 0x3C];
+const LAVENDER: [u8; 3] = [0x74, 0x5E, 0xB1];
+const DARK_GOLD: [u8; 3] = [0x9B, 0x77, 0x35];
 
 pub static TOOL_GROUPS: &[ToolGroup] = &[
     ToolGroup {
         id: "export",
         label: "Export a PDF",
         icon: "file-output",
-        hue: BLUE,
+        hue: LAVENDER,
         badge: None,
         availability: Ready,
         sections: &[ToolSection {
@@ -99,7 +97,7 @@ pub static TOOL_GROUPS: &[ToolGroup] = &[
         id: "fill_sign",
         label: "Fill & Sign",
         icon: "pen-line",
-        hue: PURPLE,
+        hue: TYRIAN_PURPLE,
         badge: None,
         availability: Ready,
         sections: &[ToolSection {
@@ -122,7 +120,7 @@ pub static TOOL_GROUPS: &[ToolGroup] = &[
         id: "edit",
         label: "Edit a PDF",
         icon: "file-pen-line",
-        hue: PINK,
+        hue: CRIMSON,
         badge: None,
         availability: Planned("M7"),
         sections: &[
@@ -176,7 +174,7 @@ pub static TOOL_GROUPS: &[ToolGroup] = &[
         id: "combine",
         label: "Combine files",
         icon: "files",
-        hue: BLUE,
+        hue: LAVENDER,
         badge: None,
         availability: Ready,
         sections: &[ToolSection { title: "Combine", items: &[item("Add files to combine", "files", "page.combine", Ready)] }],
@@ -185,7 +183,7 @@ pub static TOOL_GROUPS: &[ToolGroup] = &[
         id: "organize",
         label: "Organize pages",
         icon: "layout-grid",
-        hue: GREEN,
+        hue: DARK_GOLD,
         badge: None,
         availability: Ready,
         sections: &[
@@ -218,7 +216,7 @@ pub static TOOL_GROUPS: &[ToolGroup] = &[
         id: "comment",
         label: "Add comments",
         icon: "message-square-text",
-        hue: ORANGE,
+        hue: DARK_GOLD,
         badge: None,
         availability: Ready,
         sections: &[
@@ -258,7 +256,7 @@ pub static TOOL_GROUPS: &[ToolGroup] = &[
         id: "scan",
         label: "Scan & OCR",
         icon: "scan-text",
-        hue: GREEN,
+        hue: DARK_GOLD,
         badge: None,
         availability: Ready,
         sections: &[ToolSection {
@@ -276,7 +274,7 @@ pub static TOOL_GROUPS: &[ToolGroup] = &[
         id: "protect",
         label: "Protect a PDF",
         icon: "shield-check",
-        hue: BLUE,
+        hue: LAVENDER,
         badge: None,
         availability: Planned("M8"),
         sections: &[
@@ -335,7 +333,7 @@ pub static TOOL_GROUPS: &[ToolGroup] = &[
         id: "form",
         label: "Prepare a form",
         icon: "text-cursor-input",
-        hue: PURPLE,
+        hue: TYRIAN_PURPLE,
         badge: None,
         availability: Ready,
         sections: &[
@@ -375,7 +373,7 @@ pub static TOOL_GROUPS: &[ToolGroup] = &[
         id: "stamp",
         label: "Add a stamp",
         icon: "stamp",
-        hue: PURPLE,
+        hue: TYRIAN_PURPLE,
         badge: None,
         availability: Ready,
         sections: &[ToolSection { title: "Stamps", items: &[item("Stamp palette", "stamp", "comment.stamp", Ready)] }],
@@ -384,7 +382,7 @@ pub static TOOL_GROUPS: &[ToolGroup] = &[
         id: "certificate",
         label: "Use a certificate",
         icon: "badge-check",
-        hue: TEAL,
+        hue: LAVENDER,
         badge: None,
         availability: Ready,
         sections: &[ToolSection {
@@ -402,7 +400,7 @@ pub static TOOL_GROUPS: &[ToolGroup] = &[
         id: "print_production",
         label: "Use print production",
         icon: "printer",
-        hue: PURPLE,
+        hue: TYRIAN_PURPLE,
         badge: None,
         availability: Planned("M11"),
         sections: &[ToolSection {
@@ -421,7 +419,7 @@ pub static TOOL_GROUPS: &[ToolGroup] = &[
         id: "measure",
         label: "Measure objects",
         icon: "ruler",
-        hue: PINK,
+        hue: CRIMSON,
         badge: None,
         availability: Ready,
         sections: &[ToolSection {
@@ -442,7 +440,7 @@ pub static TOOL_GROUPS: &[ToolGroup] = &[
         id: "compare",
         label: "Compare files",
         icon: "git-compare",
-        hue: PINK,
+        hue: CRIMSON,
         badge: None,
         availability: Ready,
         sections: &[ToolSection { title: "Compare", items: &[item("Select files to compare", "git-compare", "doc.compare", Ready)] }],
@@ -451,7 +449,7 @@ pub static TOOL_GROUPS: &[ToolGroup] = &[
         id: "actions",
         label: "Use guided actions",
         icon: "list-checks",
-        hue: PURPLE,
+        hue: TYRIAN_PURPLE,
         badge: None,
         availability: Ready,
         sections: &[ToolSection {
@@ -469,7 +467,7 @@ pub static TOOL_GROUPS: &[ToolGroup] = &[
         id: "accessibility",
         label: "Prepare for accessibility",
         icon: "accessibility",
-        hue: PURPLE,
+        hue: TYRIAN_PURPLE,
         badge: None,
         availability: Ready,
         sections: &[ToolSection {
@@ -508,7 +506,7 @@ pub static TOOL_GROUPS: &[ToolGroup] = &[
         id: "search_index",
         label: "Add search index",
         icon: "file-search",
-        hue: GREEN,
+        hue: DARK_GOLD,
         badge: None,
         availability: Planned("M12"),
         sections: &[ToolSection { title: "Index", items: &[item("Manage embedded index", "file-search", "search.index", Planned("M12"))] }],
@@ -517,7 +515,7 @@ pub static TOOL_GROUPS: &[ToolGroup] = &[
         id: "javascript",
         label: "Use JavaScript",
         icon: "braces",
-        hue: BLUE,
+        hue: LAVENDER,
         badge: None,
         availability: Planned("M6"),
         sections: &[ToolSection {
@@ -533,7 +531,7 @@ pub static TOOL_GROUPS: &[ToolGroup] = &[
         id: "ai",
         label: "AI assistant",
         icon: "sparkles",
-        hue: PINK,
+        hue: CRIMSON,
         badge: Some("Optional"),
         availability: Provider,
         sections: &[ToolSection {

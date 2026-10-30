@@ -22,7 +22,7 @@ pub(super) fn title(ui: &mut egui::Ui, text: &str) {
 
 fn error(ui: &mut egui::Ui, err: &Option<String>) {
     if let Some(e) = err.as_ref().filter(|e| !e.is_empty()) {
-        ui.colored_label(Color32::from_rgb(0xD7, 0x37, 0x3F), tl!(e));
+        ui.colored_label(crate::theme::Tokens::get(ui.ctx()).danger, tl!(e));
         ui.add_space(4.0);
     }
 }

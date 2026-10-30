@@ -18,8 +18,8 @@ use pdfcraft_render::PageInfo;
 use crate::canvas::PageXform;
 use crate::{Dialog, PdfCraftApp, i18n, theme, widgets};
 
-const SELECT_BLUE: Color32 = Color32::from_rgb(0x14, 0x73, 0xE6);
-const ERROR_RED: Color32 = Color32::from_rgb(0xD1, 0x3B, 0x3B);
+const SELECT: Color32 = crate::theme::ON_PAGE_SELECT;
+const ERROR_RED: Color32 = crate::theme::ON_PAGE_ALERT;
 /// A divider can't be dragged to leave a column less than this share of the table, or less than a
 /// quarter of what the two columns it divides have between them when that is smaller.
 const MIN_SHARE: f64 = 0.04;
@@ -359,7 +359,7 @@ fn column_bar(ui: &mut egui::Ui, d: &mut FieldTableDraft, t: &theme::Tokens) {
         // The last column ends at the bar's edge, whatever rounding says.
         let right = if c + 1 == n { bar.right() } else { right.min(bar.right()) };
         let column = Rect::from_min_max(pos2(left, bar.top()), pos2(right, bar.bottom()));
-        painter.rect_filled(column, CornerRadius::ZERO, SELECT_BLUE.gamma_multiply(if c % 2 == 0 { 0.11 } else { 0.055 }));
+        painter.rect_filled(column, CornerRadius::ZERO, SELECT.gamma_multiply(if c % 2 == 0 { 0.11 } else { 0.055 }));
         if column.width() > 32.0 {
             painter.text(column.center(), egui::Align2::CENTER_CENTER, format!("{:.0}%", share * 100.0), theme::medium(11.0), t.text);
         }
@@ -367,7 +367,7 @@ fn column_bar(ui: &mut egui::Ui, d: &mut FieldTableDraft, t: &theme::Tokens) {
     }
     painter.rect_stroke(bar, CornerRadius::same(3), Stroke::new(1.0, t.border), egui::StrokeKind::Inside);
     for (i, &x) in edges(&shares).iter().enumerate().take(n.saturating_sub(1)) {
-        let stroke = if active == Some(i) { Stroke::new(3.0, SELECT_BLUE) } else { Stroke::new(1.5, t.border) };
+        let stroke = if active == Some(i) { Stroke::new(3.0, SELECT) } else { Stroke::new(1.5, t.border) };
         painter.line_segment([pos2(x, bar.top() + 1.0), pos2(x, bar.bottom() - 1.0)], stroke);
     }
 }
@@ -420,26 +420,26 @@ pub(crate) fn paint_preview(painter: &egui::Painter, xf: &PageXform, page: usize
     let on_screen = |r: [f64; 4]| xf.view_rect([r[0] as f32, r[1] as f32, r[2] as f32, r[3] as f32]);
     let outline = on_screen(preview.laid.table.rect);
     let visible = painter.clip_rect();
-    // A tag of white `text` in the middle of `area`, kept inside it.
+    // A tag of ivory `text` in the middle of `area`, kept inside it.
     let tag = |area: Rect, text: String, fill: Color32| {
-        let galley = painter.layout_no_wrap(text, font.clone(), Color32::WHITE);
+        let galley = painter.layout_no_wrap(text, font.clone(), crate::theme::IVORY);
         let tag = Rect::from_center_size(area.center(), galley.size() + vec2(6.0, 2.0));
         let inside = painter.with_clip_rect(painter.clip_rect().intersect(area));
         inside.rect_filled(tag, CornerRadius::same(1), fill);
-        inside.galley(tag.min + vec2(3.0, 1.0), galley, Color32::WHITE);
+        inside.galley(tag.min + vec2(3.0, 1.0), galley, crate::theme::IVORY);
     };
     match &preview.laid.cells {
         Ok(cells) => {
-            painter.rect_stroke(outline, CornerRadius::ZERO, Stroke::new(1.0, SELECT_BLUE.gamma_multiply(0.3)), egui::StrokeKind::Outside);
+            painter.rect_stroke(outline, CornerRadius::ZERO, Stroke::new(1.0, SELECT.gamma_multiply(0.3)), egui::StrokeKind::Outside);
             for cell in cells {
                 let r = on_screen(cell.rect);
                 if !visible.intersects(r) {
                     continue;
                 }
                 painter.rect_filled(r, CornerRadius::ZERO, crate::prepare::FIELD_FILL);
-                painter.rect_stroke(r, CornerRadius::ZERO, Stroke::new(1.5, SELECT_BLUE), egui::StrokeKind::Inside);
+                painter.rect_stroke(r, CornerRadius::ZERO, Stroke::new(1.5, SELECT), egui::StrokeKind::Inside);
                 if r.height() >= font.size + 2.0 && r.width() >= 24.0 {
-                    tag(r, cell.name.clone(), SELECT_BLUE);
+                    tag(r, cell.name.clone(), SELECT);
                 }
             }
         }
@@ -500,7 +500,7 @@ mod tests {
                 .shapes
                 .iter()
                 .filter_map(|shape| match &shape.shape {
-                    egui::Shape::Rect(r) if r.fill == SELECT_BLUE.gamma_multiply(0.11) || r.fill == SELECT_BLUE.gamma_multiply(0.055) => Some(r.rect),
+                    egui::Shape::Rect(r) if r.fill == SELECT.gamma_multiply(0.11) || r.fill == SELECT.gamma_multiply(0.055) => Some(r.rect),
                     _ => None,
                 })
                 .collect();

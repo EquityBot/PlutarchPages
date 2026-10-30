@@ -130,8 +130,8 @@ fn compare_filters_hide_text_or_visual_changes() {
     h.run_steps(3);
     let new_i = h.state().active_ids().unwrap().0;
     let old_i = h.state().views.iter().position(|v| v.id == h.state().compare.as_ref().unwrap().old).unwrap();
-    // Visual differences are shaded orange (compare_ui::VISUAL), text changes in their kind's colour.
-    let visual = egui::Color32::from_rgb(0xF0, 0x8C, 0x1A);
+    // Visual differences are shaded dark gold (compare_ui::VISUAL), text changes in their kind's colour.
+    let visual = pdfcraft_ui_egui::theme::DARK_GOLD;
     let kinds = |h: &Harness<'_, PdfCraftApp>, i: usize| {
         let marks = &h.state().views[i].compare_marks;
         (marks.iter().filter(|m| m.2 != visual).count(), marks.iter().filter(|m| m.2 == visual).count())

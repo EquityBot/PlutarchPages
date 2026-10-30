@@ -12,7 +12,7 @@ use crate::page_cursor::Layer;
 use crate::theme::Tokens;
 use crate::{PdfCraftApp, widgets};
 
-const MARK_RED: Color32 = Color32::from_rgb(0xE3, 0x22, 0x22);
+const MARK_RED: Color32 = crate::theme::ON_PAGE_ALERT;
 
 /// Redaction Tool Properties: what new marks look like once applied.
 #[derive(Clone, Debug, PartialEq)]

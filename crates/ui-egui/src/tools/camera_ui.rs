@@ -16,7 +16,7 @@ const INSET: f32 = 0.05;
 const GRAB: f32 = 12.0;
 /// The slider's top.
 pub const MAX_LEVEL: u8 = pdfcraft_engine::camera_clean::MAX_LEVEL;
-const BLUE: Color32 = Color32::from_rgb(0x14, 0x73, 0xE6);
+const SELECT: Color32 = crate::theme::ON_PAGE_SELECT;
 
 /// The quadrilateral being placed: its page, its corners in view space (points, y down) and the
 /// corner being dragged.
@@ -131,9 +131,9 @@ pub(crate) fn paint(painter: &egui::Painter, xf: &PageXform, page: usize, view: 
         mesh.add_triangle(base, base + 2, base + 3);
     }
     painter.add(Shape::mesh(mesh));
-    painter.add(Shape::closed_line(pts.clone(), Stroke::new(1.5, BLUE)));
+    painter.add(Shape::closed_line(pts.clone(), Stroke::new(1.5, SELECT)));
     for p in pts {
-        painter.circle(p, 6.0, Color32::WHITE, Stroke::new(2.0, BLUE));
+        painter.circle(p, 6.0, crate::theme::IVORY, Stroke::new(2.0, SELECT));
     }
 }
 

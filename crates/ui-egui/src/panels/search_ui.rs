@@ -83,7 +83,7 @@ pub(crate) fn panel(ui: &mut egui::Ui, t: &Tokens, view: &mut DocView, pages: us
             TextFormat {
                 font_id: theme::semibold(12.5),
                 color: t.text,
-                background: Color32::from_rgba_unmultiplied(255, 214, 0, 90),
+                background: Color32::from_rgba_unmultiplied(theme::BRIGHT_GOLD.r(), theme::BRIGHT_GOLD.g(), theme::BRIGHT_GOLD.b(), 90),
                 ..Default::default()
             },
         );

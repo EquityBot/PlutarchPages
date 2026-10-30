@@ -29,7 +29,7 @@ use layout::{DARK_EDITOR_FILL, contrast};
 pub(crate) use layout::{caret_color_on, editor_fill, editor_font, install_source_fonts};
 use layout::{color32, editor_galley, editor_job, look_of, luminance, unseen};
 
-const ACCENT: Color32 = Color32::from_rgb(0x14, 0x73, 0xE6);
+const ACCENT: Color32 = crate::theme::ON_PAGE_SELECT;
 
 #[derive(Clone, Copy, PartialEq)]
 enum TextTarget {
@@ -369,7 +369,7 @@ pub(crate) fn page_input(cx: PageToolContext<'_>, lines: &[pdfcraft_engine::Text
     let upright = has_edges(info, page);
     let draw_handles = |b: Rect| {
         for h in width_handles(b) {
-            painter.rect(h, CornerRadius::same(2), Color32::WHITE, Stroke::new(1.0, ACCENT), egui::StrokeKind::Middle);
+            painter.rect(h, CornerRadius::same(2), crate::theme::IVORY, Stroke::new(1.0, ACCENT), egui::StrokeKind::Middle);
         }
     };
     // A drag in progress: the box follows the pointer (or the grabbed edge does); releasing applies it.

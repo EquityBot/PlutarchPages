@@ -24,9 +24,15 @@ pub use draft::{ACTION_KINDS, ActionDraft, FieldDraft, FieldTab};
 pub(crate) use draft::{da_font, da_size};
 pub(crate) use properties::body;
 
-const SELECT_BLUE: Color32 = Color32::from_rgb(0x14, 0x73, 0xE6);
-/// Acrobat's field fill in Prepare Form (light blue).
-pub(crate) const FIELD_FILL: Color32 = Color32::from_rgba_premultiplied(0x1B, 0x34, 0x54, 0x59);
+const SELECT: Color32 = crate::theme::ON_PAGE_SELECT;
+/// The field fill in Prepare Form: Tyrian purple at alpha 0x59, premultiplied.
+pub(crate) const FIELD_FILL: Color32 = {
+    const fn scaled(v: u8) -> u8 {
+        ((v as u16 * 0x59 + 127) / 255) as u8
+    }
+    let c = theme::TYRIAN_PURPLE;
+    Color32::from_rgba_premultiplied(scaled(c.r()), scaled(c.g()), scaled(c.b()), 0x59)
+};
 
 /// The Add form components tools.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -564,24 +570,24 @@ pub(crate) fn paint_page(cx: PageToolContext<'_>, form: &[FormField], view: &Doc
             painter.rect_stroke(
                 r,
                 CornerRadius::ZERO,
-                Stroke::new(if also { 2.0 } else { 1.0 }, if selected || also { SELECT_BLUE } else { Color32::from_gray(90) }),
+                Stroke::new(if also { 2.0 } else { 1.0 }, if selected || also { SELECT } else { theme::ON_PAGE_HINT }),
                 egui::StrokeKind::Inside,
             );
-            // The name tag: white text on black, clipped to the field.
+            // The name tag: ivory text on black, clipped to the field.
             // The full name, as Acrobat shows it: MASTER.first, not first (#2696).
             let label = f.name.as_str();
             let font = theme::regular((9.0 * zoom).clamp(7.0, 13.0));
-            let galley = painter.layout_no_wrap(label.to_string(), font, Color32::WHITE);
+            let galley = painter.layout_no_wrap(label.to_string(), font, theme::IVORY);
             let size = galley.size() + vec2(6.0, 2.0);
             let tag = Rect::from_center_size(r.center(), size);
             let clip = painter.clip_rect().intersect(r);
             let p2 = painter.with_clip_rect(clip);
-            p2.rect_filled(tag, CornerRadius::same(1), if selected { SELECT_BLUE } else { Color32::BLACK });
-            p2.galley(tag.min + vec2(3.0, 1.0), galley, Color32::WHITE);
+            p2.rect_filled(tag, CornerRadius::same(1), if selected { SELECT } else { Color32::BLACK });
+            p2.galley(tag.min + vec2(3.0, 1.0), galley, theme::IVORY);
             if selected {
-                painter.rect_stroke(r.expand(1.0), CornerRadius::ZERO, Stroke::new(2.0, SELECT_BLUE), egui::StrokeKind::Outside);
+                painter.rect_stroke(r.expand(1.0), CornerRadius::ZERO, Stroke::new(2.0, SELECT), egui::StrokeKind::Outside);
                 for (c, ..) in handles(r) {
-                    painter.circle(c, 3.5, Color32::WHITE, Stroke::new(1.5, SELECT_BLUE));
+                    painter.circle(c, 3.5, theme::IVORY, Stroke::new(1.5, SELECT));
                 }
             }
         }
@@ -589,7 +595,7 @@ pub(crate) fn paint_page(cx: PageToolContext<'_>, form: &[FormField], view: &Doc
     if let (Some((_, Grab::Draw(from) | Grab::Select(from), _)), Some(p)) = (grab, pointer) {
         let r = Rect::from_two_pos(from, p).intersect(xf.rect);
         painter.rect_filled(r, CornerRadius::ZERO, FIELD_FILL);
-        painter.rect_stroke(r, CornerRadius::ZERO, Stroke::new(1.0, SELECT_BLUE), egui::StrokeKind::Inside);
+        painter.rect_stroke(r, CornerRadius::ZERO, Stroke::new(1.0, SELECT), egui::StrokeKind::Inside);
     }
 }
 

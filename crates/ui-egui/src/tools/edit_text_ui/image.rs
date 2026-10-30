@@ -145,7 +145,7 @@ fn crop_input(cx: &ImageCx<'_>, view: &mut DocView, i: usize, b: Rect) -> bool {
         painter.rect(
             Rect::from_center_size(h, egui::vec2(8.0, 8.0)),
             CornerRadius::ZERO,
-            Color32::WHITE,
+            crate::theme::IVORY,
             Stroke::new(1.0, ACCENT),
             egui::StrokeKind::Middle,
         );
@@ -161,7 +161,7 @@ fn crop_input(cx: &ImageCx<'_>, view: &mut DocView, i: usize, b: Rect) -> bool {
     let cancel = pill(tl!("Cancel"), done.min.x - 6.0, y);
     let t = crate::theme::Tokens::get(ui.ctx());
     painter.rect_filled(done, CornerRadius::same(11), ACCENT);
-    painter.text(done.center(), egui::Align2::CENTER_CENTER, tl!("Done"), font.clone(), Color32::WHITE);
+    painter.text(done.center(), egui::Align2::CENTER_CENTER, tl!("Done"), font.clone(), crate::theme::IVORY);
     painter.rect(cancel, CornerRadius::same(11), t.panel, Stroke::new(1.0, t.border), egui::StrokeKind::Inside);
     painter.text(cancel.center(), egui::Align2::CENTER_CENTER, tl!("Cancel"), font, t.text);
     // Cropping takes over its page's cursor, and the buttons' wherever they are; other pages
@@ -325,7 +325,7 @@ fn draw_handles(painter: &egui::Painter, rect: Rect) {
         painter.rect(
             Rect::from_center_size(c, egui::vec2(8.0, 8.0)),
             CornerRadius::ZERO,
-            Color32::WHITE,
+            crate::theme::IVORY,
             Stroke::new(1.0, ACCENT),
             egui::StrokeKind::Middle,
         );
@@ -351,7 +351,7 @@ fn turn_preview(cx: &ImageCx<'_>, view: &mut DocView, i: usize, b: Rect, knob: P
     painter.add(egui::Shape::closed_line(outline, Stroke::new(1.5, ACCENT)));
     let galley = painter.layout_no_wrap(format!("{degrees:.0}\u{b0}"), egui::FontId::proportional(12.0), ACCENT);
     let label = Rect::from_center_size(turn(knob) - egui::vec2(0.0, 14.0), galley.size() + egui::vec2(8.0, 4.0));
-    painter.rect(label, CornerRadius::same(3), Color32::WHITE, Stroke::new(1.0, ACCENT), egui::StrokeKind::Middle);
+    painter.rect(label, CornerRadius::same(3), crate::theme::IVORY, Stroke::new(1.0, ACCENT), egui::StrokeKind::Middle);
     painter.galley(label.center() - galley.size() / 2.0, galley, ACCENT);
     view.cursor.claim(Layer::Drag, egui::CursorIcon::Grabbing);
     if resp.drag_stopped() || !ptr.primary_down {
@@ -515,7 +515,7 @@ pub(crate) fn image_input(cx: &ImageCx<'_>, images: &[pdfcraft_engine::PageImage
         let (knob, stem) = rotate_knob(b, ui.clip_rect());
         if view.image_selection.as_ref().is_some_and(|s| s.drag.is_none()) {
             painter.line_segment([stem, knob], Stroke::new(1.0, ACCENT));
-            painter.circle(knob, 5.0, Color32::WHITE, Stroke::new(1.0, ACCENT));
+            painter.circle(knob, 5.0, crate::theme::IVORY, Stroke::new(1.0, ACCENT));
             if allow_interaction && hover_pos.is_some_and(|p| p.distance(knob) < 8.0) {
                 view.cursor.claim(Layer::Handle, egui::CursorIcon::Grab);
             }

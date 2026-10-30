@@ -11,7 +11,7 @@ use crate::page_cursor::Layer;
 use crate::theme::{self, Tokens};
 use crate::{PdfCraftApp, widgets};
 
-const LINK_BLUE: Color32 = Color32::from_rgb(0x14, 0x73, 0xE6);
+const LINK: Color32 = crate::theme::ON_PAGE_SELECT;
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct LinkView {
@@ -116,7 +116,7 @@ pub(crate) fn paint(painter: &egui::Painter, xf: &PageXform, page: usize, info: 
         painter.rect_stroke(
             r,
             CornerRadius::ZERO,
-            Stroke::new(if selected { 2.0 } else { 1.0 }, LINK_BLUE.gamma_multiply(if selected { 1.0 } else { 0.6 })),
+            Stroke::new(if selected { 2.0 } else { 1.0 }, LINK.gamma_multiply(if selected { 1.0 } else { 0.6 })),
             egui::StrokeKind::Outside,
         );
     }
@@ -124,8 +124,8 @@ pub(crate) fn paint(painter: &egui::Painter, xf: &PageXform, page: usize, info: 
         && dp == page
     {
         let r = Rect::from_two_pos(start, p);
-        painter.rect_filled(r, CornerRadius::ZERO, LINK_BLUE.gamma_multiply(0.08));
-        painter.rect_stroke(r, CornerRadius::ZERO, Stroke::new(1.0, LINK_BLUE), egui::StrokeKind::Inside);
+        painter.rect_filled(r, CornerRadius::ZERO, LINK.gamma_multiply(0.08));
+        painter.rect_stroke(r, CornerRadius::ZERO, Stroke::new(1.0, LINK), egui::StrokeKind::Inside);
     }
 }
 

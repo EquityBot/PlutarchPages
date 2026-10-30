@@ -19,7 +19,7 @@ pub struct PickedImage {
     pub generation: u64,
 }
 
-const BLUE: Color32 = Color32::from_rgb(0x3A, 0x7B, 0xF0);
+const SELECT: Color32 = crate::theme::ON_PAGE_SELECT;
 
 /// A click on page `page` (Select tool, not taken by anything else) selects the picture under
 /// it, even with text drawn over it (scans with an OCR layer, captions); dragging or a double
@@ -66,8 +66,8 @@ pub(crate) fn paint(painter: &egui::Painter, xf: &PageXform, page: usize, info: 
         return;
     }
     let r = xf.user_rect(info, page, picked.rect.map(|v| v as f32));
-    painter.rect_filled(r, CornerRadius::ZERO, Color32::from_rgba_unmultiplied(0x3A, 0x7B, 0xF0, 50));
-    painter.rect_stroke(r, CornerRadius::ZERO, Stroke::new(2.0, BLUE), egui::StrokeKind::Outside);
+    painter.rect_filled(r, CornerRadius::ZERO, Color32::from_rgba_unmultiplied(SELECT.r(), SELECT.g(), SELECT.b(), 50));
+    painter.rect_stroke(r, CornerRadius::ZERO, Stroke::new(2.0, SELECT), egui::StrokeKind::Outside);
 }
 
 /// A file name without characters file systems refuse.

@@ -1,8 +1,8 @@
 use super::paint::edit_anchor;
 use super::state::{Composer, ComposerKind};
 use super::{
-    Annotation, Color32, CommentPrefs, CommentTool, DocInfo, DocView, Edit, Rect, ReviewState, Rgb, SELECT_BLUE, SWATCHES, Sense, Stroke, color32,
-    icons, theme, tool_for, vec2,
+    Annotation, Color32, CommentPrefs, CommentTool, DocInfo, DocView, Edit, Rect, ReviewState, Rgb, SWATCHES, Sense, Stroke, color32, icons, theme,
+    tool_for, vec2,
 };
 
 /// Save attachment… and, for a PDF, Open in a new tab, first in a file attachment comment's
@@ -185,7 +185,7 @@ fn swatch(ui: &mut egui::Ui, c: Rgb, on: bool, tooltip: &str) -> egui::Response 
     ui.painter().circle_filled(r.center(), 9.0, color32(c));
     ui.painter().circle_stroke(r.center(), 9.0, Stroke::new(1.0, Color32::from_black_alpha(40)));
     if on || resp.hovered() {
-        ui.painter().circle_stroke(r.center(), 11.0, Stroke::new(1.5, SELECT_BLUE));
+        ui.painter().circle_stroke(r.center(), 11.0, Stroke::new(1.5, theme::Tokens::get(ui.ctx()).accent_text));
     }
     resp.on_hover_text(tooltip)
 }
@@ -200,7 +200,7 @@ fn other_colour_swatch(ui: &mut egui::Ui, open: bool) -> egui::Response {
         ui.painter().line_segment([c - d, c + d], Stroke::new(1.5, ink));
     }
     if open || resp.hovered() {
-        ui.painter().circle_stroke(c, 11.0, Stroke::new(1.5, SELECT_BLUE));
+        ui.painter().circle_stroke(c, 11.0, Stroke::new(1.5, theme::Tokens::get(ui.ctx()).accent_text));
     }
     let label = tl!("Other colour…");
     resp.widget_info(|| egui::WidgetInfo::selected(egui::Role::Button, true, open, label));
@@ -345,7 +345,7 @@ fn fill_button(ui: &mut egui::Ui, fill: Option<Rgb>) -> egui::Response {
             ui.painter().rect_filled(sq, 2.0, color32(c));
         }
         None => {
-            ui.painter().line_segment([sq.left_bottom(), sq.right_top()], Stroke::new(1.5, Color32::from_rgb(0xD3, 0x2F, 0x2F)));
+            ui.painter().line_segment([sq.left_bottom(), sq.right_top()], Stroke::new(1.5, theme::RED));
         }
     }
     ui.painter().rect_stroke(sq, 2.0, edge, egui::StrokeKind::Inside);
@@ -361,12 +361,12 @@ fn fill_button(ui: &mut egui::Ui, fill: Option<Rgb>) -> egui::Response {
 }
 
 /// Status badge icon and label for a review state name.
-pub fn status_badge(state: &str) -> Option<(&'static str, &'static str, Color32)> {
+pub fn status_badge(t: &theme::Tokens, state: &str) -> Option<(&'static str, &'static str, Color32)> {
     match state {
-        "Accepted" => Some(("thumbs-up", "Accepted", Color32::from_rgb(0x2D, 0x9D, 0x5B))),
-        "Rejected" => Some(("thumbs-down", "Rejected", Color32::from_rgb(0xD3, 0x2F, 0x2F))),
-        "Cancelled" => Some(("circle-x", "Cancelled", Color32::from_rgb(0x8E, 0x8E, 0x8E))),
-        "Completed" => Some(("check", "Completed", Color32::from_rgb(0x2D, 0x9D, 0x5B))),
+        "Accepted" => Some(("thumbs-up", "Accepted", t.success)),
+        "Rejected" => Some(("thumbs-down", "Rejected", t.danger)),
+        "Cancelled" => Some(("circle-x", "Cancelled", t.text_faint)),
+        "Completed" => Some(("check", "Completed", t.success)),
         _ => None,
     }
 }

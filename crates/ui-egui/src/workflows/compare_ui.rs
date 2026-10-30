@@ -30,8 +30,8 @@ pub struct CompareState {
     pub show_visual: bool,
 }
 
-/// Visual differences are shaded orange.
-pub const VISUAL: Color32 = Color32::from_rgb(0xF0, 0x8C, 0x1A);
+/// Visual differences are shaded dark gold.
+pub const VISUAL: Color32 = crate::theme::DARK_GOLD;
 
 /// What the panel asks for.
 pub enum PanelAction {

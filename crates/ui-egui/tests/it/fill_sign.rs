@@ -765,11 +765,12 @@ fn pixel_at(h: &Harness<'static, PdfCraftApp>, pixels: &image::RgbaImage, x: f32
     pixels.get_pixel(p.x.round() as u32, p.y.round() as u32).0
 }
 
-fn has_blue_near(pixels: &image::RgbaImage, p: Pos2) -> bool {
+fn has_handle_near(pixels: &image::RgbaImage, p: Pos2) -> bool {
     (-5..=5).any(|dy| {
         (-5..=5).any(|dx| {
             let v = pixels.get_pixel((p.x as i32 + dx) as u32, (p.y as i32 + dy) as u32).0;
-            i32::from(v[2]) > i32::from(v[0]) + 40 && i32::from(v[2]) > i32::from(v[1]) + 35
+            let handle = pdfcraft_ui_egui::theme::ON_PAGE_SELECT;
+            (0..3).all(|i| v[i].abs_diff(handle.to_array()[i]) < 40)
         })
     })
 }
@@ -803,7 +804,7 @@ fn image_signature_live_resize_and_move_preserve_background_and_hide_moving_hand
         assert!(v[1] > 230 && i32::from(v[1]) > i32::from(v[0]) + 10 && i32::from(v[1]) > i32::from(v[2]) + 10, "page content is preserved: {v:?}")
     };
     assert_green(pixel_at(&h, &resized, 90.0, 250.0));
-    assert!(has_blue_near(&resized, at(&h, 220.0, 266.0)), "resizing keeps its handles visible");
+    assert!(has_handle_near(&resized, at(&h, 220.0, 266.0)), "resizing keeps its handles visible");
     let doc = h.state().session.get(h.state().views[0].id).unwrap();
     assert_eq!(doc.edit_generation(), generation, "pointer frames never edit the document");
     assert_eq!(doc.can_undo(), Some("Add signature"));
@@ -835,7 +836,7 @@ fn image_signature_live_resize_and_move_preserve_background_and_hide_moving_hand
             (x - 90.0, y - 30.0),
             (x - 90.0, y),
         ] {
-            assert!(!has_blue_near(&moving, at(&h, hx, hy)), "moving hides the frame and all eight handles");
+            assert!(!has_handle_near(&moving, at(&h, hx, hy)), "moving hides the frame and all eight handles");
         }
         assert_eq!(h.state().session.get(h.state().views[0].id).unwrap().can_undo(), Some("Resize comment"));
         if y == 140.0
@@ -848,7 +849,7 @@ fn image_signature_live_resize_and_move_preserve_background_and_hide_moving_hand
     h.drop_at(end);
     h.run_steps(2);
     let released = h.render().unwrap();
-    assert!(has_blue_near(&released, at(&h, 240.0, 170.0)), "the frame returns immediately on release");
+    assert!(has_handle_near(&released, at(&h, 240.0, 170.0)), "the frame returns immediately on release");
     let doc = h.state().session.get(h.state().views[0].id).unwrap();
     assert_eq!(doc.can_undo(), Some("Move comment"));
     assert_eq!(doc.edit_generation(), generation + 2, "one edit for each completed gesture");
@@ -945,10 +946,10 @@ fn embedded_image_signature_live_gestures_follow_document_and_view_rotation() {
         assert!(pixel_at(&h, &pixels, x, y)[..3].iter().all(|v| *v > 240), "old ink is removed during movement");
         let [x, y] = u(204.0, 166.0);
         let corner = at(&h, x, y);
-        assert!(!has_blue_near(&pixels, corner));
+        assert!(!has_handle_near(&pixels, corner));
         h.drop_at(target);
         h.run_steps(2);
-        assert!(has_blue_near(&h.render().unwrap(), corner));
+        assert!(has_handle_near(&h.render().unwrap(), corner));
     }
     std::fs::remove_file(path).unwrap();
 }
@@ -998,7 +999,7 @@ fn image_signature_corners_restore_original_aspect_after_edge_resize_and_reopen(
         ];
         let ink_x = expected[0] + 198.0 * if hx < 0.0 { 0.15 } else { 0.85 };
         let pixels = rendered_ink(&mut h, ink_x, (expected[1] + expected[3]) / 2.0);
-        assert!(has_blue_near(&pixels, at(&h, if hx < 0.0 { expected[0] } else { expected[2] }, if hy < 0.0 { expected[1] } else { expected[3] })));
+        assert!(has_handle_near(&pixels, at(&h, if hx < 0.0 { expected[0] } else { expected[2] }, if hy < 0.0 { expected[1] } else { expected[3] })));
         let doc = h.state().session.get(h.state().views[0].id).unwrap();
         assert_eq!(doc.edit_generation(), generation, "corner previews remain read-only");
         assert_rect(doc.info.annotations[0].rect, [70.0, 170.0, 214.0, 226.0]);

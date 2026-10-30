@@ -148,13 +148,13 @@ pub(crate) fn options_body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens)
 }
 
 /// The red of failed checks (as for invalid signatures).
-const FAILED: egui::Color32 = egui::Color32::from_rgb(0xD7, 0x37, 0x3F);
+const FAILED: egui::Color32 = crate::theme::RED;
 
 fn status_icon(t: &Tokens, s: Status) -> (&'static str, egui::Color32) {
     match s {
-        Status::Passed => ("circle-check", egui::Color32::from_rgb(0x2D, 0x9D, 0x4F)),
+        Status::Passed => ("circle-check", t.success),
         Status::Failed => ("circle-x", FAILED),
-        Status::Manual => ("circle-help", egui::Color32::from_rgb(0xD9, 0x8E, 0x04)),
+        Status::Manual => ("circle-help", t.warning),
         Status::Skipped => ("circle-dashed", t.text_faint),
     }
 }

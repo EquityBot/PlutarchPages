@@ -2791,7 +2791,7 @@ licence = "MIT OR Apache-2.0"
 licence_file = "assets/app-icon/LICENSE.txt"
 kind = "icon"
 usage = "Master artwork; every other app-icon file is rendered from it (packaging/icons.sh)"
-sha256 = "27745c021830f82c033b0f15f2d8d9f8e099138743297887ff7e2c9e7ed069da"
+sha256 = "ba79fea56c0e4b76f063c86594d6f447275b507c722fd56583db591515385c06"
 
 [[asset]]
 path = "assets/app-icon/pdfcraft-small.svg"
@@ -2802,7 +2802,7 @@ licence = "MIT OR Apache-2.0"
 licence_file = "assets/app-icon/LICENSE.txt"
 kind = "icon"
 usage = "README header and assets/app-icon/README.md"
-sha256 = "b524df1a583f8034a5a23836955e4fb423e0149429d695e80d95e5056f408678"
+sha256 = "ba4c15c0e34e597083cf89769b08e0db6fee53994f512f227c1c154a4a6ecef9"
 
 [[asset]]
 path = "assets/app-icon/pdfcraft-1024.png"
@@ -2813,7 +2813,7 @@ licence = "MIT OR Apache-2.0"
 licence_file = "assets/app-icon/LICENSE.txt"
 kind = "icon"
 usage = "Runtime window/Dock icon on macOS (apps/pdfcraft/src/main.rs)"
-sha256 = "68ac6730b8990d07503351d32eacea81e9ec171a7a6f09daf52d6555d8245c8a"
+sha256 = "15fc405f45d1e5958da48630ae1230d797555fbc8d47ea728ce087b522183c62"
 
 [[asset]]
 path = "assets/app-icon/pdfcraft.icns"
@@ -2824,7 +2824,7 @@ licence = "MIT OR Apache-2.0"
 licence_file = "assets/app-icon/LICENSE.txt"
 kind = "icon"
 usage = "macOS app bundle icon"
-sha256 = "fca7e7a0e34cc5c5ecae5bca97ee896aac68c4a34b088bc3a0b3271484f23974"
+sha256 = "9aaf5f2cf012cd376867102579445f92a70a3a41ffa83ad285609962d7cba0d2"
 
 [[asset]]
 path = "assets/app-icon/pdfcraft.ico"
@@ -2835,7 +2835,7 @@ licence = "MIT OR Apache-2.0"
 licence_file = "assets/app-icon/LICENSE.txt"
 kind = "icon"
 usage = "Embedded in pdfcraft.exe by apps/pdfcraft/build.rs (Explorer, taskbar, Start menu, Alt-Tab)"
-sha256 = "709271d66e07710a3f785ea21b0c85c5228eaf8bebe5058bc0f71f9ef20749eb"
+sha256 = "4038fbd7c4a1a8fb16a82dbe4a93fafd4342cedcc353850e03c186c574fa0785"
 
 [[asset]]
 path = "assets/app-icon/pdfcraft-document.svg"
@@ -2846,7 +2846,7 @@ licence = "ISC AND (MIT OR Apache-2.0)"
 licence_file = "assets/app-icon/LICENSE-document.txt"
 kind = "icon"
 usage = "Master artwork for the Windows PDF file type icon; rendered by packaging/icons.sh, without fonts or external images"
-sha256 = "c129f1b538ce16e3c3fa0d89d3301038c51249ba5d61bfd98c46e69cfdf5c316"
+sha256 = "dc99b273428705256129319d526f474e107bcdd2325c923d43d9e7c6717a137f"
 
 [[asset]]
 path = "assets/app-icon/pdfcraft-document.ico"
@@ -2857,7 +2857,7 @@ licence = "ISC AND (MIT OR Apache-2.0)"
 licence_file = "assets/app-icon/LICENSE-document.txt"
 kind = "icon"
 usage = "Embedded in pdfcraft.exe as resource 2; the Windows installer uses it for PdfCraft.Document and Applications/pdfcraft.exe PDF file associations"
-sha256 = "910be5e0ecdc94ce00368077ca1bef449bd5d62a75516feeb37884296c6fac4d"
+sha256 = "614a86c0cedbc663c15150c2e14ce1d4d5ee0b37952ebbbe5c8b8dbb1b6781a5"
 
 [[asset]]
 path = "assets/app-icon/hicolor/16x16/apps/ai.storyteller.pdfcraft.png"
@@ -2868,7 +2868,7 @@ licence = "MIT OR Apache-2.0"
 licence_file = "assets/app-icon/LICENSE.txt"
 kind = "icon"
 usage = "Linux hicolor theme icon (packaging/linux/ai.storyteller.pdfcraft.desktop)"
-sha256 = "660d2aace45ec1a28bc7e3708eab71ffee5cb1203f57a6256f7bd7c727193567"
+sha256 = "1b4b38909b2deac20bb37e86f9df35e843e3e56fdacb8d7663f37ef6aa47cf1d"
 
 [[asset]]
 path = "assets/app-icon/hicolor/24x24/apps/ai.storyteller.pdfcraft.png"
@@ -2879,7 +2879,7 @@ licence = "MIT OR Apache-2.0"
 licence_file = "assets/app-icon/LICENSE.txt"
 kind = "icon"
 usage = "Linux hicolor theme icon (packaging/linux/ai.storyteller.pdfcraft.desktop)"
-sha256 = "1989441bdcc8d1df0d73cfe7eb836e9211abaa0fd7fd6ec7e4634bfcd472995d"
+sha256 = "4ed2a977e7643769ec7c144fe5146d4656ef4461f915c62c6292ca6ae48552d8"
 
 [[asset]]
 path = "assets/app-icon/hicolor/32x32/apps/ai.storyteller.pdfcraft.png"
@@ -2890,7 +2890,7 @@ licence = "MIT OR Apache-2.0"
 licence_file = "assets/app-icon/LICENSE.txt"
 kind = "icon"
 usage = "Linux hicolor theme icon (packaging/linux/ai.storyteller.pdfcraft.desktop)"
-sha256 = "7fd1ac555f7f6b13ef3fba2696dfb86900cfcb7f7b669aece38590bf2306cf2e"
+sha256 = "cbcec71077b4541c2cb263a4d8baf6046fe81e9f29a8a36d3539d0bc3f264bb7"
 
 [[asset]]
 path = "assets/app-icon/hicolor/48x48/apps/ai.storyteller.pdfcraft.png"
@@ -2901,7 +2901,7 @@ licence = "MIT OR Apache-2.0"
 licence_file = "assets/app-icon/LICENSE.txt"
 kind = "icon"
 usage = "Linux hicolor theme icon (packaging/linux/ai.storyteller.pdfcraft.desktop)"
-sha256 = "784ef3bd9f9e479cb2df22a0aee259a441a9c358390e646639c3a0ed79d41288"
+sha256 = "a17bfe4958a5bfc25ca7d76c8f054ce1b1ff0c3088ece97537a87105ed5b3b4a"
 
 [[asset]]
 path = "assets/app-icon/hicolor/64x64/apps/ai.storyteller.pdfcraft.png"
@@ -2912,7 +2912,7 @@ licence = "MIT OR Apache-2.0"
 licence_file = "assets/app-icon/LICENSE.txt"
 kind = "icon"
 usage = "Linux hicolor theme icon (packaging/linux/ai.storyteller.pdfcraft.desktop)"
-sha256 = "deb1a9f849549d3f0652fb6d3c30b6eb6ea54498eaea8c1007d901bbafe7067c"
+sha256 = "50b11c39ccdba334dfd4962eb77b403a48abfd30b6acbf9b58ce3ec2fb67e57e"
 
 [[asset]]
 path = "assets/app-icon/hicolor/128x128/apps/ai.storyteller.pdfcraft.png"
@@ -2923,7 +2923,7 @@ licence = "MIT OR Apache-2.0"
 licence_file = "assets/app-icon/LICENSE.txt"
 kind = "icon"
 usage = "Linux hicolor theme icon (packaging/linux/ai.storyteller.pdfcraft.desktop)"
-sha256 = "1933bbeaea290497facd328e917dafcc433d0c0caa9f1e207aa45ac1e430898c"
+sha256 = "980dff6bbd2312a3adb8f5e0bd466ba6ef734bd9401f68040bfb39bbcdd41e47"
 
 [[asset]]
 path = "assets/app-icon/hicolor/256x256/apps/ai.storyteller.pdfcraft.png"
@@ -2934,7 +2934,7 @@ licence = "MIT OR Apache-2.0"
 licence_file = "assets/app-icon/LICENSE.txt"
 kind = "icon"
 usage = "Linux hicolor theme icon (packaging/linux/ai.storyteller.pdfcraft.desktop); runtime window icon on Windows and Linux (apps/pdfcraft/src/main.rs)"
-sha256 = "47094c09fb77eb35d465eee46445626a4d78c7ef50629cc7d04a602de3e144e9"
+sha256 = "cdc0db0b1cbba5353f2b0743bff4086b7d059ee3c8719a8618a8c42a3146af0e"
 
 [[asset]]
 path = "assets/app-icon/hicolor/512x512/apps/ai.storyteller.pdfcraft.png"
@@ -2945,7 +2945,7 @@ licence = "MIT OR Apache-2.0"
 licence_file = "assets/app-icon/LICENSE.txt"
 kind = "icon"
 usage = "Linux hicolor theme icon (packaging/linux/ai.storyteller.pdfcraft.desktop)"
-sha256 = "dea8010a8b41011aba054d3bfb8b790da57bc958c60869f508e1bbd288d3f280"
+sha256 = "5f227f3f36ec43d9b58aaf2b90af211ebfa734ce976ab4d93307fe597b39e116"
 
 [[asset]]
 path = "assets/app-icon/hicolor/scalable/apps/ai.storyteller.pdfcraft.svg"
@@ -2956,7 +2956,7 @@ licence = "MIT OR Apache-2.0"
 licence_file = "assets/app-icon/LICENSE.txt"
 kind = "icon"
 usage = "Linux hicolor theme icon (packaging/linux/ai.storyteller.pdfcraft.desktop)"
-sha256 = "27745c021830f82c033b0f15f2d8d9f8e099138743297887ff7e2c9e7ed069da"
+sha256 = "ba79fea56c0e4b76f063c86594d6f447275b507c722fd56583db591515385c06"
 
 [[asset]]
 path = ".github/assets/banner-light.svg"
@@ -3034,138 +3034,6 @@ licence_file = "LICENSE-APACHE"
 kind = "image"
 usage = "README badge row; committed static SVG, text names the font family only, no embedded fonts"
 sha256 = "d60e88a8c56df37dda916263fa5cea446da6d3f8ab886bcb877252c9e2555115"
-
-[[asset]]
-path = "docs/images/pdfcraft-bookmarks.png"
-title = "PdfCraft screenshot: Bookmarks"
-author = "PdfCraft contributors (generated by `cargo xtask screenshots`)"
-source = "this repository"
-licence = "MIT OR Apache-2.0"
-licence_file = "LICENSE-MIT"
-kind = "image"
-usage = "README: navigation. Shows only PdfCraft UI, Lucide icons and the showcase PDF built from the [[fetched]] OFL fonts"
-sha256 = "6daf2dceda8737da0c5f9e7895e5c4cc24cc845938ffca478713c2230573240d"
-
-[[asset]]
-path = "docs/images/pdfcraft-dark.png"
-title = "PdfCraft screenshot: Dark theme"
-author = "PdfCraft contributors (generated by `cargo xtask screenshots`)"
-source = "this repository"
-licence = "MIT OR Apache-2.0"
-licence_file = "LICENSE-MIT"
-kind = "image"
-usage = "README: themes. Shows only PdfCraft UI, Lucide icons and the showcase PDF built from the [[fetched]] OFL fonts"
-sha256 = "18fbd4931b2a8d01a88aef0d5d0837e3cdc12aa35f8529bedbb4a930565d47e5"
-
-[[asset]]
-path = "docs/images/pdfcraft-find.png"
-title = "PdfCraft screenshot: Find text"
-author = "PdfCraft contributors (generated by `cargo xtask screenshots`)"
-source = "this repository"
-licence = "MIT OR Apache-2.0"
-licence_file = "LICENSE-MIT"
-kind = "image"
-usage = "README: search. Shows only PdfCraft UI, Lucide icons and the showcase PDF built from the [[fetched]] OFL fonts"
-sha256 = "b52771502be4c03e2dabf107c77d5183fad7f39655146d59761dda855c2d4b52"
-
-[[asset]]
-path = "docs/images/pdfcraft-forms.png"
-title = "PdfCraft screenshot: Interactive form"
-author = "PdfCraft contributors (generated by `cargo xtask screenshots`)"
-source = "this repository"
-licence = "MIT OR Apache-2.0"
-licence_file = "LICENSE-MIT"
-kind = "image"
-usage = "README: forms. Shows only PdfCraft UI, Lucide icons and the showcase PDF built from the [[fetched]] OFL fonts"
-sha256 = "f8eb7705056d32e9c8e4d3b8b197c3e500faae08672e4622d6327d2799b536e7"
-
-[[asset]]
-path = "docs/images/pdfcraft-layers.png"
-title = "PdfCraft screenshot: Layers"
-author = "PdfCraft contributors (generated by `cargo xtask screenshots`)"
-source = "this repository"
-licence = "MIT OR Apache-2.0"
-licence_file = "LICENSE-MIT"
-kind = "image"
-usage = "README: layers. Shows only PdfCraft UI, Lucide icons and the showcase PDF built from the [[fetched]] OFL fonts"
-sha256 = "20ff9e1c6ecc74d000a7514b82fe9e39f82c8ef5e7c1a52e9060c5ca349020d6"
-
-[[asset]]
-path = "docs/images/pdfcraft-organize.png"
-title = "PdfCraft screenshot: Organize pages"
-author = "PdfCraft contributors (generated by `cargo xtask screenshots`)"
-source = "this repository"
-licence = "MIT OR Apache-2.0"
-licence_file = "LICENSE-MIT"
-kind = "image"
-usage = "README: organize. Shows only PdfCraft UI, Lucide icons and the showcase PDF built from the [[fetched]] OFL fonts"
-sha256 = "0a309ba73bcfccbe0106824b55fc347cc0b32293d1db68149d5eccec9c087ba1"
-
-[[asset]]
-path = "docs/images/pdfcraft-palette.png"
-title = "PdfCraft screenshot: Command palette"
-author = "PdfCraft contributors (generated by `cargo xtask screenshots`)"
-source = "this repository"
-licence = "MIT OR Apache-2.0"
-licence_file = "LICENSE-MIT"
-kind = "image"
-usage = "README: tools. Shows only PdfCraft UI, Lucide icons and the showcase PDF built from the [[fetched]] OFL fonts"
-sha256 = "74867793e506c03255459e838eef0b08e485c13b7ea8a6b8de3ec16870067eda"
-
-[[asset]]
-path = "docs/images/pdfcraft-properties.png"
-title = "PdfCraft screenshot: Document properties"
-author = "PdfCraft contributors (generated by `cargo xtask screenshots`)"
-source = "this repository"
-licence = "MIT OR Apache-2.0"
-licence_file = "LICENSE-MIT"
-kind = "image"
-usage = "README: metadata. Shows only PdfCraft UI, Lucide icons and the showcase PDF built from the [[fetched]] OFL fonts"
-sha256 = "86f293543b299fa1665db999a68978138f8d61a4082d7c5b5025498e188da459"
-
-[[asset]]
-path = "docs/images/pdfcraft-scripts.png"
-title = "PdfCraft screenshot: Scripts of the world"
-author = "PdfCraft contributors (generated by `cargo xtask screenshots`)"
-source = "this repository"
-licence = "MIT OR Apache-2.0"
-licence_file = "LICENSE-MIT"
-kind = "image"
-usage = "README: rendering. Shows only PdfCraft UI, Lucide icons and the showcase PDF built from the [[fetched]] OFL fonts"
-sha256 = "0dde8ed5a14dee7396379963adff517bd249c7dd0fe494c389b612e643584b15"
-
-[[asset]]
-path = "docs/images/pdfcraft-split.png"
-title = "PdfCraft screenshot: Split dialog"
-author = "PdfCraft contributors (generated by `cargo xtask screenshots`)"
-source = "this repository"
-licence = "MIT OR Apache-2.0"
-licence_file = "LICENSE-MIT"
-kind = "image"
-usage = "README: split. Shows only PdfCraft UI, Lucide icons and the showcase PDF built from the [[fetched]] OFL fonts"
-sha256 = "bf31e13b563ead564af968c5fae8d1c07b91ee38867d0cf1aae9e0582efc2fe5"
-
-[[asset]]
-path = "docs/images/pdfcraft-twoup.png"
-title = "PdfCraft screenshot: Two-up reading"
-author = "PdfCraft contributors (generated by `cargo xtask screenshots`)"
-source = "this repository"
-licence = "MIT OR Apache-2.0"
-licence_file = "LICENSE-MIT"
-kind = "image"
-usage = "README: layouts. Shows only PdfCraft UI, Lucide icons and the showcase PDF built from the [[fetched]] OFL fonts"
-sha256 = "a72ed1b84c827e3aa1dd3282d857b4742f02d8ff23fc39b62115c840ebad14b4"
-
-[[asset]]
-path = "docs/images/pdfcraft-viewer.png"
-title = "PdfCraft screenshot: Viewer with comments"
-author = "PdfCraft contributors (generated by `cargo xtask screenshots`)"
-source = "this repository"
-licence = "MIT OR Apache-2.0"
-licence_file = "LICENSE-MIT"
-kind = "image"
-usage = "README hero. Shows only PdfCraft UI, Lucide icons and the showcase PDF built from the [[fetched]] OFL fonts"
-sha256 = "ecd261028d8837f7f7c013dd796d81ca7e89643bcfcbad3ab9fbfbe87ded04e3"
 
 [[asset]]
 path = "assets/icons/pin.svg"
@@ -3319,7 +3187,7 @@ licence = "MIT OR Apache-2.0"
 licence_file = "assets/app-icon/LICENSE.txt"
 kind = "image"
 usage = "Finder window of the macOS DMG; rendered to background.tiff by packaging/macos/dmg/generate.py"
-sha256 = "f208091c702350d39096be33ab2ac1ed521ce7cbc93d44789911c5ddd7a5b799"
+sha256 = "769e2a49eb96283ae48d1109bdb0ee159b1b17b9f407f440e092c6818eaad904"
 
 
 [[asset]]
@@ -3331,7 +3199,7 @@ licence = "MIT OR Apache-2.0"
 licence_file = "assets/app-icon/LICENSE.txt"
 kind = "image"
 usage = "1x + 2x HiDPI 16-colour palette TIFF copied into the macOS DMG by packaging/macos/package.sh; includes the app icon and the free LittleCMS built-in sRGB profile"
-sha256 = "e6ab168dad3e125196590375a41da1eb6638c74ebe68004508c44d72374eb916"
+sha256 = "5b8c3b1395805311d3c43fde2682e0a73dbb900d52faee60845f8655fab38b48"
 
 [[fetched]]
 file = "text-detection.onnx"
@@ -3507,3 +3375,146 @@ licence = "MIT OR Apache-2.0"
 licence_file = "LICENSE-MIT"
 kind = "translation"
 usage = "Catalan UI strings, compiled in by crates/ui-egui/src/i18n.rs"
+
+[[asset]]
+path = "docs/images/pdfcraft-bookmarks.png"
+title = "PdfCraft screenshot: Bookmarks"
+author = "PdfCraft contributors (generated by `cargo xtask screenshots`)"
+source = "this repository"
+licence = "MIT OR Apache-2.0"
+licence_file = "LICENSE-MIT"
+kind = "image"
+usage = "README: navigation. Shows only PdfCraft UI, Lucide icons and the showcase PDF built from the [[fetched]] OFL fonts"
+sha256 = "4bae80dfa57ab0edbef73de503a84f54b8ec2cd9ef5e0b358b93f99263045b14"
+
+[[asset]]
+path = "docs/images/pdfcraft-dark.png"
+title = "PdfCraft screenshot: Dark theme"
+author = "PdfCraft contributors (generated by `cargo xtask screenshots`)"
+source = "this repository"
+licence = "MIT OR Apache-2.0"
+licence_file = "LICENSE-MIT"
+kind = "image"
+usage = "README: themes. Shows only PdfCraft UI, Lucide icons and the showcase PDF built from the [[fetched]] OFL fonts"
+sha256 = "7b8fdf0722c1f568233aea25ed1c906a70aa1bbca7717bcbe403f3a1715e2a54"
+
+[[asset]]
+path = "docs/images/pdfcraft-find.png"
+title = "PdfCraft screenshot: Find text"
+author = "PdfCraft contributors (generated by `cargo xtask screenshots`)"
+source = "this repository"
+licence = "MIT OR Apache-2.0"
+licence_file = "LICENSE-MIT"
+kind = "image"
+usage = "README: search. Shows only PdfCraft UI, Lucide icons and the showcase PDF built from the [[fetched]] OFL fonts"
+sha256 = "8e5683fef9c6443f72cb7c11443786dd7979dbe294614d00322d8bede4c401e1"
+
+[[asset]]
+path = "docs/images/pdfcraft-forms.png"
+title = "PdfCraft screenshot: Interactive form"
+author = "PdfCraft contributors (generated by `cargo xtask screenshots`)"
+source = "this repository"
+licence = "MIT OR Apache-2.0"
+licence_file = "LICENSE-MIT"
+kind = "image"
+usage = "README: forms. Shows only PdfCraft UI, Lucide icons and the showcase PDF built from the [[fetched]] OFL fonts"
+sha256 = "521b252bbebeed6eab74519e325473c237a60aec8c2a1ee838b1e42a7f09dc5c"
+
+[[asset]]
+path = "docs/images/pdfcraft-layers.png"
+title = "PdfCraft screenshot: Layers"
+author = "PdfCraft contributors (generated by `cargo xtask screenshots`)"
+source = "this repository"
+licence = "MIT OR Apache-2.0"
+licence_file = "LICENSE-MIT"
+kind = "image"
+usage = "README: layers. Shows only PdfCraft UI, Lucide icons and the showcase PDF built from the [[fetched]] OFL fonts"
+sha256 = "06c8558117f4fc437cb5a6ec0041f640331174e222e320697e4597219dd6405b"
+
+[[asset]]
+path = "docs/images/pdfcraft-organize.png"
+title = "PdfCraft screenshot: Organize pages"
+author = "PdfCraft contributors (generated by `cargo xtask screenshots`)"
+source = "this repository"
+licence = "MIT OR Apache-2.0"
+licence_file = "LICENSE-MIT"
+kind = "image"
+usage = "README: organize. Shows only PdfCraft UI, Lucide icons and the showcase PDF built from the [[fetched]] OFL fonts"
+sha256 = "78e6efd83b8b4916cfcbf6e99a48b0288026c383b7c005a00feaf56e6c63880e"
+
+[[asset]]
+path = "docs/images/pdfcraft-palette.png"
+title = "PdfCraft screenshot: Command palette"
+author = "PdfCraft contributors (generated by `cargo xtask screenshots`)"
+source = "this repository"
+licence = "MIT OR Apache-2.0"
+licence_file = "LICENSE-MIT"
+kind = "image"
+usage = "README: tools. Shows only PdfCraft UI, Lucide icons and the showcase PDF built from the [[fetched]] OFL fonts"
+sha256 = "4a56444416b7140f1ac696732d19760ecf7cefa74291a1513443dd0b2af9f189"
+
+[[asset]]
+path = "docs/images/pdfcraft-properties.png"
+title = "PdfCraft screenshot: Document properties"
+author = "PdfCraft contributors (generated by `cargo xtask screenshots`)"
+source = "this repository"
+licence = "MIT OR Apache-2.0"
+licence_file = "LICENSE-MIT"
+kind = "image"
+usage = "README: metadata. Shows only PdfCraft UI, Lucide icons and the showcase PDF built from the [[fetched]] OFL fonts"
+sha256 = "ef7466e501b0da941dbf21e4829bc4aa1f78551af2ffafea9fb3dab04039b33b"
+
+[[asset]]
+path = "docs/images/pdfcraft-scripts.png"
+title = "PdfCraft screenshot: Scripts of the world"
+author = "PdfCraft contributors (generated by `cargo xtask screenshots`)"
+source = "this repository"
+licence = "MIT OR Apache-2.0"
+licence_file = "LICENSE-MIT"
+kind = "image"
+usage = "README: rendering. Shows only PdfCraft UI, Lucide icons and the showcase PDF built from the [[fetched]] OFL fonts"
+sha256 = "24375f19e0cde9396ff4bda222d9252e8cfb1643be93de7e53b9ae5d5e15ac84"
+
+[[asset]]
+path = "docs/images/pdfcraft-split.png"
+title = "PdfCraft screenshot: Split dialog"
+author = "PdfCraft contributors (generated by `cargo xtask screenshots`)"
+source = "this repository"
+licence = "MIT OR Apache-2.0"
+licence_file = "LICENSE-MIT"
+kind = "image"
+usage = "README: split. Shows only PdfCraft UI, Lucide icons and the showcase PDF built from the [[fetched]] OFL fonts"
+sha256 = "831ae570c16ab6700573a6a6af0db03d66be0e7fd4fca2df6f4109772da6a934"
+
+[[asset]]
+path = "docs/images/pdfcraft-tools.png"
+title = "PdfCraft screenshot: All tools"
+author = "PdfCraft contributors (generated by `cargo xtask screenshots`)"
+source = "this repository"
+licence = "MIT OR Apache-2.0"
+licence_file = "LICENSE-MIT"
+kind = "image"
+usage = "README: tool catalogue. Shows only PdfCraft UI, Lucide icons and the showcase PDF built from the [[fetched]] OFL fonts"
+sha256 = "0d8604f1d80df90f0fc9613ec292af5b7bc9f96038beb9eb70cc220926f20903"
+
+[[asset]]
+path = "docs/images/pdfcraft-twoup.png"
+title = "PdfCraft screenshot: Two-up reading"
+author = "PdfCraft contributors (generated by `cargo xtask screenshots`)"
+source = "this repository"
+licence = "MIT OR Apache-2.0"
+licence_file = "LICENSE-MIT"
+kind = "image"
+usage = "README: layouts. Shows only PdfCraft UI, Lucide icons and the showcase PDF built from the [[fetched]] OFL fonts"
+sha256 = "c63f40ff133e38fc52a6225e8c61d8a7113064b68cadbf8579e3d6f294acc70b"
+
+[[asset]]
+path = "docs/images/pdfcraft-viewer.png"
+title = "PdfCraft screenshot: Viewer with comments"
+author = "PdfCraft contributors (generated by `cargo xtask screenshots`)"
+source = "this repository"
+licence = "MIT OR Apache-2.0"
+licence_file = "LICENSE-MIT"
+kind = "image"
+usage = "README hero. Shows only PdfCraft UI, Lucide icons and the showcase PDF built from the [[fetched]] OFL fonts"
+sha256 = "c7db562f8a6a78e6ba452e5c7ff45c505c52fa7fab769819904c5f712a652025"

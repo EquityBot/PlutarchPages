@@ -944,16 +944,10 @@ fn paint_page_surface(ui: &mut egui::Ui, view: &mut DocView, frame: &mut PageFra
     }
     painter.rect_filled(r, CornerRadius::ZERO, paper);
     if let Some(err) = view.errors.get(&i) {
-        painter.rect_filled(r, CornerRadius::ZERO, Color32::from_rgb(0xFB, 0xF4, 0xF4));
-        icons::paint(
-            ui,
-            Rect::from_center_size(r.center() - vec2(0.0, 26.0), vec2(28.0, 28.0)),
-            "triangle-alert",
-            26.0,
-            Color32::from_rgb(0xC8, 0x3A, 0x3A),
-        );
+        painter.rect_filled(r, CornerRadius::ZERO, theme::IVORY);
+        icons::paint(ui, Rect::from_center_size(r.center() - vec2(0.0, 26.0), vec2(28.0, 28.0)), "triangle-alert", 26.0, theme::RED);
         let message = crate::i18n::fmt(tl!("This page couldn't be displayed.\n{e}"), &[("e", err)]);
-        let msg = ui.fonts_mut(|f| f.layout(message, theme::regular(12.5), Color32::from_rgb(0x6A, 0x2A, 0x2A), (r.width() - 40.0).max(80.0)));
+        let msg = ui.fonts_mut(|f| f.layout(message, theme::regular(12.5), Color32::BLACK, (r.width() - 40.0).max(80.0)));
         painter.galley(pos2(r.center().x - msg.size().x / 2.0, r.center().y), msg, Color32::BLACK);
     } else {
         let (pw_pt, ph_pt) = (info.pages[i].width.max(1.0), info.pages[i].height.max(1.0));
@@ -1350,28 +1344,29 @@ fn paint_text_marks(ui: &egui::Ui, view: &DocView, text: &PageText, page: usize,
                 continue;
             }
             let fill = if find.current == Some(index) {
-                Color32::from_rgba_unmultiplied(255, 140, 0, 110)
+                Color32::from_rgba_unmultiplied(theme::DARK_GOLD.r(), theme::DARK_GOLD.g(), theme::DARK_GOLD.b(), 110)
             } else {
-                Color32::from_rgba_unmultiplied(255, 214, 0, 90)
+                Color32::from_rgba_unmultiplied(theme::BRIGHT_GOLD.r(), theme::BRIGHT_GOLD.g(), theme::BRIGHT_GOLD.b(), 90)
             };
             for line_rect in text.line_rects(range.clone()) {
                 painter.rect_filled(to_screen(line_rect).expand(1.0), CornerRadius::same(2), fill);
             }
         }
     }
+    let select = theme::ON_PAGE_SELECT;
     if view.all_text {
         for line_rect in text.line_rects(0..text.glyphs.len()) {
-            painter.rect_filled(to_screen(line_rect), CornerRadius::same(1), Color32::from_rgba_unmultiplied(0x3A, 0x7B, 0xF0, 70));
+            painter.rect_filled(to_screen(line_rect), CornerRadius::same(1), Color32::from_rgba_unmultiplied(select.r(), select.g(), select.b(), 70));
         }
     }
     if let Some(selection) = view.selection.filter(|selection| selection.page == page) {
         for line_rect in selection.rects(text) {
-            painter.rect_filled(to_screen(line_rect), CornerRadius::same(1), Color32::from_rgba_unmultiplied(0x3A, 0x7B, 0xF0, 70));
+            painter.rect_filled(to_screen(line_rect), CornerRadius::same(1), Color32::from_rgba_unmultiplied(select.r(), select.g(), select.b(), 70));
         }
         if let Span::Column { rect } = selection.span
             && dragging
         {
-            let outline = Stroke::new(1.0, Color32::from_rgb(0x3A, 0x7B, 0xF0));
+            let outline = Stroke::new(1.0, select);
             painter.rect_stroke(to_screen(rect), CornerRadius::ZERO, outline, egui::StrokeKind::Middle);
         }
     }
@@ -1640,10 +1635,11 @@ fn page_overlays(ui: &mut egui::Ui, view: &mut DocView, frame: &mut PageFrame<'_
         if age < 1.6 {
             let a = ((1.6 - age) / 1.6 * 255.0) as u8;
             let sr = xf.user_rect(info, i, fr).expand(4.0);
+            let c = theme::ON_PAGE_SELECT;
             painter.rect_stroke(
                 sr,
                 CornerRadius::same(3),
-                Stroke::new(2.5, Color32::from_rgba_unmultiplied(0x1B, 0x63, 0xE0, a)),
+                Stroke::new(2.5, Color32::from_rgba_unmultiplied(c.r(), c.g(), c.b(), a)),
                 egui::StrokeKind::Outside,
             );
             ui.ctx().request_repaint();
@@ -1657,7 +1653,8 @@ fn page_overlays(ui: &mut egui::Ui, view: &mut DocView, frame: &mut PageFrame<'_
     for badge in signature_badges(&doc.signatures, i) {
         let [x0, y0, x1, y1] = badge.rect;
         let sr = xf.user_rect(info, i, [x0 as f32, y0 as f32, x1 as f32, y1 as f32]);
-        let (icon, color) = crate::sign_ui::signature_status_style(badge.status);
+        // Pages stay white, so the light theme's status colours in either theme.
+        let (icon, color) = crate::sign_ui::signature_status_style(&Tokens::for_kind(theme::ThemeKind::Light), badge.status);
         painter.rect_stroke(sr, CornerRadius::same(2), Stroke::new(1.5, color), egui::StrokeKind::Outside);
         // A widget too small for the mark keeps its outline: the verdict still shows.
         if sr.width() < 4.0 || sr.height() < 4.0 {
@@ -1685,8 +1682,9 @@ fn paint_field_highlights(painter: &egui::Painter, xf: &PageXform, info: &DocInf
         for widget in field.widgets.iter().filter(|widget| widget.page == Some(page) && !widget.hidden && !widget.read_only) {
             let rect = widget.rect;
             let screen_rect = xf.user_rect(info, page, [rect[0] as f32, rect[1] as f32, rect[2] as f32, rect[3] as f32]);
-            let tint = Color32::from_rgba_unmultiplied(0x6E, 0x8E, 0xF5, 48);
-            let (width, color) = if required { (2.0, Color32::from_rgb(0xE3, 0x22, 0x22)) } else { (1.0, Color32::from_rgb(0x6E, 0x8E, 0xF5)) };
+            let hint = theme::ON_PAGE_HINT;
+            let tint = Color32::from_rgba_unmultiplied(hint.r(), hint.g(), hint.b(), 48);
+            let (width, color) = if required { (2.0, theme::ON_PAGE_ALERT) } else { (1.0, hint) };
             if widget.round {
                 let radius = screen_rect.width().min(screen_rect.height()) / 2.0;
                 painter.circle_filled(screen_rect.center(), radius, tint);
@@ -2844,7 +2842,7 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
     // Security, stay as they are.
     let secured = show_secured_notice && doc.security_summary().is_some_and(|s| !(s.owner || (s.permissions.modify() && s.permissions.assemble())));
     let repaired = !doc.repair_log().is_empty();
-    let notice = notices(view, doc, secured, repaired, crate::sign_ui::banner(&doc.signatures), ui, &t);
+    let notice = notices(view, doc, secured, repaired, crate::sign_ui::banner(&doc.signatures, &t), ui, &t);
     apply_notice(app, index, notice);
     let Some(doc) = app.session.get(app.views[index].id) else { return };
     let info = &doc.info;

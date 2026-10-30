@@ -1,8 +1,6 @@
 use super::bookmarks::{BmAction, OutlineCtx, outline_item, outline_matches};
 use super::pages::{page_tools, pages, thumbnail_size};
-use super::{
-    Align, Align2, Color32, DocInfo, FieldKind, Layout, Nav, PdfCraftApp, Rect, RightPanel, Sense, Stroke, Tokens, human_size, icons, theme, vec2,
-};
+use super::{Align, Align2, DocInfo, FieldKind, Layout, Nav, PdfCraftApp, Rect, RightPanel, Sense, Stroke, Tokens, human_size, icons, theme, vec2};
 
 /// Draw the selected right-hand panel and apply its navigation, layer, bookmark or edit actions.
 pub fn right_panel(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
@@ -525,7 +523,7 @@ fn fields(ui: &mut egui::Ui, panel: FieldsPanel<'_>) -> Option<(String, usize)> 
                 let press = theme::Press::track(ui, &resp);
                 press.wash(ui, rect, 6, selected);
                 let body = rect.translate(press.offset());
-                icons::paint(ui, Rect::from_min_size(body.min + vec2(8.0, 7.0), vec2(16.0, 16.0)), icon, 15.0, Color32::from_rgb(0x8E, 0x4E, 0xE6));
+                icons::paint(ui, Rect::from_min_size(body.min + vec2(8.0, 7.0), vec2(16.0, 16.0)), icon, 15.0, t.info);
                 let value =
                     f.value.as_ref().map(|v| if v.chars().count() > 18 { format!("{}…", v.chars().take(17).collect::<String>()) } else { v.clone() });
                 let value_font = theme::regular(11.5);

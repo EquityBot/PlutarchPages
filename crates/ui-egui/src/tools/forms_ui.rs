@@ -17,9 +17,9 @@ use crate::canvas::{DocView, PageToolContext, PageXform};
 use crate::page_cursor::Layer;
 use crate::theme::Tokens;
 
-const FOCUS_BLUE: Color32 = Color32::from_rgb(0x14, 0x73, 0xE6);
+const FOCUS: Color32 = crate::theme::ON_PAGE_SELECT;
 /// Background of the in-place text field editor, the same in every theme.
-const FIELD_FILL: Color32 = Color32::from_rgb(0xFF, 0xFF, 0xF4);
+const FIELD_FILL: Color32 = crate::theme::IVORY;
 
 /// The field being edited.
 #[derive(Clone, Debug, PartialEq)]
@@ -483,12 +483,12 @@ pub(crate) fn paint_page(
             let r = widget_rect(xf, info, page, w.rect);
             let focused = view.forms.focus.as_ref().is_some_and(|x| x.name == f.name && x.widget == wi);
             if focused {
-                painter.rect_stroke(r.expand(1.0), CornerRadius::same(2), Stroke::new(2.0, FOCUS_BLUE), egui::StrokeKind::Outside);
+                painter.rect_stroke(r.expand(1.0), CornerRadius::same(2), Stroke::new(2.0, FOCUS), egui::StrokeKind::Outside);
             }
             if view.forms.unbaked.contains(&(f.name.clone(), page)) {
                 paint_unbaked_widget(painter, xf, f, w, r);
             } else if fillable(f) && pointer.is_some_and(|p| r.contains(p)) {
-                painter.rect_stroke(r, CornerRadius::same(1), Stroke::new(1.0, FOCUS_BLUE.gamma_multiply(0.8)), egui::StrokeKind::Outside);
+                painter.rect_stroke(r, CornerRadius::same(1), Stroke::new(1.0, FOCUS.gamma_multiply(0.8)), egui::StrokeKind::Outside);
             }
         }
     }
@@ -549,7 +549,7 @@ fn paint_unbaked_widget(painter: &egui::Painter, xf: &PageXform, f: &FormField, 
     match f.kind {
         FormFieldKind::Text | FormFieldKind::Combo => {
             let text = f.value.first().map(String::as_str).unwrap_or("");
-            painter.rect_filled(r, CornerRadius::same(1), Color32::from_rgb(0xFF, 0xFF, 0xF4));
+            painter.rect_filled(r, CornerRadius::same(1), FIELD_FILL);
             painter.rect_stroke(r, CornerRadius::same(1), Stroke::new(1.0, Color32::from_gray(180)), egui::StrokeKind::Inside);
             if !text.is_empty() {
                 let unrotated_w = if xf.rot % 180 == 90 { xf.ph } else { xf.pw };
@@ -570,7 +570,7 @@ fn paint_unbaked_widget(painter: &egui::Painter, xf: &PageXform, f: &FormField, 
             }
         }
         FormFieldKind::List => {
-            painter.rect_filled(r, CornerRadius::same(1), Color32::from_rgb(0xFF, 0xFF, 0xF4));
+            painter.rect_filled(r, CornerRadius::same(1), FIELD_FILL);
             painter.rect_stroke(r, CornerRadius::same(1), Stroke::new(1.0, Color32::from_gray(180)), egui::StrokeKind::Inside);
             let unrotated_w = if xf.rot % 180 == 90 { xf.ph } else { xf.pw };
             let zoom = (xf.rect.width() / unrotated_w.max(1.0)) as f64;
@@ -589,7 +589,7 @@ fn paint_unbaked_widget(painter: &egui::Painter, xf: &PageXform, f: &FormField, 
                 }
                 let row_rect = Rect::from_min_size(egui::pos2(r.min.x + 1.0, y), egui::vec2(r.width() - 2.0, row_h));
                 if f.value.contains(export) {
-                    p.rect_filled(row_rect, CornerRadius::ZERO, Color32::from_rgb(0x99, 0xC0, 0xDC));
+                    p.rect_filled(row_rect, CornerRadius::ZERO, crate::theme::ON_PAGE_SELECT.gamma_multiply(0.35));
                 }
                 p.text(
                     egui::pos2(r.min.x + 3.0, y + font_size * 0.15),
@@ -602,7 +602,7 @@ fn paint_unbaked_widget(painter: &egui::Painter, xf: &PageXform, f: &FormField, 
             }
         }
         FormFieldKind::CheckBox => {
-            painter.rect_filled(r, CornerRadius::same(1), Color32::from_rgb(0xFF, 0xFF, 0xF4));
+            painter.rect_filled(r, CornerRadius::same(1), FIELD_FILL);
             painter.rect_stroke(r, CornerRadius::same(1), Stroke::new(1.0, Color32::from_gray(180)), egui::StrokeKind::Inside);
             let checked = f.value.first().is_some_and(|v| v != "Off" && !v.is_empty());
             if checked {
@@ -611,7 +611,7 @@ fn paint_unbaked_widget(painter: &egui::Painter, xf: &PageXform, f: &FormField, 
             }
         }
         FormFieldKind::Radio => {
-            painter.rect_filled(r, CornerRadius::same(1), Color32::from_rgb(0xFF, 0xFF, 0xF4));
+            painter.rect_filled(r, CornerRadius::same(1), FIELD_FILL);
             painter.rect_stroke(r, CornerRadius::same(1), Stroke::new(1.0, Color32::from_gray(180)), egui::StrokeKind::Inside);
             let selected = f.value.first().map(String::as_str) == w.on_state.as_deref();
             if selected {

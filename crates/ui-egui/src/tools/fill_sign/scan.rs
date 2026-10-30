@@ -362,7 +362,7 @@ pub(super) fn scan_tab(
     if let Some(image) = &d.image {
         image_preview(ui, rect.shrink(8.0), image, preview);
     } else if let Some(problem) = &scan.problem {
-        ui.put(rect.shrink(12.0), egui::Label::new(egui::RichText::new(problem.as_str()).color(Color32::from_rgb(0x8A, 0x5A, 0x00))).wrap());
+        ui.put(rect.shrink(12.0), egui::Label::new(egui::RichText::new(problem.as_str()).color(crate::theme::ON_PAGE_ALERT)).wrap());
     }
     browse
 }

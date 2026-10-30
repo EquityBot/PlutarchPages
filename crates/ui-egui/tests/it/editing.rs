@@ -3294,7 +3294,7 @@ fn switching_from_a_narrow_editor_keeps_one_frame_and_a_wide_heading_on_one_line
         .iter()
         .filter(|shape| {
             matches!(&shape.shape,
-                egui::Shape::Rect(rect) if rect.stroke.color == egui::Color32::from_rgb(0x14, 0x73, 0xE6)
+                egui::Shape::Rect(rect) if rect.stroke.color == pdfcraft_ui_egui::theme::ON_PAGE_SELECT
                     && rect.rect.width() > 100.0 && page.contains(rect.rect.center())
             )
         })
@@ -3660,7 +3660,7 @@ fn a_paragraph_editor_opens_at_full_opacity() {
     h.drag_at(top.center());
     h.run_steps(1);
     h.drop_at(top.center());
-    let accent = egui::Color32::from_rgb(0x14, 0x73, 0xE6);
+    let accent = pdfcraft_ui_egui::theme::ON_PAGE_SELECT;
     for frame in 0..8 {
         h.step();
         // The click's own frame opens it: the editor's frame is there from then on, at full colour.
@@ -5153,7 +5153,7 @@ fn one_editor_contains_mixed_styles_and_visual_rows() {
         .shapes
         .iter()
         .find_map(|s| match &s.shape {
-            egui::Shape::Rect(r) if r.stroke.color == egui::Color32::from_rgb(0x14, 0x73, 0xE6) && r.rect.width() > 50.0 => Some(r.rect),
+            egui::Shape::Rect(r) if r.stroke.color == pdfcraft_ui_egui::theme::ON_PAGE_SELECT && r.rect.width() > 50.0 => Some(r.rect),
             _ => None,
         })
         .unwrap();
@@ -5303,7 +5303,7 @@ fn private_document_regions_open_as_one_editor() {
                 .iter()
                 .filter(|s| {
                     matches!(&s.shape,
-                egui::Shape::Rect(r) if r.stroke.color==egui::Color32::from_rgb(0x14,0x73,0xE6)
+                egui::Shape::Rect(r) if r.stroke.color==pdfcraft_ui_egui::theme::ON_PAGE_SELECT
                     && r.rect.width()>50.0 && page.contains(r.rect.center()))
                 })
                 .count();
@@ -5410,7 +5410,7 @@ fn inline_editor_preserves_source_font_and_previews_live_bounds() {
             .shapes
             .iter()
             .find_map(|s| match &s.shape {
-                egui::Shape::Rect(r) if r.stroke.color == egui::Color32::from_rgb(0x14, 0x73, 0xE6) && r.rect.width() > 100.0 => Some(r.rect),
+                egui::Shape::Rect(r) if r.stroke.color == pdfcraft_ui_egui::theme::ON_PAGE_SELECT && r.rect.width() > 100.0 => Some(r.rect),
                 _ => None,
             })
             .unwrap()
@@ -5537,7 +5537,7 @@ fn cropped_images_do_not_intercept_text_and_stay_inside_each_page() {
         assert!(h.state().views[0].image_selection.as_ref().is_some_and(|s| s.page == page));
         for shape in &h.output().shapes {
             if let egui::Shape::Rect(rect) = &shape.shape
-                && rect.stroke.color == egui::Color32::from_rgb(0x14, 0x73, 0xE6)
+                && rect.stroke.color == pdfcraft_ui_egui::theme::ON_PAGE_SELECT
                 && rect.rect.width() > 50.0
             {
                 assert!(r.expand(3.0).contains_rect(rect.rect), "no image frame escapes its own page");
@@ -5649,7 +5649,7 @@ fn image_pixels_follow_the_frame_while_a_corner_is_dragged() {
     assert!(h.state().views[0].image_selection.is_some());
     let frame = |h: &Harness<'static, PdfCraftApp>| {
         h.output().shapes.iter().find_map(|s| match &s.shape {
-            egui::Shape::Rect(r) if r.stroke.color == egui::Color32::from_rgb(0x14, 0x73, 0xE6) && r.rect.width() > 20.0 => Some(r.rect),
+            egui::Shape::Rect(r) if r.stroke.color == pdfcraft_ui_egui::theme::ON_PAGE_SELECT && r.rect.width() > 20.0 => Some(r.rect),
             _ => None,
         })
     };

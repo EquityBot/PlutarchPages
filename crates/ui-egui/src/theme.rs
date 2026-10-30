@@ -1,16 +1,32 @@
-//! Design tokens and egui style. PlutarchPages uses the owner's Mermaid colour scheme (black,
-//! ivory, Tyrian purple and crimson): ivory chrome in the light theme, true black (for OLED
-//! screens) in the dark one, crimson as the one accent. Pages stay white. Every custom widget
-//! reads `Tokens::get`.
+//! Design tokens and egui style. PlutarchPages uses the owner's Mermaid colour scheme: ivory
+//! chrome in the light theme, true black (for OLED screens) in the dark one, crimson as the one
+//! accent, gold frames and links, and red, gold, lavender and Rhodesian green for status. Pages
+//! stay white. Every custom widget reads `Tokens::get`; tints are mixes of the colours below, and
+//! `chrome_literals_stay_in_the_theme` keeps other colours out of the interface code.
 
 use std::sync::Arc;
 
 use egui::epaint::text::{FallbackAlign, FontTweak, HintingTarget, SmoothHinting};
 use egui::{Color32, CornerRadius, FontData, FontDefinitions, FontFamily, FontId, Rect, Response, Stroke, Vec2, Visuals};
 
-const IVORY: Color32 = Color32::from_rgb(0xFF, 0xFF, 0xF0);
-const CRIMSON: Color32 = Color32::from_rgb(0x99, 0x00, 0x24);
-const TYRIAN_PURPLE: Color32 = Color32::from_rgb(0x66, 0x02, 0x3C);
+pub const IVORY: Color32 = Color32::from_rgb(0xFF, 0xFF, 0xF0);
+pub const PLATINUM: Color32 = Color32::from_rgb(0xE5, 0xE4, 0xE2);
+pub const BRIGHT_GOLD: Color32 = Color32::from_rgb(0xFF, 0xD3, 0x2A);
+pub const DARK_GOLD: Color32 = Color32::from_rgb(0x9B, 0x77, 0x35);
+pub const LAVENDER: Color32 = Color32::from_rgb(0x74, 0x5E, 0xB1);
+pub const RED: Color32 = Color32::from_rgb(0xE7, 0x16, 0x2F);
+pub const TYRIAN_PURPLE: Color32 = Color32::from_rgb(0x66, 0x02, 0x3C);
+pub const CRIMSON: Color32 = Color32::from_rgb(0x99, 0x00, 0x24);
+/// Passed results only.
+pub const RHODESIAN_GREEN: Color32 = Color32::from_rgb(0x0F, 0x4B, 0x32);
+
+/// Selection, handles and guides drawn over a page. Pages stay white in both themes, so these
+/// don't change with the theme.
+pub const ON_PAGE_SELECT: Color32 = TYRIAN_PURPLE;
+/// A second on-page mark that has to read apart from the selection (hover, text under the pointer).
+pub const ON_PAGE_HINT: Color32 = LAVENDER;
+/// Errors and redaction marks over a page.
+pub const ON_PAGE_ALERT: Color32 = RED;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
 pub enum ThemeKind {
@@ -70,6 +86,11 @@ pub struct Tokens {
     pub accent_soft: Color32,
     pub field: Color32,
     pub badge_new: Color32,
+    /// A passed result: a valid signature, a passed check.
+    pub success: Color32,
+    pub warning: Color32,
+    pub danger: Color32,
+    pub info: Color32,
     pub page_shadow: Color32,
     pub radius: u8,
 }
@@ -77,36 +98,42 @@ pub struct Tokens {
 impl Tokens {
     pub fn for_kind(kind: ThemeKind) -> Self {
         match kind {
-            // Ivory surfaces and black text; the warm greys and purple tints are ivory mixed
-            // with black or Tyrian purple, so no other hue appears.
+            // Ivory surfaces, a platinum strip and black text; frames are dark gold on ivory, and
+            // the warm greys and purple tints are ivory mixed with black or Tyrian purple.
             ThemeKind::Light => Self {
                 kind,
-                titlebar: Color32::from_rgb(0xEB, 0xEB, 0xDD),
+                titlebar: PLATINUM,
                 chrome: IVORY,
                 panel: IVORY,
-                pasteboard: Color32::from_rgb(0xF2, 0xF2, 0xE4),
+                pasteboard: Color32::from_rgb(0xF2, 0xF2, 0xE9),
                 card: IVORY,
-                border: Color32::from_rgb(0xD6, 0xD6, 0xCA),
-                divider: Color32::from_rgb(0xE6, 0xE6, 0xD8),
+                border: Color32::from_rgb(0xD2, 0xC2, 0x9C),
+                divider: Color32::from_rgb(0xE6, 0xDD, 0xC1),
                 text: Color32::BLACK,
-                text_muted: Color32::from_rgb(0x4D, 0x4D, 0x4D),
-                text_faint: Color32::from_rgb(0x66, 0x66, 0x66),
-                icon: Color32::from_rgb(0x26, 0x26, 0x26),
-                hover: Color32::from_rgb(0xF0, 0xF0, 0xE2),
-                pressed: Color32::from_rgb(0xE0, 0xE0, 0xD3),
+                text_muted: Color32::from_rgb(0x4C, 0x4C, 0x48),
+                text_faint: Color32::from_rgb(0x66, 0x66, 0x60),
+                icon: Color32::from_rgb(0x26, 0x26, 0x24),
+                hover: Color32::from_rgb(0xF2, 0xF2, 0xE9),
+                pressed: PLATINUM,
                 selected: Color32::from_rgb(0xEA, 0xDC, 0xD7),
                 accent: CRIMSON,
                 accent_text: CRIMSON,
-                accent_soft: Color32::from_rgb(0xF0, 0xE6, 0xDE),
+                accent_soft: Color32::from_rgb(0xF3, 0xEB, 0xE2),
                 field: IVORY,
                 badge_new: CRIMSON,
+                success: RHODESIAN_GREEN,
+                // Dark gold is 4.09:1 on ivory, too faint for small text; this is it with 20% black.
+                warning: Color32::from_rgb(0x7C, 0x5F, 0x2A),
+                danger: RED,
+                info: LAVENDER,
                 page_shadow: Color32::from_black_alpha(34),
                 radius: 6,
             },
             // True black for OLED screens: every surface is #000000 except raised cards and
-            // fields; greys carry no hue, text is ivory. Crimson is the accent and Tyrian purple
-            // marks selection; links use a light crimson, since crimson itself is too dark to
-            // read on black.
+            // fields; text is ivory and platinum, frames are dark gold at low strength. Crimson
+            // is the accent, Tyrian purple marks selection and hover, and links and warnings are
+            // bright gold (crimson itself is too dark to read on black). Green and lavender text
+            // are mixed with ivory for the same reason.
             ThemeKind::Dark => Self {
                 kind,
                 titlebar: Color32::BLACK,
@@ -114,20 +141,25 @@ impl Tokens {
                 panel: Color32::BLACK,
                 pasteboard: Color32::BLACK,
                 card: Color32::from_rgb(0x0A, 0x0A, 0x0A),
-                border: Color32::from_rgb(0x26, 0x26, 0x26),
-                divider: Color32::from_rgb(0x26, 0x26, 0x26),
+                border: Color32::from_rgb(0x55, 0x41, 0x1D),
+                divider: Color32::from_rgb(0x2E, 0x24, 0x10),
                 text: IVORY,
-                text_muted: Color32::from_rgb(0xC8, 0xC8, 0xC8),
-                text_faint: Color32::from_rgb(0x9A, 0x9A, 0x9A),
-                icon: Color32::from_rgb(0xC8, 0xC8, 0xC8),
-                hover: Color32::from_rgb(0x16, 0x16, 0x16),
-                pressed: Color32::from_rgb(0x26, 0x26, 0x26),
+                text_muted: PLATINUM,
+                text_faint: Color32::from_rgb(0x9C, 0x9B, 0x9A),
+                icon: PLATINUM,
+                hover: Color32::from_rgb(0x29, 0x01, 0x18),
+                pressed: Color32::from_rgb(0x47, 0x01, 0x2A),
                 selected: TYRIAN_PURPLE,
                 accent: CRIMSON,
-                accent_text: Color32::from_rgb(0xFF, 0x9C, 0x91),
+                accent_text: BRIGHT_GOLD,
                 accent_soft: TYRIAN_PURPLE,
-                field: Color32::from_rgb(0x0A, 0x0A, 0x0A),
+                field: Color32::from_rgb(0x0F, 0x0C, 0x05),
                 badge_new: CRIMSON,
+                success: Color32::from_rgb(0x87, 0xA5, 0x91),
+                warning: BRIGHT_GOLD,
+                // Red is 4.29:1 on a raised card; this is it with 8% ivory.
+                danger: Color32::from_rgb(0xEB, 0x2E, 0x42),
+                info: Color32::from_rgb(0x97, 0x86, 0xC5),
                 page_shadow: Color32::from_black_alpha(120),
                 radius: 6,
             },

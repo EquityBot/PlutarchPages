@@ -1,8 +1,8 @@
 use super::geometry::{HANDLES, grabs_points, handle_pos, is_markup, reshapable, reshaped, resizable};
 use super::state::{Gesture, PageCx, SETTLE_SECS};
 use super::{
-    Annotation, Color32, CommentTool, CornerRadius, DocInfo, DocView, Edit, LineEnding, NewAnnotation, Pos2, QuickTool, Rect, SELECT_BLUE, Shape,
-    Stroke, color32, vec2,
+    Annotation, Color32, CommentTool, CornerRadius, DocInfo, DocView, Edit, LineEnding, NewAnnotation, Pos2, QuickTool, Rect, SELECT, Shape, Stroke,
+    color32, vec2,
 };
 
 /// Paint comment selection, hover and gesture previews on a page.
@@ -27,7 +27,7 @@ pub(crate) fn paint_page(ui: &egui::Ui, painter: &egui::Painter, cx: &PageCx<'_>
         && cv.selected != Some((cx.page, a.index))
     {
         for r in cx.screen_rects(a) {
-            painter.rect_stroke(r.expand(2.0), CornerRadius::same(2), Stroke::new(1.0, SELECT_BLUE.gamma_multiply(0.7)), egui::StrokeKind::Outside);
+            painter.rect_stroke(r.expand(2.0), CornerRadius::same(2), Stroke::new(1.0, SELECT.gamma_multiply(0.7)), egui::StrokeKind::Outside);
         }
     }
     if let Some((page, index)) = cv.selected
@@ -36,7 +36,7 @@ pub(crate) fn paint_page(ui: &egui::Ui, painter: &egui::Painter, cx: &PageCx<'_>
     {
         if is_markup(&a.subtype) && !a.quads.is_empty() {
             for r in cx.screen_rects(a) {
-                painter.rect_stroke(r.expand(2.0), CornerRadius::ZERO, Stroke::new(1.0, SELECT_BLUE), egui::StrokeKind::Middle);
+                painter.rect_stroke(r.expand(2.0), CornerRadius::ZERO, Stroke::new(1.0, SELECT), egui::StrokeKind::Middle);
             }
             return paint_gesture(painter, cx, view);
         }
@@ -49,11 +49,11 @@ pub(crate) fn paint_page(ui: &egui::Ui, painter: &egui::Painter, cx: &PageCx<'_>
             return paint_points(painter, cx, view, a, pointer, shift);
         }
         let r = cx.adjusted_rect(a, cv.gesture.as_ref(), pointer, shift, view.pending_edit.as_ref()).expand(2.0);
-        painter.rect_stroke(r, CornerRadius::ZERO, Stroke::new(1.0, SELECT_BLUE), egui::StrokeKind::Middle);
+        painter.rect_stroke(r, CornerRadius::ZERO, Stroke::new(1.0, SELECT), egui::StrokeKind::Middle);
         if cx.allowed && resizable(a) {
             for h in HANDLES {
                 let c = handle_pos(r, h);
-                painter.circle(c, 4.5, Color32::WHITE, Stroke::new(1.0, SELECT_BLUE));
+                painter.circle(c, 4.5, crate::theme::IVORY, Stroke::new(1.0, SELECT));
             }
         }
     }
@@ -97,7 +97,7 @@ fn paint_points(painter: &egui::Painter, cx: &PageCx<'_>, view: &DocView, a: &An
     let points = changing.unwrap_or(points);
     let screen: Vec<Pos2> = points.iter().map(|q| cx.to_screen(*q)).collect();
     if changed {
-        let stroke = Stroke::new(1.5, SELECT_BLUE);
+        let stroke = Stroke::new(1.5, SELECT);
         painter.add(if a.subtype == "Polygon" {
             egui::Shape::closed_line(screen.clone(), stroke)
         } else {
@@ -105,7 +105,7 @@ fn paint_points(painter: &egui::Painter, cx: &PageCx<'_>, view: &DocView, a: &An
         });
     }
     for c in screen {
-        painter.circle(c, 4.5, Color32::WHITE, Stroke::new(1.0, SELECT_BLUE));
+        painter.circle(c, 4.5, crate::theme::IVORY, Stroke::new(1.0, SELECT));
     }
     paint_gesture(painter, cx, view);
 }
@@ -136,7 +136,7 @@ fn paint_draw(painter: &egui::Painter, cx: &PageCx<'_>, tool: &CommentTool, poin
             CommentTool::Eraser => {
                 // As wide as what it rubs out (see `erase`).
                 let width = (2.0 * eraser_radius_px(style.width)) as f32;
-                painter.add(egui::Shape::line(pts, Stroke::new(width, Color32::from_gray(128).gamma_multiply(0.35))));
+                painter.add(egui::Shape::line(pts, Stroke::new(width, crate::theme::ON_PAGE_HINT.gamma_multiply(0.35))));
             }
             CommentTool::Line | CommentTool::Arrow if pts.len() == 2 => {
                 painter.line_segment([pts[0], pts[1]], stroke);
@@ -164,11 +164,11 @@ fn paint_draw(painter: &egui::Painter, cx: &PageCx<'_>, tool: &CommentTool, poin
                 }
                 painter.add(egui::Shape::line(line, stroke));
                 if let Some(first) = pts.first().filter(|_| *tool != CommentTool::PolyLine && pts.len() >= 3) {
-                    painter.circle_stroke(*first, 5.0, Stroke::new(1.0, SELECT_BLUE));
+                    painter.circle_stroke(*first, 5.0, Stroke::new(1.0, SELECT));
                 }
             }
             CommentTool::TextBox if pts.len() == 2 => {
-                painter.rect_stroke(Rect::from_two_pos(pts[0], pts[1]), CornerRadius::ZERO, Stroke::new(1.0, SELECT_BLUE), egui::StrokeKind::Inside);
+                painter.rect_stroke(Rect::from_two_pos(pts[0], pts[1]), CornerRadius::ZERO, Stroke::new(1.0, SELECT), egui::StrokeKind::Inside);
             }
             CommentTool::Callout if pts.len() == 2 => {
                 painter.line_segment([pts[0], pts[1]], stroke);

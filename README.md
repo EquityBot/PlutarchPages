@@ -30,9 +30,9 @@
 <br>
 
 <p align="center">
-  <img src="docs/images/pdfcraft-viewer.png" alt="PdfCraft with the PdfCraft Showcase cover page open, the All tools panel on the left and 20 threaded comments on the right" width="100%">
+  <img src="docs/images/pdfcraft-viewer.png" alt="PlutarchPages with the PlutarchPages Showcase cover page open, the All tools panel on the left and 20 threaded comments on the right" width="100%">
   <br>
-  <sub>The PdfCraft Showcase, a 13-page specimen PDF, open with the All tools panel and threaded comments.</sub>
+  <sub>The PlutarchPages Showcase, a 13-page specimen PDF, open with the All tools panel and threaded comments.</sub>
 </p>
 
 <p align="center">
@@ -100,7 +100,7 @@ PdfCraft renders PDFs with care for the details that make a page feel right: ker
 - **Deep zoom stays sharp.** Large pages render in tiles, so text stays crisp at any magnification.
 - **Built to survive bad files.** Every page renders in isolation and damaged documents are repaired. Across the 983-file pdf.js test corpus the result is 0 crashes.
 - **Layouts for every task:** continuous, single page, two-up, view rotation, full screen and a distraction-free Read mode.
-- **Light and dark themes** in black, ivory, Tyrian purple and crimson: ivory chrome in the light theme, and a true black dark theme for OLED screens. Pages stay white.
+- **Light and dark themes** in one colour scheme: ivory chrome or true black for OLED screens, crimson and Tyrian purple accents, gold frames and links. Pages stay white.
 
 <table>
 <tr>

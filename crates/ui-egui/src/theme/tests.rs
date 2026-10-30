@@ -26,13 +26,52 @@ fn dark_is_true_black_and_the_scheme_colours_stay_readable() {
     assert_eq!((dark.text, dark.selected), (IVORY, TYRIAN_PURPLE));
     for t in [Tokens::for_kind(ThemeKind::Light), dark] {
         assert_eq!(t.accent, CRIMSON);
-        for (name, fg, bg) in
-            [("text on selected", t.text, t.selected), ("links", t.accent_text, t.panel), ("white on accent", Color32::WHITE, t.accent)]
-        {
+        for (name, fg, bg) in [("text on selected", t.text, t.selected), ("links", t.accent_text, t.panel), ("ivory on accent", IVORY, t.accent)] {
             let r = contrast(fg, bg);
             assert!(r >= 4.5, "{:?} {name}: {r:.2}:1", t.kind);
         }
     }
+}
+
+/// Status colours read as text on every surface, and a passed result is Rhodesian green or its
+/// tint, never another green.
+#[test]
+fn status_colours_stay_readable_on_every_surface() {
+    for kind in [ThemeKind::Light, ThemeKind::Dark] {
+        let t = Tokens::for_kind(kind);
+        for (name, fg) in [("success", t.success), ("warning", t.warning), ("danger", t.danger), ("info", t.info)] {
+            for bg in [t.chrome, t.panel, t.card] {
+                let r = contrast(fg, bg);
+                assert!(r >= 4.5, "{kind:?} {name}: {r:.2}:1");
+            }
+        }
+    }
+    assert_eq!(Tokens::for_kind(ThemeKind::Light).success, RHODESIAN_GREEN);
+}
+
+/// Interface colours live in this file, so an upstream merge can't bring its blue back
+/// unnoticed. Colours a document or the user chose arrive as variables, not hex literals.
+#[test]
+fn chrome_literals_stay_in_the_theme() {
+    fn walk(dir: &std::path::Path, found: &mut Vec<String>) {
+        for entry in std::fs::read_dir(dir).unwrap().flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                walk(&path, found);
+            } else if path.extension().is_some_and(|e| e == "rs") && !path.ends_with("theme.rs") && !path.to_string_lossy().contains("tests") {
+                let source = std::fs::read_to_string(&path).unwrap();
+                let code = source.split("#[cfg(test)]").next().unwrap_or_default();
+                for (n, line) in code.lines().enumerate() {
+                    if ["from_rgb(0x", "from_rgba_unmultiplied(0x", "from_rgba_premultiplied(0x"].iter().any(|p| line.contains(p)) {
+                        found.push(format!("{}:{}", path.display(), n + 1));
+                    }
+                }
+            }
+        }
+    }
+    let mut found = Vec::new();
+    walk(std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/src")), &mut found);
+    assert!(found.is_empty(), "colour literals outside theme.rs: {found:#?}");
 }
 
 /// #3193: a bookmark's own colour is kept where it reads on the panel, and moved towards the

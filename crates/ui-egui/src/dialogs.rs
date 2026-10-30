@@ -906,16 +906,16 @@ fn dialog_split(ui: &mut egui::Ui, app: &mut PdfCraftApp, req: &mut Pending) -> 
     ui.add_enabled_ui(draft.mode == M::Pages, |ui| {
         ui.horizontal(|ui| {
             ui.add_space(24.0);
-            ui.label(tl!("Pages per file"));
-            ui.add(egui::DragValue::new(&mut draft.every).range(1..=n.max(1)));
+            let label = ui.label(tl!("Pages per file"));
+            ui.add(egui::DragValue::new(&mut draft.every).range(1..=n.max(1))).labelled_by(label.id);
         });
     });
     widgets::radio_value(ui, &mut draft.mode, M::Size, tl!("File size"));
     ui.add_enabled_ui(draft.mode == M::Size, |ui| {
         ui.horizontal(|ui| {
             ui.add_space(24.0);
-            ui.label(tl!("At most"));
-            ui.add(egui::DragValue::new(&mut draft.size_mb).range(0.05..=2000.0).speed(0.1).suffix(" MB"));
+            let label = ui.label(tl!("At most"));
+            ui.add(egui::DragValue::new(&mut draft.size_mb).range(0.05..=2000.0).speed(0.1).suffix(" MB")).labelled_by(label.id);
         });
     });
     ui.add_enabled_ui(!marks.is_empty(), |ui| {

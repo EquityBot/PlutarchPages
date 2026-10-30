@@ -219,7 +219,7 @@ pub(super) fn stamp_palette(app: &mut PdfCraftApp, ui: &mut egui::Ui, t: &Tokens
                         Align2::CENTER_CENTER,
                         shown,
                         font,
-                        Color32::WHITE,
+                        theme::IVORY,
                     );
                 } else {
                     ui.painter().rect(chip, CornerRadius::same(5), col.gamma_multiply(0.1), Stroke::new(1.5, col), egui::StrokeKind::Inside);

@@ -61,9 +61,8 @@ const TOP: f32 = 12.0;
 pub(crate) const MAX_EXPAND: usize = 2000;
 /// The shape drawn for a page whose size is unknown (US Letter); nothing is rendered for it.
 const FALLBACK_PAGE: (f32, f32) = (612.0, 792.0);
-/// Icons drawn on the (always white) paper, in either theme: the light theme's muted text, which
-/// keeps its contrast on white where the dark theme's doesn't.
-const ON_PAPER: Color32 = Color32::from_rgb(0x5E, 0x5E, 0x66);
+/// Icons drawn on the (always white) paper, in either theme.
+const ON_PAPER: Color32 = Color32::BLACK;
 
 /// A card being dragged: which file, and the list as it was (see [`RowAction::DropAt`]).
 #[derive(Clone, Copy)]

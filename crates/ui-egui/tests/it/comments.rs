@@ -2207,7 +2207,7 @@ fn the_eraser_rubs_as_wide_as_its_thickness_setting() {
 /// The widths of the eraser preview's strokes drawn in the last frame.
 fn eraser_preview_widths(h: &Harness<'static, PdfCraftApp>) -> Vec<f32> {
     fn walk(shape: &egui::Shape, out: &mut Vec<f32>) {
-        let preview = egui::Color32::from_gray(128).gamma_multiply(0.35);
+        let preview = pdfcraft_ui_egui::theme::ON_PAGE_HINT.gamma_multiply(0.35);
         match shape {
             egui::Shape::Vec(shapes) => shapes.iter().for_each(|s| walk(s, out)),
             egui::Shape::Path(p) if p.stroke.color == egui::epaint::ColorMode::Solid(preview) => out.push(p.stroke.width),

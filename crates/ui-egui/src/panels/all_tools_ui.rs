@@ -120,7 +120,7 @@ fn tile(ui: &mut egui::Ui, t: &Tokens, g: &ToolGroup, items: &[&'static str]) ->
     ui.painter().rect(rect, CornerRadius::same(10), press.fill(t.card, t.hover, t.pressed), Stroke::new(1.0, t.divider), egui::StrokeKind::Inside);
     let body = rect.translate(press.offset());
     let ready = g.availability == Availability::Ready;
-    let hue = Color32::from_rgb(g.hue[0], g.hue[1], g.hue[2]);
+    let hue = theme::readable(Color32::from_rgb(g.hue[0], g.hue[1], g.hue[2]), t.card, t.text);
     icons::paint(ui, Rect::from_center_size(body.center_top() + vec2(0.0, 34.0), vec2(32.0, 32.0)), g.icon, 30.0, hue);
     let mut job =
         egui::text::LayoutJob::simple(tl!(g.label).to_owned(), theme::medium(13.0), if ready { t.text } else { t.text_muted }, body.width() - 16.0);
@@ -154,7 +154,7 @@ fn tile(ui: &mut egui::Ui, t: &Tokens, g: &ToolGroup, items: &[&'static str]) ->
         let w = widgets::text_width(ui, tl!(b), &font);
         let r = Rect::from_min_size(body.right_top() + vec2(-w - 18.0, 8.0), vec2(w + 10.0, 16.0));
         ui.painter().rect_filled(r, CornerRadius::same(4), t.badge_new);
-        ui.painter().text(r.center(), Align2::CENTER_CENTER, tl!(b), font, Color32::WHITE);
+        ui.painter().text(r.center(), Align2::CENTER_CENTER, tl!(b), font, theme::IVORY);
     }
     let resp = if elided { resp.on_hover_text(format!("{}\n{note}", tl!(g.label))) } else { resp };
     theme::hand(resp)

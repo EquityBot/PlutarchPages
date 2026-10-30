@@ -17,8 +17,8 @@ use crate::panels::Nav;
 use crate::theme::{self, Tokens};
 use crate::{icons, widgets};
 
-/// Accent bar of the selected card (11-visual-spec §3: `#0165DD`).
-const CARD_ACCENT: Color32 = Color32::from_rgb(0x01, 0x65, 0xDD);
+/// Accent bar of the selected card.
+const CARD_ACCENT: Color32 = theme::CRIMSON;
 
 /// Reader-friendly names for annotation subtypes (the PDF names are shown in tooltips).
 pub fn subtype_label(s: &str) -> &str {
@@ -368,7 +368,7 @@ fn card(ui: &mut egui::Ui, view: &mut DocView, context: CardContext<'_>) -> Opti
                     let submit = crate::comments::submit_key(ui, &r, false);
                     ui.horizontal(|ui| {
                         if (ui
-                            .add(egui::Button::new(egui::RichText::new(tl!("Save")).color(Color32::WHITE)).fill(t.accent).corner_radius(12))
+                            .add(egui::Button::new(egui::RichText::new(tl!("Save")).color(theme::IVORY)).fill(t.accent).corner_radius(12))
                             .clicked()
                             || submit)
                             && let Some((page, index, text)) = view.comments.editing.take()
@@ -392,7 +392,7 @@ fn card(ui: &mut egui::Ui, view: &mut DocView, context: CardContext<'_>) -> Opti
                         widgets::wrapped_text(ui, body, theme::regular(13.0), t.text, !selected);
                     }
                 }
-                if let Some((icon, label, c)) = status.and_then(status_badge) {
+                if let Some((icon, label, c)) = status.and_then(|s| status_badge(t, s)) {
                     ui.add_space(4.0);
                     ui.horizontal(|ui| {
                         ui.add(icons::image(icon, 13.0, c));
@@ -534,10 +534,10 @@ fn card(ui: &mut egui::Ui, view: &mut DocView, context: CardContext<'_>) -> Opti
 /// A 26 pt round badge: a type glyph (comments) or initials (replies). Returns where it was drawn.
 fn avatar(ui: &mut egui::Ui, t: &Tokens, icon: Option<&str>, text: Option<&str>, color: Color32) -> egui::Rect {
     let (r, _) = ui.allocate_exact_size(vec2(26.0, 26.0), Sense::hover());
-    let bg = if t.dark() { Color32::from_gray(0x55) } else { Color32::from_gray(0xD8) };
+    let bg = t.pressed;
     ui.painter().circle_filled(r.center(), 12.0, bg);
     if let Some(i) = icon {
-        icons::paint(ui, r, i, 13.0, legible(color, t));
+        icons::paint(ui, r, i, 13.0, theme::readable(legible(color, t), bg, t.text));
     }
     if let Some(s) = text {
         ui.painter().text(r.center(), egui::Align2::CENTER_CENTER, s, theme::semibold(10.5), t.text);

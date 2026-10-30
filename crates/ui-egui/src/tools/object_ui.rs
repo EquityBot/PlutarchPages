@@ -10,7 +10,7 @@ use pdfcraft_render::DocInfo;
 use crate::canvas::{DocView, PageToolContext, PageXform};
 use crate::page_cursor::Layer;
 
-const BLUE: Color32 = Color32::from_rgb(0x14, 0x73, 0xE6);
+const SELECT: Color32 = crate::theme::ON_PAGE_SELECT;
 
 #[derive(Default)]
 pub(crate) struct ObjectSelection {
@@ -439,17 +439,17 @@ pub(crate) fn paint(painter: &egui::Painter, xf: &PageXform, page: usize, info: 
     let mut union = Rect::NOTHING;
     for object in &selection.selected {
         let rect = screen(xf, info, page, object).translate(delta);
-        painter.rect_filled(rect, 0.0, BLUE.gamma_multiply(0.05));
-        painter.rect_stroke(rect, 0.0, Stroke::new(1.5, BLUE), egui::StrokeKind::Outside);
+        painter.rect_filled(rect, 0.0, SELECT.gamma_multiply(0.05));
+        painter.rect_stroke(rect, 0.0, Stroke::new(1.5, SELECT), egui::StrokeKind::Outside);
         union = union.union(rect);
     }
     if selection.selected.len() > 1 {
-        painter.rect_stroke(union.expand(4.0), 0.0, Stroke::new(1.0, BLUE.gamma_multiply(0.7)), egui::StrokeKind::Outside);
+        painter.rect_stroke(union.expand(4.0), 0.0, Stroke::new(1.0, SELECT.gamma_multiply(0.7)), egui::StrokeKind::Outside);
     }
     if let Some(g) = selection.gesture.filter(|g| g.marquee) {
         let area = Rect::from_two_pos(g.start, g.now).intersect(xf.rect);
-        painter.rect_filled(area, 0.0, BLUE.gamma_multiply(0.08));
-        painter.rect_stroke(area, 0.0, Stroke::new(1.0, BLUE), egui::StrokeKind::Outside);
+        painter.rect_filled(area, 0.0, SELECT.gamma_multiply(0.08));
+        painter.rect_stroke(area, 0.0, Stroke::new(1.0, SELECT), egui::StrokeKind::Outside);
     }
 }
 

@@ -449,7 +449,7 @@ fn tab(ui: &mut egui::Ui, spec: TabSpec<'_>, close: &mut Option<usize>) -> egui:
             Rect::from_min_size(rect.min + vec2(6.0, (height - 16.0) / 2.0), vec2(16.0, 16.0)),
             icon,
             15.0,
-            if active { t.accent } else { t.text_muted },
+            if active { t.accent_text } else { t.text_muted },
         );
         ui.painter().galley(rect.min + vec2(28.0, (rect.height() - label_galley.size().y) / 2.0), label_galley.clone(), label_color);
     });

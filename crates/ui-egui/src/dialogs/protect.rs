@@ -54,7 +54,7 @@ impl ProtectDraft {
 }
 
 /// A rough password strength, as Acrobat's meter shows (Weak / Medium / Strong).
-pub fn strength(pw: &str) -> (&'static str, Color32) {
+pub fn strength(t: &Tokens, pw: &str) -> (&'static str, Color32) {
     let classes = [
         pw.chars().any(char::is_lowercase),
         pw.chars().any(char::is_uppercase),
@@ -66,11 +66,11 @@ pub fn strength(pw: &str) -> (&'static str, Color32) {
     .count();
     let n = pw.chars().count();
     if n >= 12 && classes >= 3 {
-        ("Strong", Color32::from_rgb(0x2D, 0x9D, 0x5B))
+        ("Strong", t.success)
     } else if n >= 8 && classes >= 2 {
-        ("Medium", Color32::from_rgb(0xE8, 0x8A, 0x1A))
+        ("Medium", t.warning)
     } else {
-        ("Weak", Color32::from_rgb(0xD3, 0x2F, 0x2F))
+        ("Weak", t.danger)
     }
 }
 
@@ -80,7 +80,7 @@ fn radio(ui: &mut egui::Ui, t: &Tokens, on: bool, label: &str) -> egui::Response
     let c = egui::pos2(rect.left() + 9.0, rect.center().y);
     if on {
         ui.painter().circle_filled(c, 8.0, t.accent);
-        ui.painter().circle_filled(c, 3.0, Color32::WHITE);
+        ui.painter().circle_filled(c, 3.0, theme::IVORY);
     } else {
         ui.painter().circle_stroke(c, 7.5, egui::Stroke::new(1.5, t.text_muted));
     }
@@ -113,7 +113,7 @@ pub(crate) fn body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens) -> (boo
     };
     let r = field(ui, "Type Password", &mut d.password, "protect-pw");
     if r.changed() || !d.password.is_empty() {
-        let (s, c) = strength(&d.password);
+        let (s, c) = strength(t, &d.password);
         if !d.password.is_empty() {
             ui.label(egui::RichText::new(crate::i18n::fmt(tl!("Strength: {s}"), &[("s", tl!(s))])).font(theme::medium(11.5)).color(c));
         }
@@ -247,8 +247,9 @@ mod tests {
             Edit::Protect(p) => assert_eq!((p.open_password, p.permissions_password.as_deref()), (None, Some("abc"))),
             other => panic!("{other:?}"),
         }
-        assert_eq!(strength("abc").0, "Weak");
-        assert_eq!(strength("Abcdefg1").0, "Medium");
-        assert_eq!(strength("Correct-Horse-9").0, "Strong");
+        let t = Tokens::for_kind(crate::theme::ThemeKind::Light);
+        assert_eq!(strength(&t, "abc").0, "Weak");
+        assert_eq!(strength(&t, "Abcdefg1").0, "Medium");
+        assert_eq!(strength(&t, "Correct-Horse-9").0, "Strong");
     }
 }

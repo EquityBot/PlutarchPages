@@ -14,7 +14,7 @@ use crate::theme::Tokens;
 use crate::widgets;
 
 /// The colour of the warning under text the standard fonts can't draw.
-pub(crate) const UNDRAWABLE: Color32 = Color32::from_rgb(0xD7, 0x37, 0x3F);
+pub(crate) const UNDRAWABLE: Color32 = crate::theme::ON_PAGE_ALERT;
 
 /// The first character of a draft that can't be drawn, as the engine decides it (it refuses
 /// such text, #125): outside the standard fonts and not shaped with the Arabic face.
@@ -57,7 +57,7 @@ pub(crate) fn undrawn_message(n: &pdfcraft_engine::TextNotice) -> String {
     crate::i18n::fmt(template, &[("c", &n.ch.to_string()), ("code", &format!("U+{:04X}", u32::from(n.ch)))])
 }
 
-const SELECT_BLUE: Color32 = Color32::from_rgb(0x14, 0x73, 0xE6);
+const SELECT: Color32 = crate::theme::ON_PAGE_SELECT;
 
 /// The text being typed or retyped in place.
 #[derive(Clone, Debug, PartialEq)]
@@ -493,12 +493,12 @@ pub(crate) fn paint_page(
             r = dragged(r, g, p - start, matches!(a.content, AddedContent::Image(_)));
         }
         if selected {
-            painter.rect_stroke(r.expand(1.0), CornerRadius::ZERO, Stroke::new(1.5, SELECT_BLUE), egui::StrokeKind::Outside);
+            painter.rect_stroke(r.expand(1.0), CornerRadius::ZERO, Stroke::new(1.5, SELECT), egui::StrokeKind::Outside);
             for (c, ..) in handles(r.expand(1.0)) {
-                painter.circle(c, 3.5, Color32::WHITE, Stroke::new(1.5, SELECT_BLUE));
+                painter.circle(c, 3.5, crate::theme::IVORY, Stroke::new(1.5, SELECT));
             }
         } else if pointer.is_some_and(|p| r.expand(2.0).contains(p)) {
-            painter.rect_stroke(r.expand(1.0), CornerRadius::ZERO, Stroke::new(1.0, SELECT_BLUE.gamma_multiply(0.7)), egui::StrokeKind::Outside);
+            painter.rect_stroke(r.expand(1.0), CornerRadius::ZERO, Stroke::new(1.0, SELECT.gamma_multiply(0.7)), egui::StrokeKind::Outside);
         }
     }
 }
