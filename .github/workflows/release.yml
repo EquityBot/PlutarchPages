@@ -254,9 +254,14 @@ jobs:
           tag="v$VERSION"
           # GitHub keeps an existing tag's commit and ignores --target, so the release would point
           # at other source than these packages were built from.
-          if tagged="$(gh api "repos/$GH_REPO/commits/refs/tags/$tag" --jq .sha 2>/dev/null)" && [ "$tagged" != "$GITHUB_SHA" ]; then
-            echo "::error::Tag $tag is at $tagged, not this commit. Bump the version before pushing to release."
-            exit 1
+          # A failed lookup stops the job here: only a listing without the tag means it's absent.
+          found="$(gh api "repos/$GH_REPO/git/matching-refs/tags/$tag" --jq "map(select(.ref == \"refs/tags/$tag\")) | length")"
+          if [ "$found" != 0 ]; then
+            tagged="$(gh api "repos/$GH_REPO/commits/refs/tags/$tag" --jq .sha)"
+            if [ "$tagged" != "$GITHUB_SHA" ]; then
+              echo "::error::Tag $tag is at $tagged, not this commit. Bump the version before pushing to release."
+              exit 1
+            fi
           fi
           if draft="$(gh release view "$tag" --json isDraft --jq .isDraft 2>/dev/null)"; then
             if [ "$draft" != "true" ]; then
