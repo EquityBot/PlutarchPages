@@ -29,6 +29,7 @@ Upstream's tests for these were changed to assert the fork's behaviour. Keep the
 - Update check and repository links point at EquityBot.
 - Shared CI: workflows from `storytold/craft-common-actions` are pinned to a commit, and SonarCloud
   receives only `SONAR_TOKEN`. Upstream merges restore `@main` and `secrets: inherit`, so reapply both.
+- CodeQL: `.github/codeql/codeql-config.yml` excludes tests and `vendor/`.
 
 ## Merging upstream
 
