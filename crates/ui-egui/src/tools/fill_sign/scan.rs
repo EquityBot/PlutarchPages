@@ -325,11 +325,11 @@ pub(super) fn scan_tab(
             painter.rect_filled(r, CornerRadius::ZERO, dim);
         }
     }
-    painter.rect_stroke(fr, CornerRadius::ZERO, Stroke::new(2.0, t.accent_text), egui::StrokeKind::Middle);
+    painter.rect_stroke(fr, CornerRadius::ZERO, Stroke::new(2.0, crate::theme::ON_PAGE_SELECT), egui::StrokeKind::Middle);
     for c in [fr.left_top(), fr.right_top(), fr.left_bottom(), fr.right_bottom()] {
         let r = egui::Rect::from_center_size(c, vec2(9.0, 9.0));
         painter.rect_filled(r, CornerRadius::same(2), Color32::WHITE);
-        painter.rect_stroke(r, CornerRadius::same(2), Stroke::new(1.5, t.accent_text), egui::StrokeKind::Inside);
+        painter.rect_stroke(r, CornerRadius::same(2), Stroke::new(1.5, crate::theme::ON_PAGE_SELECT), egui::StrokeKind::Inside);
     }
     if resp.hovered() && scan.drag.is_none() {
         let hover = ui.input(|i| i.pointer.hover_pos());

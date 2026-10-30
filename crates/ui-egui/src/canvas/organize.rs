@@ -513,7 +513,7 @@ pub(super) fn organize_grid(view: &mut DocView, info: &DocInfo, editable: bool, 
     view.grid_gap = pointer.filter(|_| editable && view.org_drag.is_none()).and_then(|p| drop_gap(&cells, p));
     if editable && ui.input(|i| !i.raw.hovered_files.is_empty()) {
         let painter = ui.painter().with_clip_rect(viewport);
-        painter.rect_stroke(viewport.shrink(2.0), CornerRadius::same(6), Stroke::new(2.0, t.accent_text), egui::StrokeKind::Inside);
+        painter.rect_stroke(viewport.shrink(2.0), CornerRadius::same(6), Stroke::new(2.0, theme::ON_PAGE_SELECT), egui::StrokeKind::Inside);
         if let Some(gap) = view.grid_gap {
             let at = cells.iter().find(|(i, _)| *i == gap).map(|(_, r)| (r.left() + 3.0, r.y_range()));
             if let Some((x, row)) = at.or(cells.last().map(|(_, r)| (r.right() - 3.0, r.y_range()))) {

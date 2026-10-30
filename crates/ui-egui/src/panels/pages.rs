@@ -239,7 +239,7 @@ fn file_drop(ui: &mut egui::Ui, t: &Tokens, view: &mut crate::DocView, rows: &[R
         return;
     }
     let painter = ui.painter().with_clip_rect(clip);
-    painter.rect_stroke(clip.shrink(2.0), CornerRadius::same(6), Stroke::new(2.0, t.accent_text), egui::StrokeKind::Inside);
+    painter.rect_stroke(clip.shrink(2.0), CornerRadius::same(6), Stroke::new(2.0, theme::ON_PAGE_SELECT), egui::StrokeKind::Inside);
     if let (Some(gap), Some(first), Some(last)) = (view.panel_gap, rows.first(), rows.last()) {
         let y = rows.get(gap).map_or(last.bottom() + 2.0, |r| r.top() - 3.0);
         painter.line_segment([pos2(first.left(), y), pos2(first.right(), y)], Stroke::new(3.0, t.accent_text));

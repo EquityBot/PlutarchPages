@@ -175,7 +175,7 @@ pub(crate) fn body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens) -> (boo
             let [l, bo, ri, to] = d.margins.map(|v| v as f32 * s);
             let inner = Rect::from_min_max(pos2(page.left() + l, page.top() + to), pos2(page.right() - ri, page.bottom() - bo));
             if inner.is_positive() {
-                ui.painter().rect_stroke(inner, CornerRadius::ZERO, Stroke::new(1.5, t.accent_text), egui::StrokeKind::Middle);
+                ui.painter().rect_stroke(inner, CornerRadius::ZERO, Stroke::new(1.5, theme::ON_PAGE_SELECT), egui::StrokeKind::Middle);
             }
             ui.painter().text(
                 page.center_bottom() + vec2(0.0, 6.0),
