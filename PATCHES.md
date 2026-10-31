@@ -44,6 +44,10 @@ Upstream's tests for these were changed to assert the fork's behaviour. Keep the
   share registry state with an upstream install. `pdfcraft.exe` stays, so `App Paths\pdfcraft.exe` and
   `Applications\pdfcraft.exe` are still shared: installing it alongside upstream isn't supported.
 - CodeQL: `.github/codeql/codeql-config.yml` excludes tests and `vendor/`.
+- Script folding in Find: `crates/render/src/text/search.rs` folds Kangxi radicals, Arabic
+  presentation forms, Persian yeh and kaf and Arabic-Indic digits. Redaction word search stays on
+  `PageText::find_for_redaction`, which adds back the literal matches: if an upstream merge moves a
+  redaction caller to `find_opts`, it can mark less.
 
 ## Merging upstream
 

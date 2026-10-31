@@ -23,6 +23,8 @@ log = { workspace = true }
 serde = { workspace = true }
 # Reads rendered pixel words as bytes; already in the tree through hayro.
 bytemuck = { version = "1" }
+# Script folding in text search; already in the tree through hayro-syntax's stringprep.
+unicode-normalization = "0.1"
 
 # lopdf (bootstrap) draws random bytes for encryption; on the web they come from the browser.
 [target.'cfg(target_arch = "wasm32")'.dependencies]

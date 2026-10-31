@@ -1,12 +1,61 @@
 //! Literal search in normalized page text, retaining the original glyph owners.
 use super::{PageText, fold_case};
 use std::ops::Range;
+use unicode_normalization::UnicodeNormalization;
 
-pub(super) fn find(page: &PageText, query: &str, sensitive: bool, whole_words: bool, limit: usize) -> Vec<Range<usize>> {
+/// Folds script variants a reader can't tell apart, in both the query and the page:
+///
+/// - Kangxi radicals and the CJK radical supplement forms with a compatibility mapping (U+2E9F,
+///   U+2EF3) become their unified ideographs, so `⾒` is found by typing `見`.
+/// - Arabic presentation forms become base letters ([`push_presentation_form`]).
+/// - Persian yeh and alef maksura become Arabic yeh, and Persian kaf becomes Arabic kaf.
+/// - Arabic-Indic and Extended Arabic-Indic digits become ASCII digits.
+///
+/// Whole-string NFKC is deliberately not used: it would compose `e` + U+0301 so that `e` stops
+/// matching, and fold `½` or `™` too. Folding one character at a time also means text
+/// that matched before folding still matches after it. One character can become several; each
+/// keeps its glyph as owner in [`find`], so a match inside an expansion reports the whole glyph.
+fn fold_script(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for c in s.chars() {
+        match c {
+            '\u{2E9F}' | '\u{2EF3}' | '\u{2F00}'..='\u{2FD5}' => out.extend(c.nfkc()),
+            '\u{FB50}'..='\u{FDFF}' | '\u{FE70}'..='\u{FEFF}' => push_presentation_form(c, &mut out),
+            _ => out.push(base_letter(c)),
+        }
+    }
+    out
+}
+
+/// A presentation form as its letters, without a ligature's vowel marks and kashida, which a
+/// reader searching for the word would not type. A form that is only marks (U+FE70) keeps them
+/// and loses its spacing carrier, so it can still be found.
+fn push_presentation_form(form: char, out: &mut String) {
+    let is_mark = |c: char| matches!(c, '\u{640}' | '\u{64B}'..='\u{65F}' | '\u{670}');
+    let has_letter = form.nfkc().any(|c| !c.is_whitespace() && !is_mark(c));
+    out.extend(form.nfkc().filter(|&c| if has_letter { !is_mark(c) } else { !c.is_whitespace() && c != '\u{640}' }).map(base_letter));
+}
+
+fn base_letter(c: char) -> char {
+    match c {
+        '\u{6CC}' | '\u{649}' => '\u{64A}',
+        '\u{6A9}' => '\u{643}',
+        '\u{660}'..='\u{669}' => char::from_digit(u32::from(c) - 0x660, 10).unwrap_or(c),
+        '\u{6F0}'..='\u{6F9}' => char::from_digit(u32::from(c) - 0x6F0, 10).unwrap_or(c),
+        _ => c,
+    }
+}
+
+/// `script_variants` is off only for the literal half of redaction search
+/// ([`PageText::find_for_redaction`]).
+pub(super) fn find(page: &PageText, query: &str, sensitive: bool, whole_words: bool, script_variants: bool, limit: usize) -> Vec<Range<usize>> {
     if limit == 0 {
         return Vec::new();
     }
-    let fold = |s: &str| if sensitive { s.to_owned() } else { fold_case(s) };
+    let fold = |s: &str| {
+        let cased = if sensitive { s.to_owned() } else { fold_case(s) };
+        if script_variants { fold_script(&cased) } else { cased }
+    };
     let needle: Vec<char> = fold(query).split_whitespace().collect::<Vec<_>>().join(" ").chars().collect();
     if needle.is_empty() {
         return Vec::new();

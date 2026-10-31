@@ -113,7 +113,7 @@ impl Automation {
                     None => needles
                         .iter()
                         .enumerate()
-                        .flat_map(|(i, w)| text.find_opts(w, case_sensitive, whole_words).into_iter().map(move |h| (Some(i), h)))
+                        .flat_map(|(i, w)| text.find_for_redaction(w, case_sensitive, whole_words).into_iter().map(move |h| (Some(i), h)))
                         .collect(),
                 };
                 for (word, h) in hits {

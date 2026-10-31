@@ -456,6 +456,10 @@ from public specifications like the rest of PdfCraft.
 - **Convert colours to grayscale** (PDF-XChange's Color Converter; Edit menu, `doc_convert_gray`).
 - **Export to Excel** (PDF-XChange's Convert to MS Office; File menu, `doc_export_office` with an
   `.xlsx` path): one worksheet per page, detected tables as rows and columns, plain numbers as numbers.
+- **Find across script variants** (`text_find` too): Kangxi radicals find their ideographs (`⾒` and
+  `見`), Arabic presentation forms their letters, Persian yeh and kaf their Arabic letters, and
+  Arabic-Indic digits ASCII digits. Always on; redaction word search finds these as well as every
+  literal match.
 
 Not implemented, and why: cloud storage connectors (Box, Dropbox, Google Drive, OneDrive,
 SharePoint need registered OAuth apps), FileOpen and Azure RMS DRM (proprietary vendor SDKs), the
