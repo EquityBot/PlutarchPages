@@ -457,7 +457,8 @@ from public specifications like the rest of PdfCraft.
 - **Export to Excel** (PDF-XChange's Convert to MS Office; File menu, `doc_export_office` with an
   `.xlsx` path): one worksheet per page, detected tables as rows and columns, plain numbers as numbers.
 - **Find across script variants** (`text_find` too): Kangxi radicals find their ideographs (`⾒` and
-  `見`), Arabic presentation forms their letters, Persian yeh and kaf their Arabic letters, and
+  `見`), Arabic presentation forms their letters, Persian yeh and kaf their Arabic letters, Arabic
+  vowel marks and kashida are ignored, and
   Arabic-Indic digits ASCII digits. Always on; redaction word search finds these as well as every
   literal match.
 

@@ -149,11 +149,7 @@ fn arabic_presentation_forms_match_base_letters() {
 
 #[test]
 fn arabic_and_persian_letter_variants_match() {
-    for yeh in ["\u{64A}", "\u{6CC}", "\u{649}"] {
-        assert_same_letters(yeh, "\u{64A}");
-        assert_same_letters(yeh, "\u{6CC}");
-        assert_same_letters(yeh, "\u{649}");
-    }
+    assert_same_letters("\u{64A}", "\u{6CC}");
     assert_same_letters("\u{643}", "\u{6A9}");
     assert_eq!(page(&["ک", "ت", "ا", "ب"]).find("كتاب"), vec![0..4]);
     // Other letters stay apart.
@@ -295,4 +291,28 @@ fn long_repeated_prefix_search_preserves_the_last_match_and_limit() {
     let query = format!("{}b", "a".repeat(4095));
     assert_eq!(text.find_opts_limited(&query, false, false, 1), vec![126977..131073]);
     assert!(text.find(&format!("{}c", "a".repeat(4095))).is_empty());
+}
+
+/// A ligature with a vowel mark matches its letters typed with or without the mark, and so does
+/// the same word spelled out with the mark, in both case modes.
+#[test]
+fn arabic_marks_match_either_way() {
+    for sensitive in [false, true] {
+        for query in ["\u{630}\u{670}", "\u{630}"] {
+            assert_eq!(page(&["\u{FC5B}"]).find_opts(query, sensitive, false), vec![0..1], "{query}");
+            assert_eq!(page(&["\u{630}\u{670}"]).find_opts(query, sensitive, false), vec![0..1], "{query}");
+        }
+        assert_eq!(page(&["\u{FD3C}"]).find_opts("\u{627}\u{64B}", sensitive, false), vec![0..1]);
+    }
+    // Marks and kashida drawn as glyphs of their own don't split a word.
+    assert_eq!(page(&["\u{643}", "\u{64E}", "\u{62A}", "\u{640}", "\u{628}"]).find("\u{643}\u{62A}\u{628}"), vec![0..5]);
+    // A query of marks alone still finds them.
+    assert_eq!(page(&["\u{628}", "\u{64B}"]).find("\u{64B}"), vec![1..2]);
+}
+
+#[test]
+fn alef_maksura_stays_apart_from_yeh() {
+    assert!(page(&["\u{639}", "\u{644}", "\u{649}"]).find("\u{639}\u{644}\u{64A}").is_empty());
+    assert!(page(&["\u{639}", "\u{644}", "\u{64A}"]).find("\u{639}\u{644}\u{649}").is_empty());
+    assert_eq!(page(&["\u{639}", "\u{644}", "\u{6CC}"]).find("\u{639}\u{644}\u{64A}"), vec![0..3]);
 }
