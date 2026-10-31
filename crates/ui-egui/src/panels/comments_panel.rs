@@ -549,7 +549,7 @@ fn inline_editor(ui: &mut egui::Ui, t: &Tokens, view: &mut DocView, key: (usize,
     }
     let submit = crate::comments::submit_key(ui, &r, false);
     ui.horizontal(|ui| {
-        if (ui.add(egui::Button::new(egui::RichText::new(tl!("Save")).color(Color32::WHITE)).fill(t.accent).corner_radius(12)).clicked() || submit)
+        if (ui.add(egui::Button::new(egui::RichText::new(tl!("Save")).color(theme::IVORY)).fill(t.accent).corner_radius(12)).clicked() || submit)
             && let Some((page, index, text)) = view.comments.editing.take()
         {
             edit = Some(Edit::SetAnnotationContents { page, index, text });
