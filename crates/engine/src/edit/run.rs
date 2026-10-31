@@ -190,6 +190,14 @@ pub(crate) struct EditCtx {
     pub(crate) redaction_overlays: Vec<pdfcraft_cos::ObjRef>,
 }
 
+/// 32 bytes from the operating system's secure generator, for new encryption keys and salts.
+/// Protection fails if the generator does, rather than encrypting with weaker randomness.
+fn entropy() -> Result<[u8; 32], EditError> {
+    let mut out = [0u8; 32];
+    getrandom::fill(&mut out).map_err(|e| EditError::Protection(format!("no secure random numbers for the encryption keys: {e}")))?;
+    Ok(out)
+}
+
 impl EditCtx {
     pub(crate) fn new(now: Option<i64>, salt: u64) -> Self {
         let mut seed = 0x9E37_79B9_7F4A_7C15u64 ^ salt;
@@ -219,21 +227,6 @@ impl EditCtx {
             renamed_fields: Vec::new(),
             redaction_overlays: Vec::new(),
         }
-    }
-
-    /// 32 bytes of entropy for new encryption keys and salts. `RandomState` is seeded by the
-    /// operating system, so no extra dependency is needed.
-    fn entropy(&mut self) -> [u8; 32] {
-        use std::hash::{BuildHasher, Hasher};
-        let mut out = [0u8; 32];
-        for (i, chunk) in out.chunks_mut(8).enumerate() {
-            let mut h = std::collections::hash_map::RandomState::new().build_hasher();
-            h.write_u64(self.seed ^ i as u64);
-            h.write_u64(self.count);
-            self.count += 1;
-            chunk.copy_from_slice(&h.finish().to_le_bytes());
-        }
-        out
     }
 
     /// A fresh `/NM`: a random-looking UUID (version 4 layout) from a splitmix64 stream.
@@ -755,10 +748,10 @@ pub(crate) fn run_edit(doc: &mut pdfcraft_cos::Document, edit: &Edit, cx: &mut E
         }
         Edit::Protect(p) => {
             p.validate()?;
-            let seed = cx.entropy();
+            let seed = entropy()?;
             // Without a permissions password nothing is restricted, so the owner password is a
             // random one nobody needs.
-            let random_owner: String = cx.entropy().iter().map(|b| format!("{b:02x}")).collect();
+            let random_owner: String = entropy()?.iter().map(|b| format!("{b:02x}")).collect();
             let params = pdfcraft_cos::NewEncryption {
                 algorithm: p.algorithm,
                 user_password: p.open_password.as_deref().unwrap_or(""),
