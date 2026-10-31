@@ -12,8 +12,8 @@
 # which repackages the prebuilt release binaries. Keep runtime-version and finish-args identical.
 # Its own id, so it can sit beside upstream's ai.storyteller.pdfcraft and neither updates the other.
 # Flatpak exports only files named after the id, so the commands below rename the desktop entry,
-# MIME file, metainfo and icons from the id the other packages use. StartupWMClass keeps the old
-# id: it's the Wayland app id the binary sends (APP_ID in apps/pdfcraft/src/main.rs).
+# MIME file, metainfo and icons from the id the other packages use. The binary sends this id as its Wayland app id
+# when FLATPAK_ID says it's in this sandbox (window_app_id in apps/pdfcraft/src/main.rs).
 id: io.github.EquityBot.PlutarchPages
 runtime: org.freedesktop.Platform
 runtime-version: '25.08'
@@ -107,7 +107,7 @@ modules:
       - install -Dm755 target/release/pdfcraft /app/bin/pdfcraft
       - install -Dm644 NOTICE /app/share/doc/pdfcraft/NOTICE
       - install -Dm644 packaging/linux/ai.storyteller.pdfcraft.desktop /app/share/applications/io.github.EquityBot.PlutarchPages.desktop
-      - sed -i 's/^Icon=.*/Icon=io.github.EquityBot.PlutarchPages/' /app/share/applications/io.github.EquityBot.PlutarchPages.desktop
+      - sed -i -e 's/^Icon=.*/Icon=io.github.EquityBot.PlutarchPages/' -e 's/^StartupWMClass=.*/StartupWMClass=io.github.EquityBot.PlutarchPages/' /app/share/applications/io.github.EquityBot.PlutarchPages.desktop
       - install -Dm644 packaging/linux/ai.storyteller.pdfcraft.mime.xml /app/share/mime/packages/io.github.EquityBot.PlutarchPages.xml
       - mkdir -p /app/share/icons && cp -R assets/app-icon/hicolor /app/share/icons/
       - for icon in /app/share/icons/hicolor/*/apps/ai.storyteller.pdfcraft.*; do mv "$icon" "${icon%/*}/io.github.EquityBot.PlutarchPages.${icon##*.}"; done

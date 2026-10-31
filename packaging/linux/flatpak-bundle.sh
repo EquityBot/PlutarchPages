@@ -66,6 +66,8 @@ if [[ "$TEST" = 1 ]]; then
   flatpak install --user -y --noninteractive --reinstall "$OUT"
   flatpak info --user "$APP_ID"
   flatpak run --command=pdfcraft-cli "$APP_ID" --version
+  # The window's Wayland app id depends on this (window_app_id in apps/pdfcraft/src/main.rs).
+  flatpak run --command=sh "$APP_ID" -c 'test "$FLATPAK_ID" = '"$APP_ID"
   # Flatpak silently leaves out anything not named after the id, and the desktop would show no app.
   exports="${XDG_DATA_HOME:-$HOME/.local/share}/flatpak/exports/share"
   test -f "$exports/applications/$APP_ID.desktop"

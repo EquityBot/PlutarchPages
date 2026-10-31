@@ -79,9 +79,6 @@ jobs:
       PDFCRAFT_BUILD_SHA: ${{ github.sha }}
       CRAFT_FONTS_DIR: ${{ github.workspace }}/craft-fonts
       CRAFT_FONTS_REQUIRED: "1"
-      # The release the x64 install test upgrades from. Any published release older than the
-      # build will do; a version override skips the upgrade, because it may be the older one.
-      UPGRADE_FROM: "0.15.0"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -113,6 +110,8 @@ jobs:
       - name: Build and package, unsigned
         shell: pwsh
         run: ./packaging/windows/package.ps1 -Arch ${{ matrix.arch }}
+      # The x64 install test upgrades from the latest published release. A version override skips
+      # the upgrade, because it may be the older one, and so does a build no newer than that release.
       - name: Download the MSI to upgrade from and check it against its release's checksums
         if: matrix.arch == 'x64' && env.INPUT_VERSION == ''
         timeout-minutes: 10
@@ -120,9 +119,17 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $name = "pdfcraft-$env:UPGRADE_FROM-windows-x64.msi"
+          $tag = gh release view --repo $env:GITHUB_REPOSITORY --json tagName --jq .tagName
+          if ($LASTEXITCODE -ne 0) { throw "gh release view exited with $LASTEXITCODE" }
+          $previous = $tag -replace '^v', ''
+          if ([version]$previous -ge [version]$env:VERSION) {
+            Write-Output "::notice::No upgrade test: $env:VERSION is not newer than the latest release, $previous."
+            exit 0
+          }
+          "UPGRADE_FROM=$previous" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          $name = "pdfcraft-$previous-windows-x64.msi"
           $dir = Join-Path $env:RUNNER_TEMP 'upgrade-from'
-          gh release download "v$env:UPGRADE_FROM" --repo $env:GITHUB_REPOSITORY --dir $dir --pattern $name --pattern SHA256SUMS.txt
+          gh release download $tag --repo $env:GITHUB_REPOSITORY --dir $dir --pattern $name --pattern SHA256SUMS.txt
           if ($LASTEXITCODE -ne 0) { throw "gh release download exited with $LASTEXITCODE" }
           $listed = @(Get-Content -LiteralPath (Join-Path $dir 'SHA256SUMS.txt') | Where-Object { $_ -cmatch "^[0-9a-f]{64} [ *]$([regex]::Escape($name))$" })
           if ($listed.Count -ne 1) { throw "SHA256SUMS.txt lists $name $($listed.Count) times" }
@@ -135,7 +142,7 @@ jobs:
         shell: pwsh
         run: |
           $upgrade = @{}
-          if (-not $env:INPUT_VERSION) {
+          if ($env:UPGRADE_FROM) {
             $upgrade = @{
               PreviousPath = Join-Path $env:RUNNER_TEMP "upgrade-from/pdfcraft-$env:UPGRADE_FROM-windows-x64.msi"
               PreviousVersion = $env:UPGRADE_FROM
@@ -486,7 +493,11 @@ jobs:
             if [ "${{ matrix.arch }}" = aarch64 ]; then
               pkg install -y rust
             else
-              curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain stable
+              # A fixed rustup release, checked before it runs. The toolchain it installs is signed by the Rust project.
+              curl --proto '=https' --tlsv1.2 -sSf -o /tmp/rustup-init https://static.rust-lang.org/rustup/archive/1.29.2/x86_64-unknown-freebsd/rustup-init
+              [ "$(sha256 -q /tmp/rustup-init)" = 75761aeaa57195f998cb0dd641508a10c528b4d8ea6dcd91465ead110b969439 ] || exit 1
+              chmod +x /tmp/rustup-init
+              /tmp/rustup-init -y --profile minimal --default-toolchain stable
             fi
       - name: Set up the aarch64 cross toolchain
         if: matrix.arch == 'aarch64'
