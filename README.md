@@ -402,7 +402,16 @@ The summary is in **[ROADMAP.md](ROADMAP.md)**; the full assessment by dimension
 
 ## Downloads
 
-This fork publishes no builds of its own yet; build it from source (see [Development](docs/development.md)). Upstream PdfCraft builds are on the [latest release](https://github.com/storytold/pdfcraft/releases/latest) has every build listed below, and [all releases](https://github.com/storytold/pdfcraft/releases) has earlier versions and their notes. `<ver>` in the file names is the version number, and `SHA256SUMS.txt` lists a checksum for every file.
+Builds are on the [latest release](https://github.com/EquityBot/PlutarchPages/releases/latest). Download the file for your system; `<ver>` in the file names is the version number.
+
+| System | Download |
+| --- | --- |
+| Windows | `pdfcraft-<ver>-windows-x64.msi`, also x86 and arm64, or a `-portable.zip` |
+| macOS | `pdfcraft-<ver>-macos-universal.dmg` |
+| Linux | `.AppImage`, `.deb`, `.rpm` or `.tar.gz`, for x86_64 and aarch64 |
+| Command line only | `pdfcraft-cli-<ver>-*`, for Linux and macOS |
+
+**The packages are unsigned**, so Windows and macOS may warn about or block them. `SHA256SUMS.txt` on the release lists a checksum for every file. Flatpak, Arch, FreeBSD, riscv64 and web packages aren't built yet. To build from source instead, see [Development](docs/development.md).
 
 ---
 
