@@ -30,10 +30,8 @@ impl Automation {
             Some(hex) => Some(json::hex_rgb(hex).ok_or_else(|| ToolError::InvalidArgs(format!("color must be #RRGGBB, not {hex:?}")))?),
         };
         let (bold, italic) = (a.opt_bool("bold")?.unwrap_or(false), a.opt_bool("italic")?.unwrap_or(false));
-        let edits = vec![
-            Edit::SetBookmarkColor { path: path.clone(), color },
-            Edit::SetBookmarkStyle { path, bold: Some(bold), italic: Some(italic) },
-        ];
+        let edits =
+            vec![Edit::SetBookmarkColor { path: path.clone(), color }, Edit::SetBookmarkStyle { path, bold: Some(bold), italic: Some(italic) }];
         self.apply(a, Edit::Batch { label: "Style".into(), edits })
     }
 
