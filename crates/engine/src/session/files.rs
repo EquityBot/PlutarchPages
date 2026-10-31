@@ -1,10 +1,9 @@
 use super::{
-    Arc, CombineSource, Combined, DataFormat, DocId, EditError, Hidden, ImageResolution, LOW_RESOLUTION_PRINT_DPI, OptimizeReport, SaveOptions,
-    Session, SourceKind, SplitPart, decode_text, guard, open_source, open_source_with, optimize, print, print_raster, set_default_layer_state,
-    source_kind, writable, write_full,
+    Arc, CombineSource, Combined, DataFormat, DocId, EditError, Hidden, ImageResolution, OptimizeReport, SaveOptions, Session, SourceKind, SplitPart,
+    decode_text, guard, open_source, open_source_with, optimize, print, source_kind, writable, write_full,
 };
 
-use crate::{Converted, conversion_note_replaced, conversion_notes_csv, conversion_notes_email};
+use crate::{Converted, PrintSource, conversion_note_replaced, conversion_notes_csv, conversion_notes_email};
 
 impl Session {
     /// The page count of another PDF (Replace Pages, Insert Pages dialogs).
@@ -161,48 +160,24 @@ impl Session {
 
     /// The print-ready PDF for `settings` (sheets laid out for the paper; see `pdfcraft-print`).
     pub fn print_pdf(&self, id: DocId, settings: &print::Settings) -> Result<Vec<u8>, EditError> {
+        Ok(self.print_source(id)?.print(settings)?.bytes)
+    }
+
+    /// The document as it stands, to print from another thread: rendering pages for a print can
+    /// take minutes, and edits made meanwhile don't reach it. Refused when printing isn't allowed.
+    pub fn print_source(&self, id: DocId) -> Result<PrintSource, EditError> {
         let doc = self.get(id).ok_or(EditError::NoDocument)?;
         if !doc.allows_printing() {
             return Err(EditError::NotPermitted("printing"));
         }
-        // Table 22, bit 12 clear: only a low-level representation may be printed, so the pages
-        // always go as pictures, at no more than the low resolution.
-        let low_res = doc.permissions().is_some_and(|p| !p.print_high_quality()).then(|| print::Raster {
-            dpi: settings.raster.map_or(LOW_RESOLUTION_PRINT_DPI, |r| r.dpi.min(LOW_RESOLUTION_PRINT_DPI)),
-            grayscale: settings.raster.is_some_and(|r| r.grayscale),
-        });
-        // Print as image: the pages used become pictures first, then the picture document is
-        // imposed in their place (its page k is the k-th distinct source page used).
-        if let Some(raster) = low_res.as_ref().or(settings.raster.as_ref()) {
-            let mut distinct: Vec<usize> = Vec::new();
-            for &p in &settings.pages {
-                if !distinct.contains(&p) {
-                    distinct.push(p);
-                }
-            }
-            let bytes = print_raster::rasterize(doc, &distinct, raster, settings.content).map_err(EditError::Print)?;
-            let pictures = pdfcraft_cos::Document::open(Arc::new(bytes)).map_err(|e| EditError::Print(e.to_string()))?;
-            let remapped = print::Settings {
-                pages: settings.pages.iter().map(|p| distinct.iter().position(|d| d == p).unwrap_or(0)).collect(),
-                content: print::Content::Document,
-                raster: None,
-                ..settings.clone()
-            };
-            return pdfcraft_print::impose(&pictures, &remapped).map_err(|e| EditError::Print(e.to_string()));
-        }
-        let mut cos = match doc.editor.as_ref() {
-            Some(e) => e.cos.clone(),
-            None => {
-                pdfcraft_cos::Document::open_with_password(doc.bytes.clone(), doc.password.as_deref()).map_err(|e| EditError::Write(e.to_string()))?
-            }
-        };
-        // #3046: the layers print as they are shown. Once the Layers panel (or a set-layer
-        // action) has changed one, the print copy's default configuration says which are on, so a
-        // hidden layer stays off on paper too; untouched, the document's own configuration prints.
-        if !doc.config.layers.is_empty() {
-            set_default_layer_state(&mut cos, &doc.info.layers);
-        }
-        pdfcraft_print::impose(&cos, settings).map_err(|e| EditError::Print(e.to_string()))
+        Ok(PrintSource {
+            export: doc.export_source(),
+            working: doc.editor.as_ref().map(|e| e.cos.clone()),
+            bytes: doc.bytes.clone(),
+            password: doc.password.as_deref().map(str::to_string),
+            layers: if doc.config.layers.is_empty() { Vec::new() } else { doc.info.layers.clone() },
+            low_resolution_only: doc.permissions().is_some_and(|p| !p.print_high_quality()),
+        })
     }
 
     /// For each page, whether its text mostly runs bottom-to-top ([`pdfcraft_print::text_reads_up`]);

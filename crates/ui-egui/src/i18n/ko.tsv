@@ -2688,6 +2688,7 @@ certificate	SHA-256 digest	SHA-256 다이제스트
 	Print as image	이미지로 인쇄
 	Resolution:	해상도:
 	Use it when a printer skips text, shading or transparency. The print is no longer searchable text; with Print in grayscale, the pictures are grey.	프린터에서 텍스트, 음영 또는 투명 효과가 누락될 때 사용하세요. 인쇄물은 더 이상 검색 가능한 텍스트가 아니며, 회색조로 인쇄하면 그림이 회색으로 인쇄됩니다.
+	Pages that use Type 3 fonts print as images, because Windows can close PlutarchPages while printing them. The other pages print as usual.	Type 3 글꼴을 사용하는 페이지는 이미지로 인쇄됩니다. 해당 페이지를 인쇄하는 동안 Windows가 PlutarchPages를 닫을 수 있기 때문입니다. 다른 페이지는 평소대로 인쇄됩니다.
 	Crop Image	이미지 자르기
 	Remove Crop	자르기 제거
 	Trim the picture with its handles; Enter or Done applies	핸들로 그림을 다듬으세요. Enter 또는 완료를 누르면 적용됩니다

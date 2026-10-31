@@ -456,6 +456,11 @@ from public specifications like the rest of PdfCraft.
 - **Convert colours to grayscale** (PDF-XChange's Color Converter; Edit menu, `doc_convert_gray`).
 - **Export to Excel** (PDF-XChange's Convert to MS Office; File menu, `doc_export_office` with an
   `.xlsx` path): one worksheet per page, detected tables as rows and columns, plain numbers as numbers.
+- **Windows printing with Type 3 fonts** (upstream
+  [#2684](https://github.com/storytold/pdfcraft/issues/2684), from
+  [PR #3021](https://github.com/storytold/pdfcraft/pull/3021) by guillehr2): pages that draw with
+  Type 3 fonts go to a Windows printer as pictures, so `d2d1.dll` can't close the app on them, and
+  a printer's job is built off the UI thread.
 
 Not implemented, and why: cloud storage connectors (Box, Dropbox, Google Drive, OneDrive,
 SharePoint need registered OAuth apps), FileOpen and Azure RMS DRM (proprietary vendor SDKs), the

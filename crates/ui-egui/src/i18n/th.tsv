@@ -2692,6 +2692,7 @@ key	Space	Space
 	Print as image	พิมพ์เป็นรูปภาพ
 	Resolution:	ความละเอียด:
 	Use it when a printer skips text, shading or transparency. The print is no longer searchable text; with Print in grayscale, the pictures are grey.	ใช้เมื่อเครื่องพิมพ์พิมพ์ข้อความ การไล่เฉดสี หรือความโปร่งใสไม่ออก งานพิมพ์จะไม่เป็นข้อความที่ค้นหาได้ และถ้าเลือก "พิมพ์เป็นระดับสีเทา" รูปภาพจะเป็นสีเทา
+	Pages that use Type 3 fonts print as images, because Windows can close PlutarchPages while printing them. The other pages print as usual.	หน้าที่ใช้ฟอนต์ Type 3 จะพิมพ์เป็นรูปภาพ เนื่องจาก Windows อาจปิด PlutarchPages ขณะพิมพ์หน้าเหล่านั้น หน้าอื่นจะพิมพ์ตามปกติ
 	Crop Image	ครอบตัดรูปภาพ
 	Remove Crop	เอาการครอบตัดออก
 	Trim the picture with its handles; Enter or Done applies	ตัดขอบรูปด้วยจุดจับ กด Enter หรือ "เสร็จสิ้น" เพื่อใช้
