@@ -20,7 +20,7 @@ pub const UPDATE_APP: craft_update::app::App = craft_update::app::App {
     former_ids: &[],
     former_names: &[],
     icon_png: Some(include_bytes!("../../../assets/app-icon/hicolor/128x128/apps/ai.storyteller.pdfcraft.png")),
-    accent: Some([0xb7, 0x02, 0x28]),
+    accent: Some([0x99, 0x00, 0x24]),
     ..craft_update::suite::PDFCRAFT
 };
 
