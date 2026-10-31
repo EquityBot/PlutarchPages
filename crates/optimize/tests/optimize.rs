@@ -1732,11 +1732,17 @@ fn monochrome_images_keep_what_they_should() {
         seed ^= seed << 17;
         seed
     };
-    // Twelve dark bands a row, their edges ragged by up to five samples, as a scan's are.
+    // Twelve dark bands a row, their edges ragged by up to five samples, as a scan's are. Each
+    // edge drifts by at most 2 samples a row, as a scanned edge does: rows redrawn independently
+    // are noise that zlib-rs, which Flate uses in a full Windows workspace build, compresses as
+    // well as Group 4, so the test would depend on the backend.
+    let mut edges = [(0usize, 0usize); 12];
     let mut ragged = vec![0xFFu8; stride * h as usize];
     for y in 0..h as usize {
-        for band in 0..12 {
-            let (x0, x1) = (band * 100 + (next() % 5) as usize, band * 100 + 50 + (next() % 5) as usize);
+        for (band, (left, right)) in edges.iter_mut().enumerate() {
+            *left = (*left + (next() % 5) as usize).saturating_sub(2).min(4);
+            *right = (*right + (next() % 5) as usize).saturating_sub(2).min(4);
+            let (x0, x1) = (band * 100 + *left, band * 100 + 50 + *right);
             for x in x0..x1.min(w as usize) {
                 ragged[y * stride + x / 8] &= !(0x80 >> (x % 8));
             }
