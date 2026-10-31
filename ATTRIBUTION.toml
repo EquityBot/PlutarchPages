@@ -2967,7 +2967,7 @@ licence = "MIT OR Apache-2.0"
 licence_file = "LICENSE-MIT"
 kind = "image"
 usage = "README header; text and emblem drawn as SVG paths, no embedded fonts or third-party art"
-sha256 = "7b97ded256b596888c9691271b5e5a8f465c9e76bd164d069dfc07feaba8a781"
+sha256 = "c3a545ab2827c092bcb1d1d0a19e0a3d46901890f149c3a0d3ddf1b421d37a02"
 
 [[asset]]
 path = ".github/assets/banner-phone-light.svg"
@@ -2978,7 +2978,7 @@ licence = "MIT OR Apache-2.0"
 licence_file = "LICENSE-MIT"
 kind = "image"
 usage = "README header; text and emblem drawn as SVG paths, no embedded fonts or third-party art"
-sha256 = "18eb1c4cd093cdd1f7902d8f3ae885e582b10da1d6daf93e6a7ed29b3ce7f70b"
+sha256 = "d3800ee5b05abbadea432c97e6f0947881ca2bd9c8130c64f62fb186c6b5b8fc"
 
 [[asset]]
 path = ".github/assets/banner-phone.svg"
@@ -2989,7 +2989,7 @@ licence = "MIT OR Apache-2.0"
 licence_file = "LICENSE-MIT"
 kind = "image"
 usage = "README header; text and emblem drawn as SVG paths, no embedded fonts or third-party art"
-sha256 = "1f2c57ad8fe5a4685f58a00b9174dd5729fa1b2a7ac856a7e19c75e39a4ff736"
+sha256 = "b4de5ad10713cd649f0b49a6bff8383e30d3cea82f0f4463e2ddffe8565cb6b8"
 
 [[asset]]
 path = ".github/assets/banner.svg"
@@ -3000,7 +3000,7 @@ licence = "MIT OR Apache-2.0"
 licence_file = "LICENSE-MIT"
 kind = "image"
 usage = "README header; text and emblem drawn as SVG paths, no embedded fonts or third-party art"
-sha256 = "c307345922c62274f6ef7c109a127ff5609496c4853faaf51c3c6a459e2c24ff"
+sha256 = "7f3685ffedddaea96c658c6ddd5c91008ecbae1b68c0078fa0e8d31433541c25"
 
 [[asset]]
 path = ".github/assets/badges/fork-of.svg"
