@@ -21,6 +21,9 @@ Only the latest commit on `main` and the latest release, once there is one, rece
 
 - Redaction removes marked content from the file, and refuses, changing nothing, when content under
   the marks is also used where the marks don't reach. Check the result before you share it.
+- Password protection uses AES-256 unless you choose an older compatibility level. The older
+  levels (40-bit and 128-bit RC4, and 128-bit AES) derive their keys with MD5 and exist only so
+  older readers can open the file. RC4 and MD5 are broken, so choose one only when a reader needs it.
 - Optional converters run programs you installed yourself (LibreOffice, Chrome or Edge, eSpeak NG)
   as separate processes. They are off by default where they convert files.
 - The MCP server and the UI control channel run only when you start them.

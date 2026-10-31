@@ -77,8 +77,8 @@ jobs:
       os: ${{ (github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'full-ci')) && '["ubuntu-24.04","windows-latest"]' || '["ubuntu-24.04"]' }}
       # Same craft-fonts commit as release.yml and freebsd.yml.
       craft-fonts-ref: b076417b5880bd4154bd22f00695b1d28c6bea83
-      # egui/winit/rfd, and the independent oracles (crates/oracle).
-      packages: >-
+      # egui/winit/rfd, and the independent oracles (crates/oracle). The coverage job reuses the list.
+      packages: &linux-packages >-
         libxkbcommon-dev libwayland-dev libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev
         libgtk-3-dev qpdf poppler-utils
       # cargo-deny for the deny step of `cargo xtask ci`, which requires it under CI.
@@ -90,3 +90,83 @@ jobs:
       windows-command: |
         cargo clippy --workspace --all-targets --locked -- -D warnings
         cargo test --workspace --locked
+
+  # The gate's tests run inside the pinned shared workflow, which keeps no report, so the Linux
+  # tests run once more here under instrumentation for Codecov. Not part of the gate.
+  coverage:
+    if: github.event.action != 'labeled' || github.event.label.name == 'full-ci'
+    name: Test coverage
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    env:
+      CARGO_TERM_COLOR: always
+      CARGO_INCREMENTAL: 0
+      CARGO_NET_RETRY: 10
+      # Coverage comes from instrumentation, not DWARF; debuginfo is most of target/.
+      CARGO_PROFILE_DEV_DEBUG: "0"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # The instrumented workspace build overflows the free space on a stock runner.
+      - name: Free disk space
+        run: |
+          nohup sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/.ghcup \
+            /opt/hostedtoolcache/CodeQL </dev/null >/dev/null 2>&1 &
+      - name: Install Linux build dependencies
+        uses: storytold/craft-common-actions/actions/install-apt-packages@2b3fb9dc05036f73c77d18f753a3aa9da55fa386 # main, 31 October 2026
+        with:
+          packages: *linux-packages
+      # The gate's toolchain: stable, as no rust-toolchain.toml names a channel.
+      - name: Install Rust
+        run: |
+          rustup toolchain install stable --profile minimal --no-self-update --component llvm-tools
+          rustup default stable
+      - name: Install cargo-llvm-cov and cargo-nextest
+        uses: taiki-e/install-action@8cca0918f8471c33515202b73f56ab27f2bed283 # v2.87.29
+        with:
+          tool: cargo-llvm-cov@0.9.1,cargo-nextest@0.9.150
+          fallback: none
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          # Pull requests read main's cache and never write their own.
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      # The tests `cargo xtask test` runs under nextest. vendor/ is left out, as in
+      # sonar-project.properties.
+      - name: Run the tests with line coverage
+        run: >
+          cargo llvm-cov nextest --locked --workspace --lib --bins --tests --no-fail-fast
+          --lcov --output-path coverage-rust.lcov --ignore-filename-regex '(^|/)vendor/'
+      - name: Keep the coverage report for the Codecov upload
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage-rust
+          path: coverage-rust.lcov
+          retention-days: 1
+
+  # The upload runs apart from the tests so the OIDC token is never available while test code
+  # runs. A Codecov outage must not block merges.
+  codecov:
+    name: upload coverage to Codecov
+    needs: coverage
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write # Authenticate the Codecov upload with OIDC; no stored token.
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: coverage-rust
+      - uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          use_oidc: true
+          files: coverage-rust.lcov
+          disable_search: true
+          fail_ci_if_error: true
