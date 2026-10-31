@@ -76,7 +76,7 @@ jobs:
       # the org's 5 macOS slots are kept for release builds, and release.yml builds macOS.
       os: ${{ (github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'full-ci')) && '["ubuntu-24.04","windows-latest"]' || '["ubuntu-24.04"]' }}
       # Same craft-fonts commit as release.yml and freebsd.yml.
-      craft-fonts-ref: b076417b5880bd4154bd22f00695b1d28c6bea83
+      craft-fonts-ref: &craft-fonts-ref b076417b5880bd4154bd22f00695b1d28c6bea83
       # egui/winit/rfd, and the independent oracles (crates/oracle). The coverage job reuses the list.
       packages: &linux-packages >-
         libxkbcommon-dev libwayland-dev libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev
@@ -106,9 +106,19 @@ jobs:
       CARGO_NET_RETRY: 10
       # Coverage comes from instrumentation, not DWARF; debuginfo is most of target/.
       CARGO_PROFILE_DEV_DEBUG: "0"
+      # The gate builds with craft-fonts (and requires it); without them the tests that draw
+      # Chinese text have no face for it.
+      CRAFT_FONTS_DIR: ${{ github.workspace }}/craft-fonts
+      CRAFT_FONTS_REQUIRED: "1"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: storytold/craft-fonts
+          ref: *craft-fonts-ref
+          path: craft-fonts
           persist-credentials: false
       # The instrumented workspace build overflows the free space on a stock runner.
       - name: Free disk space
