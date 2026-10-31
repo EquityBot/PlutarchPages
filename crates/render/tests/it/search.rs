@@ -337,6 +337,8 @@ fn a_hit_includes_the_marks_drawn_after_it() {
     assert_eq!(lines.find("\u{643}"), vec![0..1]);
     // Only an Arabic letter takes in what follows it.
     assert_eq!(page(&["a", "\u{640}"]).find("a"), vec![0..1]);
+    assert_eq!(page(&["\u{60C}", "\u{640}"]).find("\u{60C}"), vec![0..1]);
+    assert_eq!(page(&["\u{886}", "\u{64E}"]).find("\u{886}"), vec![0..2]);
     // Latin marks aren't folded, so they stay out of a hit, as before.
     assert_eq!(page(&["e", "\u{301}"]).find("e"), vec![0..1]);
 }
