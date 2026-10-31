@@ -612,7 +612,8 @@ jobs:
           wasm=(*.wasm)
           if [ ! -f "${wasm[0]}" ] || [ "${#wasm[@]}" != 1 ]; then echo "::error::expected 1 wasm file: ${wasm[*]}"; exit 1; fi
           python3 -m http.server 8766 --bind 127.0.0.1 &
-          trap 'kill "$!"' EXIT
+          server=$!
+          trap 'kill "$server"' EXIT
           base=http://127.0.0.1:8766
           curl -fsS --retry 5 --retry-connrefused --retry-delay 1 -o "$RUNNER_TEMP/index.html" "$base/index.html"
           grep -F "${wasm[0]}" "$RUNNER_TEMP/index.html"
