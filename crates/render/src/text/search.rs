@@ -32,18 +32,17 @@ fn fold_script(s: &str, keep_marks: bool) -> String {
     out
 }
 
-/// An Arabic vowel mark or kashida.
+/// An Arabic vowel mark or kashida. Madda and hamza (U+0653 to U+0655) aren't: they change the letter.
 fn is_arabic_mark(c: char) -> bool {
-    matches!(c, '\u{640}' | '\u{64B}'..='\u{65F}' | '\u{670}')
+    matches!(c, '\u{640}' | '\u{64B}'..='\u{652}' | '\u{656}'..='\u{65F}' | '\u{670}')
 }
 
 /// A presentation form as its letters, without a ligature's vowel marks and kashida. With
-/// `keep_marks`, a form that is only marks (U+FE70) keeps them and loses its spacing carrier, so it
-/// can still be found.
+/// `keep_marks` it keeps its marks and loses any spacing carrier (U+FE70), so they can still be found.
 fn push_presentation_form(form: char, keep_marks: bool, out: &mut String) {
     let has_letter = form.nfkc().any(|c| !c.is_whitespace() && !is_arabic_mark(c));
     let keep = |c: char| {
-        if has_letter { !is_arabic_mark(c) } else { keep_marks && !c.is_whitespace() && c != '\u{640}' }
+        if keep_marks { !c.is_whitespace() && c != '\u{640}' } else { has_letter && !is_arabic_mark(c) }
     };
     out.extend(form.nfkc().filter(|&c| keep(c)).map(base_letter));
 }
@@ -113,8 +112,14 @@ pub(super) fn find(page: &PageText, query: &str, sensitive: bool, whole_words: b
         let bounded = !whole_words || (!word(start.checked_sub(1)) && !word(Some(end)));
         if bounded {
             if let Some((_, first)) = chars.get(start)
-                && let Some(last) = owner.checked_add(1)
+                && let Some(mut last) = owner.checked_add(1)
             {
+                // A mark drawn as its own glyph folds to nothing but belongs to the hit before it.
+                while page.glyphs.get(last).is_some_and(|g| !g.text.is_empty() && fold(&g.text).is_empty())
+                    && !page.space_before.get(last).copied().unwrap_or(false)
+                {
+                    last += 1;
+                }
                 hits.push(*first..last);
                 if hits.len() == limit {
                     break;

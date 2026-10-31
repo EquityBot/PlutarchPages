@@ -316,3 +316,27 @@ fn alef_maksura_stays_apart_from_yeh() {
     assert!(page(&["\u{639}", "\u{644}", "\u{64A}"]).find("\u{639}\u{644}\u{649}").is_empty());
     assert_eq!(page(&["\u{639}", "\u{644}", "\u{6CC}"]).find("\u{639}\u{644}\u{64A}"), vec![0..3]);
 }
+
+/// Madda and hamza change the letter, so they aren't dropped as vowel marks are.
+#[test]
+fn hamza_and_madda_stay_part_of_the_letter() {
+    assert_eq!(page(&["\u{627}", "\u{654}"]).find("\u{627}\u{654}"), vec![0..2]);
+    assert!(page(&["\u{627}"]).find("\u{627}\u{654}").is_empty());
+    assert!(page(&["\u{627}"]).find("\u{627}\u{653}").is_empty());
+}
+
+/// A hit takes in a vowel mark drawn as its own glyph after it, so a redaction covers it too.
+#[test]
+fn a_hit_includes_the_marks_drawn_after_it() {
+    assert_eq!(page(&["\u{6A9}", "\u{64E}"]).find("\u{643}\u{64E}"), vec![0..2]);
+    assert_eq!(page(&["\u{643}", "\u{64E}", "\u{627}"]).find("\u{643}"), vec![0..2]);
+    assert!(page(&["\u{643}", "\u{64E}", "\u{650}", "\u{627}"]).find_for_redaction("\u{643}", false, false).contains(&(0..3)));
+    // Latin marks aren't folded, so they stay out of a hit, as before.
+    assert_eq!(page(&["e", "\u{301}"]).find("e"), vec![0..1]);
+}
+
+/// A query of marks alone also finds them inside a ligature.
+#[test]
+fn a_mark_query_finds_marks_in_a_ligature() {
+    assert_eq!(page(&["\u{FC5B}"]).find("\u{670}"), vec![0..1]);
+}
