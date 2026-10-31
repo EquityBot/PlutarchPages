@@ -241,7 +241,7 @@ unsigned and the run shows a warning.
 
 ## Checks
 
-`.github/workflows/packaging-lint.yml` runs on changes to `packaging/` and the workflows: actionlint, shellcheck,
+`.github/workflows/packaging-lint.yml` runs on every pull request, and on pushes that change `packaging/`, `assets/app-icon/` or the workflows: actionlint, shellcheck,
 a PowerShell parse, xmllint (WiX, plist, MIME), `desktop-file-validate`, `appstreamcli validate`, and
 the MSI icon-id check. The FreeBSD and Windows ARM64 workflows also exercise their packaging before a
 release does.

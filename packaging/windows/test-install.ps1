@@ -27,6 +27,7 @@ function Invoke-Msi([string[]] $Arguments) {
   if ($process.ExitCode -ne 0) { throw "msiexec $($Arguments -join ' ') exited with $($process.ExitCode)" }
 }
 
+Write-Output 'Installing'
 Invoke-Msi @('/i', "`"$msi`"", '/qn', '/norestart')
 foreach ($path in $owned) {
   if (-not (Test-Path -LiteralPath $path)) { throw "The install didn't create $path" }
@@ -34,11 +35,13 @@ foreach ($path in $owned) {
 $installed = (Get-ItemProperty -LiteralPath $key -Name InstallDir).InstallDir.TrimEnd('\')
 if ($installed -ne $folder) { throw "InstallDir is '$installed', expected '$folder'" }
 
+Write-Output 'Checking the CLI version'
 $cli = Join-Path $folder 'pdfcraft-cli.exe'
 $version = (& $cli --version) -join "`n"
 if ($LASTEXITCODE -ne 0) { throw "pdfcraft-cli --version exited with $LASTEXITCODE" }
 if ($version -notmatch [regex]::Escape($ExpectedVersion)) { throw "pdfcraft-cli reported '$version'" }
 
+Write-Output 'Starting the app'
 $app = Start-Process (Join-Path $folder 'pdfcraft.exe') -PassThru
 $deadline = (Get-Date).AddSeconds(60)
 do {
@@ -48,9 +51,11 @@ do {
 } until ($app.MainWindowHandle -ne 0 -or (Get-Date) -gt $deadline)
 if ($app.MainWindowHandle -eq 0) { throw 'pdfcraft.exe showed no window within 60 seconds' }
 $title = $app.MainWindowTitle
+Write-Output 'Stopping the app'
 Stop-Process -Id $app.Id -Force
 $app.WaitForExit()
 
+Write-Output 'Uninstalling'
 Invoke-Msi @('/x', "`"$msi`"", '/qn', '/norestart')
 foreach ($path in $owned) {
   if (Test-Path -LiteralPath $path) { throw "$path survived the uninstall" }

@@ -6,8 +6,8 @@ on:
   push:
     branches: [main, release]
     paths: [".github/workflows/**", "packaging/**", "assets/app-icon/**"]
+  # No path filter: main requires these checks, so a PR they skip could never merge.
   pull_request:
-    paths: [".github/workflows/**", "packaging/**", "assets/app-icon/**"]
   workflow_dispatch:
 
 permissions:
