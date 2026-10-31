@@ -28,7 +28,10 @@ Upstream's tests for these were changed to assert the fork's behaviour. Keep the
   hand when upstream moves or adds a control.
 - Brand: no ArtCraft name or logos (`AGENTS.md` section 1.2). Upstream merges add them back, in new
   files too, so search for them after every merge.
-- Update check and repository links point at EquityBot.
+- Update check and repository links point at EquityBot. `new_updater` in
+  `crates/ui-egui/src/platform/updates.rs` ignores ArtCraft Launcher's version pins, which are keyed
+  by the `pdfcraft` id. Don't give `UPDATE_APP` another id to avoid them: it also names the packages
+  and binaries the updater installs.
 - Update results: `crates/ui-egui/src/platform/updates.rs` keeps the fork's themed, translated dialog
   over `craft_update`'s `CheckResultDialog`, which is English only with its own colours. Upstream
   merges delete its catalogue rows and change `crates/ui-egui/tests/it/updates.rs`, so restore both.

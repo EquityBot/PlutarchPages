@@ -27,11 +27,19 @@ pub(crate) struct Updates {
     check_requested: bool,
 }
 
+/// An updater that ignores ArtCraft Launcher's version choices. They're keyed by the `pdfcraft` id
+/// this fork shares with upstream, which also names its packages, and that launcher doesn't manage
+/// PlutarchPages. An empty path can't be read, which means every app follows stable releases.
+#[cfg(not(target_arch = "wasm32"))]
+fn new_updater() -> Updater {
+    Updater::new(&crate::UPDATE_APP, env!("CARGO_PKG_VERSION")).with_pins_path("")
+}
+
 impl Default for Updates {
     fn default() -> Self {
         Self {
             #[cfg(not(target_arch = "wasm32"))]
-            updater: Updater::new(&crate::UPDATE_APP, env!("CARGO_PKG_VERSION")),
+            updater: new_updater(),
             open: false,
             #[cfg(not(target_arch = "wasm32"))]
             startup_check: false,
@@ -51,7 +59,7 @@ impl PdfCraftApp {
     /// Replaces the network with `source` (tests).
     #[cfg(not(target_arch = "wasm32"))]
     pub fn set_update_source(&mut self, source: UpdateSource) {
-        self.updates.updater = Updater::new(&crate::UPDATE_APP, env!("CARGO_PKG_VERSION")).with_source(source);
+        self.updates.updater = new_updater().with_source(source);
     }
 
     /// Help ▸ Check for updates: ask for the latest release and show the outcome.
