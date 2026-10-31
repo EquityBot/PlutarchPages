@@ -331,6 +331,12 @@ fn a_hit_includes_the_marks_drawn_after_it() {
     assert_eq!(page(&["\u{6A9}", "\u{64E}"]).find("\u{643}\u{64E}"), vec![0..2]);
     assert_eq!(page(&["\u{643}", "\u{64E}", "\u{627}"]).find("\u{643}"), vec![0..2]);
     assert!(page(&["\u{643}", "\u{64E}", "\u{650}", "\u{627}"]).find_for_redaction("\u{643}", false, false).contains(&(0..3)));
+    // Nor from the next line.
+    let mut lines = page(&["\u{643}", "\u{64E}"]);
+    lines.line_of = vec![0, 1];
+    assert_eq!(lines.find("\u{643}"), vec![0..1]);
+    // Only an Arabic letter takes in what follows it.
+    assert_eq!(page(&["a", "\u{640}"]).find("a"), vec![0..1]);
     // Latin marks aren't folded, so they stay out of a hit, as before.
     assert_eq!(page(&["e", "\u{301}"]).find("e"), vec![0..1]);
 }

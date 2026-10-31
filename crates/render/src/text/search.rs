@@ -114,9 +114,11 @@ pub(super) fn find(page: &PageText, query: &str, sensitive: bool, whole_words: b
             if let Some((_, first)) = chars.get(start)
                 && let Some(mut last) = owner.checked_add(1)
             {
-                // A mark drawn as its own glyph folds to nothing but belongs to the hit before it.
-                while page.glyphs.get(last).is_some_and(|g| !g.text.is_empty() && fold(&g.text).is_empty())
+                // A mark drawn as its own glyph folds to nothing but belongs to the Arabic letter before it.
+                while matches!(c, '\u{600}'..='\u{6FF}' | '\u{750}'..='\u{77F}' | '\u{8A0}'..='\u{8FF}')
+                    && page.glyphs.get(last).is_some_and(|g| !g.text.is_empty() && fold(&g.text).is_empty())
                     && !page.space_before.get(last).copied().unwrap_or(false)
+                    && page.line_of.get(last) == page.line_of.get(owner)
                 {
                     last += 1;
                 }
