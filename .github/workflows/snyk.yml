@@ -51,14 +51,57 @@ jobs:
       # and xtask's SBOMs list every third-party crate in the others' (checked
       # 1 November 2026), so only they are tested. `--target all` includes the
       # Windows and macOS crates the releases ship with.
+      #
+      # `snyk sbom test` does not apply .snyk, so its ignores are applied here: a
+      # finding is dropped when .snyk ignores its ID for every path ('*') with an
+      # `expires` still to come. Snyk exiting above 1 (an error), or output the
+      # filter cannot read, fails the job.
       - name: Test the Cargo graph
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         run: |
+          set -o pipefail
           cargo cyclonedx --format json --spec-version 1.5 --target all --override-filename snyk-sbom
           [ -n "$SNYK_TOKEN" ] || { echo "::error::The SNYK_TOKEN repository secret is not set, so nothing was scanned."; exit 1; }
+          # {"<ID>": "<latest unexpired expires>"} for each ID .snyk ignores everywhere.
+          ignored=$(yq -o=json '.ignore // {}' .snyk | jq -c '
+            with_entries(.value = ([.value[] | .["*"]? | .expires? // empty
+              | select((sub("\\.[0-9]+"; "") | fromdateiso8601) > now)] | max))
+            | with_entries(select(.value != null))')
+          report=$RUNNER_TEMP/snyk.json
           status=0
           for sbom in apps/*/snyk-sbom.json xtask/snyk-sbom.json; do
-            snyk sbom test --experimental --file="$sbom" || status=1
+            echo "== $sbom"
+            code=0
+            snyk sbom test --experimental --json --file="$sbom" > "$report" || code=$?
+            if [ "$code" -gt 1 ] || [ ! -s "$report" ]; then
+              cat "$report"; echo
+              echo "::error::snyk sbom test failed on $sbom (exit $code)."
+              status=1
+              continue
+            fi
+            # One line per vulnerable path, `open` or `ignored`.
+            if ! findings=$(jq -r --argjson ignored "$ignored" '
+              if type == "array" then .[] else . end
+              | if (.vulnerabilities | type) == "array" then .vulnerabilities[]
+                else error("no vulnerabilities list in the Snyk output") end
+              | $ignored[.id] as $until
+              | "\(if $until then "ignored" else "open" end) [\(.severity // "?" | ascii_upcase)] \(.title) (\(.id)) in \(.packageName)@\(.version) via \(.from // [] | join(" > "))\(if $until then ", ignored until \($until)" else "" end)"
+            ' "$report"); then
+              cat "$report"; echo
+              echo "::error::Could not read the Snyk results for $sbom."
+              status=1
+              continue
+            fi
+            [ -z "$findings" ] || printf '%s\n' "$findings"
+            open=$(printf '%s\n' "$findings" | grep -c '^open ' || true)
+            if [ "$open" -gt 0 ]; then
+              echo "::error::$open open Snyk finding(s) in $sbom."
+              status=1
+            elif [ "$code" -eq 1 ] && [ -z "$findings" ]; then
+              cat "$report"; echo
+              echo "::error::Snyk failed $sbom without listing a vulnerability."
+              status=1
+            fi
           done
           exit "$status"
