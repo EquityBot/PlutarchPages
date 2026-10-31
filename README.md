@@ -411,7 +411,7 @@ Builds are on the [latest release](https://github.com/EquityBot/PlutarchPages/re
 | Linux | `.AppImage`, `.deb`, `.rpm` or `.tar.gz`, for x86_64 and aarch64 |
 | Command line only | `pdfcraft-cli-<ver>-*`, for Linux and macOS |
 
-**The packages are unsigned**, so Windows and macOS may warn about or block them. `SHA256SUMS.txt` on the release lists a checksum for every file. Flatpak, Arch, FreeBSD, riscv64 and web packages aren't built yet. To build from source instead, see [Development](docs/development.md).
+**The packages are unsigned**, so Windows and macOS may warn about or block them. `SHA256SUMS.txt` on the release lists a checksum for every file. On Windows, don't install it alongside upstream PdfCraft: the 2 share some registry entries, so that isn't supported. Flatpak, Arch, FreeBSD, riscv64 and web packages aren't built yet. To build from source instead, see [Development](docs/development.md).
 
 ---
 
