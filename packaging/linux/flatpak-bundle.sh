@@ -71,8 +71,8 @@ if [[ "$TEST" = 1 ]]; then
   flatpak run --command=sh "$APP_ID" -c 'test "$FLATPAK_ID" = '"$APP_ID"
   # Flatpak silently leaves out anything not named after the id, and the desktop would show no app.
   exports="${XDG_DATA_HOME:-$HOME/.local/share}/flatpak/exports/share"
-  test -f "$exports/applications/$APP_ID.desktop"
-  test -f "$exports/icons/hicolor/scalable/apps/$APP_ID.svg"
+  [[ -f "$exports/applications/$APP_ID.desktop" ]]
+  [[ -f "$exports/icons/hicolor/scalable/apps/$APP_ID.svg" ]]
   flatpak run --command=sh "$APP_ID" -c 'ls /app/share/applications /app/share/metainfo /app/share/mime/packages /app/share/icons/hicolor/scalable/apps /app/share/pdfcraft/models'
   # Informational: printing runs lp/lpstat, which the freedesktop runtime doesn't ship (see the
   # manifest's finish-args). Says so if a runtime update ever adds them.
