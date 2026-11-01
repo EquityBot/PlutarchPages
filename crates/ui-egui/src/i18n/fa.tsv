@@ -2619,6 +2619,7 @@ animation effects	Off	خاموش
 	Print as image	چاپ به‌صورت تصویر
 	Resolution:	تفکیک‌پذیری:
 	Use it when a printer skips text, shading or transparency. The print is no longer searchable text; with Print in grayscale, the pictures are grey.	زمانی از آن استفاده کنید که چاپگر متن، سایه یا شفافیت را نادیده می‌گیرد. چاپ دیگر متن قابل جستوجو نیست؛ با «چاپ در مقیاس خاکستری»، تصاویر خاکستری می‌شوند.
+	Pages that use Type 3 fonts print as images, because Windows can close PlutarchPages while printing them. The other pages print as usual.	صفحه‌هایی که از قلم‌های Type 3 استفاده می‌کنند به‌صورت تصویر چاپ می‌شوند، زیرا Windows ممکن است هنگام چاپ آن‌ها PlutarchPages را ببندد. صفحه‌های دیگر طبق معمول چاپ می‌شوند.
 	Crop Image	برش تصویر
 	Remove Crop	حذف برش
 	Trim the picture with its handles; Enter or Done applies	تصویر را با دستگیره‌هایش برش دهید؛ Enter یا «انجام شد» آن را اعمال می‌کند

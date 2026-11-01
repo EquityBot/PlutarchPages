@@ -2442,6 +2442,7 @@ animation effects	Off	ປິດ
 	Print as image	ພິມເປັນຮູບພາບ
 	Resolution:	ຄວາມລະອຽດ:
 	Use it when a printer skips text, shading or transparency. The print is no longer searchable text; with Print in grayscale, the pictures are grey.	ໃຊ້ເມື່ອເຄື່ອງພິມຂ້າມຂໍ້ຄວາມ, ການໄລ່ໂທນສີ ຫຼື ຄວາມໂປ່ງໃສ. ສິ່ງພິມຈະບໍ່ແມ່ນຂໍ້ຄວາມທີ່ຄົ້ນຫາໄດ້ອີກຕໍ່ໄປ; ຫາກພິມເປັນລະດັບສີເທົາ ຮູບພາບຈະກາຍເປັນສີເທົາ.
+	Pages that use Type 3 fonts print as images, because Windows can close PlutarchPages while printing them. The other pages print as usual.	ໜ້າທີ່ໃຊ້ຟອນ Type 3 ຈະພິມເປັນຮູບພາບ ເພາະ Windows ອາດປິດ PlutarchPages ໃນຂະນະທີ່ພິມໜ້າເຫຼົ່ານັ້ນ. ໜ້າອື່ນໆຈະພິມຕາມປົກກະຕິ.
 	Crop Image	ຕັດຂອບຮູບພາບ
 	Remove Crop	ຍົກເລີກການຕັດຂອບ
 	Trim the picture with its handles; Enter or Done applies	ຕັດແຕ່ງຮູບດ້ວຍປຸ່ມຈັບ; ກົດ Enter ຫຼື ສຳເລັດ ເພື່ອນຳໃຊ້

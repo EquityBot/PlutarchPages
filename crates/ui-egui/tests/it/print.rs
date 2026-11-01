@@ -913,3 +913,130 @@ fn a_booklet_decides_two_sided_itself() {
     assert!(h.query_by_role_and_label(Role::ComboBox, "Two-sided:").is_some());
     assert_eq!(h.state().print_draft.job("x").duplex, Some(Duplex::LongEdge), "back to the choice");
 }
+
+/// Two pages: the first draws a glyph, a space and a glyph with a Chrome-style Type 3 font
+/// (#2684), the second Helvetica text.
+fn type3_and_helvetica_pdf() -> Vec<u8> {
+    pdfcraft_testkit::Pdf::new()
+        .obj("<< /Type /Catalog /Pages 2 0 R >>")
+        .obj("<< /Type /Pages /Kids [3 0 R 4 0 R] /Count 2 /MediaBox [0 0 200 300] >>")
+        .obj("<< /Type /Page /Parent 2 0 R /Contents 5 0 R /Resources << /Font << /F9 7 0 R >> >> >>")
+        .obj("<< /Type /Page /Parent 2 0 R /Contents 6 0 R /Resources << /Font << /F1 10 0 R >> >> >>")
+        .stream("", "1 0 0 -1 0 300 cm BT /F9 40 Tf 1 0 0 -1 30 80 Tm <010F01> Tj ET")
+        .stream("", "BT /F1 24 Tf 20 150 Td (Page 2) Tj ET")
+        .obj(
+            "<< /Type /Font /Subtype /Type3 /FontMatrix [0.001 0 0 -0.001 0 0] /FontBBox [0 -700 600 0] /FirstChar 0 /LastChar 15 \
+             /Widths [0 600 0 0 0 0 0 0 0 0 0 0 0 0 0 250] /Encoding << /Differences [1 /g3B 15 /g3] >> /CharProcs << /g3B 8 0 R /g3 9 0 R >> >>",
+        )
+        .stream("", "600 0 0 -700 600 0 d1\n0 -700 600 700 re f")
+        .stream("", "250 0 0 0 0 0 d1")
+        .obj("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>")
+        .build()
+}
+
+/// On Windows, the pages that draw with Type 3 fonts go to a printer as pictures, at the Print as
+/// image resolution, because the Windows print component can close the app on them (#2684), and
+/// the dialog says so while such a page is being printed. Save as PDF, Print as image (every page
+/// a picture already) and other systems leave the pages as they are, and say nothing.
+#[test]
+fn type3_pages_go_to_windows_printers_as_images_and_the_dialog_says_so() {
+    use pdfcraft_engine::print::{Raster, spool::Printer};
+    use pdfcraft_ui_egui::PrintWhich;
+    use std::time::{Duration, Instant};
+    let mut h = Harness::builder().with_size(egui::vec2(1400.0, 900.0)).build_eframe(|_| {
+        let mut app = PdfCraftApp::new();
+        app.set_option("language", "en").unwrap();
+        app.open_bytes("chrome.pdf", None, type3_and_helvetica_pdf()).unwrap();
+        app
+    });
+    h.run_steps(4);
+    h.state_mut().printer_source =
+        Some(std::sync::Arc::new(|| vec![Printer { name: "Office".into(), default: true, two_sided: Some(true), description: String::new() }]));
+    assert!(h.state_mut().execute("print.dialog"));
+    // The dialog opens without waiting for the check, whatever the document holds.
+    assert!(h.state().print_draft.type3_pages.is_empty(), "read off the UI thread, so nothing has arrived before a frame");
+    let deadline = Instant::now() + Duration::from_secs(10);
+    let windows = cfg!(windows);
+    while (h.state().print_draft.printers_loading || (windows && h.state().print_draft.type3_pages.is_empty())) && Instant::now() < deadline {
+        h.run_steps(1);
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    h.run_steps(2);
+    assert_eq!(h.state().print_draft.printer.as_deref(), Some("Office"));
+    let note = "Pages that use Type 3 fonts print as images";
+    let type3 = |h: &Harness<'_, PdfCraftApp>| h.state().print_draft.settings(2, &[]).unwrap().type3_raster;
+    assert_eq!(h.state().print_draft.type3_pages, if windows { vec![0] } else { Vec::new() });
+    assert_eq!(type3(&h), windows.then_some(Raster { dpi: 300.0, grayscale: false }));
+    assert_eq!(h.query_by_label_contains(note).is_some(), windows);
+    // The second page alone has no Type 3 font: nothing to say.
+    h.state_mut().print_draft.which = PrintWhich::Range;
+    h.state_mut().print_draft.range = "2".into();
+    h.run_steps(2);
+    assert!(h.query_by_label_contains(note).is_none());
+    h.state_mut().print_draft.which = PrintWhich::All;
+    h.run_steps(2);
+    assert_eq!(h.query_by_label_contains(note).is_some(), windows);
+    // Print as image already prints every page as a picture.
+    h.state_mut().print_draft.as_image = true;
+    h.run_steps(2);
+    assert_eq!(type3(&h), None);
+    assert!(h.query_by_label_contains(note).is_none());
+    h.state_mut().print_draft.as_image = false;
+    // Save as PDF keeps the pages as they are.
+    h.state_mut().print_draft.printer = None;
+    h.run_steps(2);
+    assert_eq!(type3(&h), None);
+    assert!(h.query_by_label_contains(note).is_none());
+}
+
+/// Printing to a printer builds the job off the UI thread (#2684 review): pages going as pictures
+/// can take minutes to render, and the app has to keep drawing. `print_now` hands the work over at
+/// once, and what becomes of the job arrives as a notice.
+#[test]
+fn a_printer_job_is_built_off_the_ui_thread() {
+    use std::time::{Duration, Instant};
+    let pages = 8;
+    let kids: Vec<String> = (0..pages).map(|i| format!("{} 0 R", 3 + i)).collect();
+    let mut pdf = pdfcraft_testkit::Pdf::new()
+        .obj("<< /Type /Catalog /Pages 2 0 R >>")
+        .obj(format!("<< /Type /Pages /Kids [{}] /Count {pages} /MediaBox [0 0 612 792] >>", kids.join(" ")));
+    for _ in 0..pages {
+        pdf = pdf.obj(format!("<< /Type /Page /Parent 2 0 R /Contents {} 0 R >>", 3 + pages));
+    }
+    let pdf = pdf.stream("", "0.2 0.4 0.6 rg 20 20 500 700 re f").build();
+    let printer = "PlutarchPages test: no such printer";
+    let mut h = Harness::builder().with_size(egui::vec2(1400.0, 900.0)).build_eframe(|_| {
+        let mut app = PdfCraftApp::new();
+        app.set_option("language", "en").unwrap();
+        app.open_bytes("slow.pdf", None, pdf.clone()).unwrap();
+        app
+    });
+    h.run_steps(4);
+    assert!(h.state_mut().execute("print.dialog"));
+    h.run_steps(1);
+    {
+        let d = &mut h.state_mut().print_draft;
+        d.printer = Some(printer.into());
+        d.printer_picked = true;
+        d.as_image = true;
+        d.dpi = 300.0;
+    }
+    // How long the job takes to build where it is built on the thread that asks.
+    let labels: Vec<String> = (1..=pages).map(|p| p.to_string()).collect();
+    let settings = h.state().print_draft.settings(pages, &labels).unwrap();
+    let (_, id) = h.state().active_ids().unwrap();
+    let start = Instant::now();
+    h.state().session.print_pdf(id, &settings).unwrap();
+    let building = start.elapsed();
+    let start = Instant::now();
+    assert!(h.state_mut().print_now(), "handed over");
+    let handing_over = start.elapsed();
+    assert!(handing_over < building / 2, "print_now took {handing_over:?}; building the job takes {building:?}");
+    // The worker reports what became of the job: this printer doesn't exist.
+    let deadline = Instant::now() + Duration::from_secs(120);
+    while h.query_by_label_contains(printer).is_none() && Instant::now() < deadline {
+        h.run_steps(1);
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    assert!(h.query_by_label_contains(printer).is_some(), "the progress card or the job's answer names the printer");
+}

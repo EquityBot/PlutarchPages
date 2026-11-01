@@ -2689,6 +2689,7 @@ key	Space	Space
 	Print as image	Cetak sebagai gambar
 	Resolution:	Resolusi:
 	Use it when a printer skips text, shading or transparency. The print is no longer searchable text; with Print in grayscale, the pictures are grey.	Gunakan saat printer melewatkan teks, arsiran atau transparansi. Hasil cetakan tidak lagi berupa teks yang dapat dicari; dengan Cetak dalam skala abu-abu, gambar menjadi abu-abu.
+	Pages that use Type 3 fonts print as images, because Windows can close PlutarchPages while printing them. The other pages print as usual.	Halaman yang memakai font Type 3 dicetak sebagai gambar, karena Windows dapat menutup PlutarchPages saat mencetaknya. Halaman lain dicetak seperti biasa.
 	Crop Image	Pangkas gambar
 	Remove Crop	Hapus pangkasan
 	Trim the picture with its handles; Enter or Done applies	Pangkas gambar dengan pegangannya; Enter atau Selesai menerapkannya

@@ -2620,6 +2620,7 @@
 	Print as image	Skriv ut som bilde
 	Resolution:	Oppløsning:
 	Use it when a printer skips text, shading or transparency. The print is no longer searchable text; with Print in grayscale, the pictures are grey.	Bruk dette når en skriver hopper over tekst, skyggelegging eller gjennomsiktighet. Utskriften er ikke lenger søkbar tekst; med Skriv ut i gråtoner blir bildene grå.
+	Pages that use Type 3 fonts print as images, because Windows can close PlutarchPages while printing them. The other pages print as usual.	Sider som bruker Type 3-skrifter, skrives ut som bilder, fordi Windows kan lukke PlutarchPages mens de skrives ut. De andre sidene skrives ut som vanlig.
 	Crop Image	Beskjær bilde
 	Remove Crop	Fjern beskjæring
 	Trim the picture with its handles; Enter or Done applies	Beskjær bildet med håndtakene; Enter eller Ferdig bekrefter

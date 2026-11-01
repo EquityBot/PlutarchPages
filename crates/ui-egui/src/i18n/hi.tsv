@@ -2688,6 +2688,7 @@ certificate	SHA-256 digest	SHA-256 डाइजेस्ट
 	Print as image	छवि के रूप में प्रिंट करें
 	Resolution:	रेज़ोल्यूशन:
 	Use it when a printer skips text, shading or transparency. The print is no longer searchable text; with Print in grayscale, the pictures are grey.	जब प्रिंटर टेक्स्ट, छायांकन या पारदर्शिता छोड़ दे, तब इसका उपयोग करें। प्रिंट अब खोजने योग्य टेक्स्ट नहीं रहता; ग्रेस्केल में प्रिंट करने पर चित्र सलेटे होते हैं।
+	Pages that use Type 3 fonts print as images, because Windows can close PlutarchPages while printing them. The other pages print as usual.	Type 3 फ़ॉन्ट का उपयोग करने वाले पृष्ठ चित्रों के रूप में प्रिंट होते हैं, क्योंकि उन्हें प्रिंट करते समय Windows PlutarchPages को बंद कर सकता है। अन्य पृष्ठ सामान्य रूप से प्रिंट होते हैं।
 	Crop Image	छवि क्रॉप करें
 	Remove Crop	क्रॉप हटाएँ
 	Trim the picture with its handles; Enter or Done applies	हैंडल से चित्र को ट्रिम करें; Enter या Done दबाने पर लागू होता है

@@ -57,6 +57,10 @@ Upstream's tests for these were changed to assert the fork's behaviour. Keep the
   share registry state with an upstream install. `pdfcraft.exe` stays, so `App Paths\pdfcraft.exe` and
   `Applications\pdfcraft.exe` are still shared: installing it alongside upstream isn't supported.
 - CodeQL: `.github/codeql/codeql-config.yml` excludes tests and `vendor/`.
+- Windows printing with Type 3 fonts (upstream #2684, from upstream PR #3021 as it stood at
+  `ed6252a6`): those pages go as pictures. Unlike the PR, a printer's job is built on its worker
+  (`Session::print_source`) and the dialog's check runs in the background, because rendering on the
+  UI thread froze the app. If upstream merges its version, keep the worker.
 
 ## Merging upstream
 
