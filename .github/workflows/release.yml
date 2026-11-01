@@ -122,7 +122,7 @@ jobs:
           $tag = gh release view --repo $env:GITHUB_REPOSITORY --json tagName --jq .tagName
           if ($LASTEXITCODE -ne 0) { throw "gh release view exited with $LASTEXITCODE" }
           $previous = $tag -replace '^v', ''
-          if ([version]$previous -ge [version]$env:VERSION) {
+          if ([semver]$previous -ge [semver]$env:VERSION) {
             Write-Output "::notice::No upgrade test: $env:VERSION is not newer than the latest release, $previous."
             exit 0
           }
