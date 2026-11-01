@@ -49,6 +49,10 @@ pub(crate) struct PrintTasks {
     /// The progress card is showing a print job (it is shared with other long jobs).
     #[cfg(not(target_arch = "wasm32"))]
     showing_progress: bool,
+    /// The pages that draw with Type 3 fonts being read for the dialog's note
+    /// (`read_type3_pages_in_background`). A later read replaces this one, whose answer is dropped.
+    #[cfg(not(target_arch = "wasm32"))]
+    type3_pages: Option<std::sync::mpsc::Receiver<Vec<usize>>>,
     /// The driver options being read, per printer (`read_options_in_background`).
     #[cfg(not(target_arch = "wasm32"))]
     options: Vec<(String, std::sync::mpsc::Receiver<Vec<spool::PrinterOption>>)>,
@@ -160,6 +164,7 @@ impl PdfCraftApp {
         self.print_draft = PrintDraft {
             crops: Vec::new(),
             crop_pages: None,
+            type3_pages: Vec::new(),
             printers,
             printers_loading,
             printer_picked: picked,
@@ -171,6 +176,8 @@ impl PdfCraftApp {
             which,
             ..keep
         };
+        #[cfg(not(target_arch = "wasm32"))]
+        self.read_type3_pages_in_background();
         self.dialog = Some(crate::Dialog::Print);
     }
 
@@ -233,6 +240,33 @@ impl PdfCraftApp {
             let _ = tx.send(source());
         });
         self.print_tasks.printers = Some(rx);
+    }
+
+    /// Where the pages that draw with Type 3 fonts print as images, the dialog says so (#2684): read
+    /// them off the GUI thread, whatever the document holds. Every printed choice is covered: the
+    /// page content and every annotation that prints.
+    #[cfg(not(target_arch = "wasm32"))]
+    fn read_type3_pages_in_background(&mut self) {
+        self.print_tasks.type3_pages = None;
+        if !spool::TYPE3_AS_IMAGE {
+            return;
+        }
+        let Some((_, id)) = self.active_ids() else { return };
+        // Printing isn't allowed: there is nothing to say.
+        let Ok(source) = self.session.print_source(id) else { return };
+        let count = self.session.get(id).map_or(0, |d| d.info.pages.len());
+        let (tx, rx) = std::sync::mpsc::channel();
+        let wake = WakeOnExit(self.ctx.clone());
+        let spawned = std::thread::Builder::new().name("print type3 pages".into()).spawn(move || {
+            let _wake = wake;
+            let tx = tx;
+            // The receiver may be gone (a newer read, or the app quit): nothing to report to then.
+            let _ = tx.send(source.type3_pages(&(0..count).collect::<Vec<_>>(), Content::DocumentAndMarkups));
+        });
+        // No thread to read them on: no note, and printing still reads them for itself.
+        if spawned.is_ok() {
+            self.print_tasks.type3_pages = Some(rx);
+        }
     }
 
     /// Read `printer`'s driver options off the GUI thread (#1818); `poll_print` picks them up.
@@ -316,6 +350,17 @@ impl PdfCraftApp {
                     }
                     d.printers = printers;
                     d.printers_loading = false;
+                }
+            }
+            if let Some(rx) = &self.print_tasks.type3_pages {
+                match rx.try_recv() {
+                    Ok(pages) => {
+                        self.print_draft.type3_pages = pages;
+                        self.print_tasks.type3_pages = None;
+                    }
+                    Err(std::sync::mpsc::TryRecvError::Empty) => {}
+                    // A read that died says nothing; printing reads the pages for itself.
+                    Err(std::sync::mpsc::TryRecvError::Disconnected) => self.print_tasks.type3_pages = None,
                 }
             }
             let mut finished = Vec::new();
@@ -403,6 +448,23 @@ impl PdfCraftApp {
             }
         };
         let name = doc.name.clone();
+        let sizes: Vec<(f64, f64)> = doc.info.pages.iter().map(|p| (f64::from(p.width), f64::from(p.height))).collect();
+        // What can be refused at once is refused here, keeping the dialog open; the rest of a
+        // printer's job is built on its worker, because pages going as pictures can take minutes.
+        #[cfg(not(target_arch = "wasm32"))]
+        if let Some(printer) = self.print_draft.printer.clone() {
+            let source = match print::layout(&sizes, &settings)
+                .map_err(|e| e.to_string())
+                .and_then(|_| self.session.print_source(id).map_err(|e| e.to_string()))
+            {
+                Ok(source) => source,
+                Err(e) => {
+                    self.notify_error(e);
+                    return false;
+                }
+            };
+            return self.send_to_printer(printer, source, settings, self.print_draft.job(&name));
+        }
         let bytes = match self.session.print_pdf(id, &settings) {
             Ok(b) => b,
             Err(e) => {
@@ -410,43 +472,55 @@ impl PdfCraftApp {
                 return false;
             }
         };
+        #[cfg(target_arch = "wasm32")]
         match self.print_draft.printer.clone() {
-            #[cfg(target_arch = "wasm32")]
-            Some(printer) if printer == crate::web_print::BROWSER_PRINTER => {
-                let sizes: Vec<(f64, f64)> = doc.info.pages.iter().map(|p| (f64::from(p.width), f64::from(p.height))).collect();
-                match print::layout(&sizes, &settings) {
-                    Ok(sheets) => self.print_in_browser(name, bytes, sheets.iter().map(|s| s.size).collect()),
-                    Err(e) => {
-                        self.notify_error(e);
-                        false
-                    }
+            Some(printer) if printer == crate::web_print::BROWSER_PRINTER => match print::layout(&sizes, &settings) {
+                Ok(sheets) => self.print_in_browser(name, bytes, sheets.iter().map(|s| s.size).collect()),
+                Err(e) => {
+                    self.notify_error(e);
+                    false
                 }
-            }
+            },
             Some(printer) => self.send_to_printer(printer, bytes, self.print_draft.job(&name)),
             None => self.save_print_pdf(&name, bytes),
         }
+        #[cfg(not(target_arch = "wasm32"))]
+        self.save_print_pdf(&name, bytes)
     }
 
-    /// Spool a job off the UI thread: on Windows every sheet is rendered at the printer's
-    /// resolution first, which can take minutes for a long document. The dialog closes at once,
-    /// the progress card counts the sheets as they reach the spooler, and the spooler's answer
-    /// arrives as a notice.
+    /// Build and spool a job off the UI thread: pages going as pictures are rendered first, and on
+    /// Windows every sheet is rendered at the printer's resolution, which can take minutes for a
+    /// long document. The dialog closes at once, the progress card counts the sheets as they reach
+    /// the spooler, and the spooler's answer, or what stopped the job, arrives as a notice.
     #[cfg(not(target_arch = "wasm32"))]
-    fn send_to_printer(&mut self, printer: String, bytes: Vec<u8>, job: spool::Job) -> bool {
+    fn send_to_printer(&mut self, printer: String, source: pdfcraft_engine::PrintSource, settings: print::Settings, job: spool::Job) -> bool {
         let (tx, rx) = std::sync::mpsc::channel();
         let ctx = self.ctx.clone();
+        let wake = WakeOnExit(ctx.clone());
         std::thread::spawn(move || {
+            let _wake = wake;
+            let tx = tx;
             let repaint = || {
                 if let Some(ctx) = &ctx {
                     ctx.request_repaint();
                 }
             };
             // The receiver may be gone (the app quit): nothing to report to then.
-            let result = spool::submit_with_progress(&bytes, &job, &mut |sent, sheets| {
-                let _ = tx.send(JobNews::Sent(sent, sheets));
-                repaint();
+            let result = source.print(&settings).map_err(|e| e.to_string()).and_then(|printed| {
+                if !printed.type3_pages.is_empty() {
+                    let list: Vec<String> = printed.type3_pages.iter().map(|p| p.saturating_add(1).to_string()).collect();
+                    log::info!(
+                        "printing page(s) {} as images: they use Type 3 fonts, which the Windows print component can crash on (#2684)",
+                        list.join(", ")
+                    );
+                }
+                spool::submit_with_progress(&printed.bytes, &job, &mut |sent, sheets| {
+                    let _ = tx.send(JobNews::Sent(sent, sheets));
+                    repaint();
+                })
+                .map_err(|e| e.to_string())
             });
-            let _ = tx.send(JobNews::Done(result.map_err(|e| e.to_string())));
+            let _ = tx.send(JobNews::Done(result));
             repaint();
         });
         self.print_tasks.jobs.push(PrintJob { printer, sheets: None, news: rx });

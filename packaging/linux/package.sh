@@ -14,7 +14,8 @@
 #
 # Cross-compiling (CI: riscv64, tar only): set CROSS_ARCH (riscv64), CROSS_TARGET (the Rust target),
 # CROSS_COMPILE (binutils prefix, for strip) and optionally EMULATOR (e.g. qemu-riscv64) to
-# smoke-test the CLI.
+# smoke-test the CLI. A build host newer than Ubuntu 22.04 also sets GLIBC_FLOOR and RPM_GLIBC_FLOOR,
+# the deb and rpm's glibc requirements.
 #
 # Usage: packaging/linux/package.sh [--skip-build] [--formats "appimage deb rpm tar cli"]
 #
@@ -126,7 +127,8 @@ if has deb || has rpm; then
   export RELEASE="1${PDFCRAFT_BUILD_LABEL:+.$PDFCRAFT_BUILD_LABEL}"
   export NFPM_ARCH="$DEB_ARCH"
   # nfpm expands env vars in fields like `version` and `arch`, but not in `contents[].src`.
-  sed "s|\${STAGE}|$STAGE|g" "$HERE/nfpm.yaml" >"$WORK/nfpm.yaml"
+  sed -e "s|\${STAGE}|$STAGE|g" -e "s|\${GLIBC_FLOOR}|${GLIBC_FLOOR:-2.35}|g" \
+    -e "s|\${RPM_GLIBC_FLOOR}|${RPM_GLIBC_FLOOR:-libm.so.6(GLIBC_2.35)(64bit)}|g" "$HERE/nfpm.yaml" >"$WORK/nfpm.yaml"
   for fmt in deb rpm; do
     if has "$fmt"; then (cd "$ROOT" && nfpm package -f "$WORK/nfpm.yaml" -p "$fmt" -t "$DIST/$BASENAME.$fmt"); fi
   done

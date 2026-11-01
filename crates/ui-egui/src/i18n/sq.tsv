@@ -2566,3 +2566,4 @@ animation effects	Off	Joaktiv
 
 # Comments panel: each reply's own "…" menu (AI-assisted, not separately native-reviewed)
 	Options for this reply	Opsionet për këtë përgjigje
+	Pages that use Type 3 fonts print as images, because Windows can close PlutarchPages while printing them. The other pages print as usual.	Faqet që përdorin shkronja Type 3 shtypen si figura, sepse Windows mund ta mbyllë PlutarchPages gjatë shtypjes së tyre. Faqet e tjera shtypen si zakonisht.

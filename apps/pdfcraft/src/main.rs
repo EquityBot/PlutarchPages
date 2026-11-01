@@ -48,6 +48,14 @@ mod windows_manifest;
 /// Freedesktop app id: the `.desktop` file name and the hicolor icon name.
 const APP_ID: &str = "ai.storyteller.pdfcraft";
 
+/// The Flatpak's app id, which its desktop entry and icons are exported under.
+const FLATPAK_APP_ID: &str = "io.github.EquityBot.PlutarchPages";
+
+/// The id the window carries, given the sandbox's `FLATPAK_ID`: it has to name the desktop entry.
+fn window_app_id(flatpak_id: Option<&str>) -> &'static str {
+    if flatpak_id == Some(FLATPAK_APP_ID) { FLATPAK_APP_ID } else { APP_ID }
+}
+
 /// The app icon (assets/app-icon/README.md). macOS gets the version on Apple's icon grid, with a
 /// transparent margin; Windows and Linux get the full-bleed tile.
 #[cfg(target_os = "macos")]
@@ -344,8 +352,8 @@ fn native_options(integrated: bool, app_frame: bool, renderer: eframe::Renderer)
         .with_inner_size([1440.0, 920.0])
         .with_min_inner_size([820.0, 520.0])
         .with_drag_and_drop(true)
-        // Wayland app id: matches packaging/linux/ai.storyteller.pdfcraft.desktop.
-        .with_app_id(APP_ID);
+        // Wayland app id: matches the desktop entry, which the Flatpak exports under its own id.
+        .with_app_id(window_app_id(std::env::var("FLATPAK_ID").ok().as_deref()));
     // Dock, taskbar, Alt-Tab and launcher icon when running unbundled.
     match eframe::icon_data::from_png_bytes(APP_ICON_PNG) {
         Ok(icon) => viewport = viewport.with_icon(icon),

@@ -1,8 +1,8 @@
 name: Release
 
-# Builds unsigned Windows, Linux and macOS packages. A push to `release` also drafts the GitHub
-# release; publishing the draft is a person's decision. A push to `ryan/release-*` is a dry run:
-# it builds and tests the same packages and drafts nothing.
+# Builds unsigned Windows, Linux, macOS, FreeBSD and web packages. A push to `release` also drafts
+# the GitHub release; publishing the draft is a person's decision. A push to `ryan/release-*` is a
+# dry run: it builds and tests the same packages and drafts nothing.
 on:
   push:
     branches: [release, "ryan/release-*"]
@@ -110,11 +110,45 @@ jobs:
       - name: Build and package, unsigned
         shell: pwsh
         run: ./packaging/windows/package.ps1 -Arch ${{ matrix.arch }}
-      - name: Install, run and uninstall the MSI
-        if: matrix.arch == 'x64'
+      # The x64 install test upgrades from the latest published release. A version override skips
+      # the upgrade, because it may be the older one, and so does a build no newer than that release.
+      - name: Download the MSI to upgrade from and check it against its release's checksums
+        if: matrix.arch == 'x64' && env.INPUT_VERSION == ''
         timeout-minutes: 10
         shell: pwsh
-        run: ./packaging/windows/test-install.ps1 -Path "dist/release/pdfcraft-$env:VERSION-windows-x64.msi" -ExpectedVersion $env:VERSION
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = gh release view --repo $env:GITHUB_REPOSITORY --json tagName --jq .tagName
+          if ($LASTEXITCODE -ne 0) { throw "gh release view exited with $LASTEXITCODE" }
+          $previous = $tag -replace '^v', ''
+          if ([semver]$previous -ge [semver]$env:VERSION) {
+            Write-Output "::notice::No upgrade test: $env:VERSION is not newer than the latest release, $previous."
+            exit 0
+          }
+          "UPGRADE_FROM=$previous" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          $name = "pdfcraft-$previous-windows-x64.msi"
+          $dir = Join-Path $env:RUNNER_TEMP 'upgrade-from'
+          gh release download $tag --repo $env:GITHUB_REPOSITORY --dir $dir --pattern $name --pattern SHA256SUMS.txt
+          if ($LASTEXITCODE -ne 0) { throw "gh release download exited with $LASTEXITCODE" }
+          $listed = @(Get-Content -LiteralPath (Join-Path $dir 'SHA256SUMS.txt') | Where-Object { $_ -cmatch "^[0-9a-f]{64} [ *]$([regex]::Escape($name))$" })
+          if ($listed.Count -ne 1) { throw "SHA256SUMS.txt lists $name $($listed.Count) times" }
+          $actual = (Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $dir $name)).Hash
+          if ($actual -ne $listed[0].Substring(0, 64)) { throw "$name is $actual, SHA256SUMS.txt says $($listed[0])" }
+          Write-Output "$name matches SHA256SUMS.txt: $actual"
+      - name: Install, run and uninstall the MSI, and upgrade to it
+        if: matrix.arch == 'x64'
+        timeout-minutes: 20
+        shell: pwsh
+        run: |
+          $upgrade = @{}
+          if ($env:UPGRADE_FROM) {
+            $upgrade = @{
+              PreviousPath = Join-Path $env:RUNNER_TEMP "upgrade-from/pdfcraft-$env:UPGRADE_FROM-windows-x64.msi"
+              PreviousVersion = $env:UPGRADE_FROM
+            }
+          }
+          ./packaging/windows/test-install.ps1 -Path "dist/release/pdfcraft-$env:VERSION-windows-x64.msi" -ExpectedVersion $env:VERSION @upgrade
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: release-windows-${{ matrix.arch }}
@@ -229,10 +263,422 @@ jobs:
           path: dist/release/*
           if-no-files-found: error
 
+  flatpak:
+    name: Flatpak ${{ matrix.arch }}
+    needs: [version, linux]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: x86_64, runner: ubuntu-24.04 }
+          - { arch: aarch64, runner: ubuntu-24.04-arm }
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      PDFCRAFT_VERSION: ${{ needs.version.outputs.version }}
+      TARGET_ARCH: ${{ matrix.arch }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-linux-${{ matrix.arch }}
+          path: dist/linux
+      - name: Install flatpak-builder
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends flatpak flatpak-builder librsvg2-common
+          # flatpak-builder's sandbox needs unprivileged user namespaces, which Ubuntu 24.04 restricts.
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      - name: Build the bundle, install it and run it in the sandbox
+        run: packaging/linux/flatpak-bundle.sh "dist/linux/pdfcraft-$VERSION-linux-$TARGET_ARCH.tar.gz"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-flatpak-${{ matrix.arch }}
+          path: dist/release/*.flatpak
+          if-no-files-found: error
+
+  arch:
+    name: Arch Linux ${{ matrix.arch }}
+    needs: [version, linux]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x86_64, aarch64]
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      PDFCRAFT_VERSION: ${{ needs.version.outputs.version }}
+      TARGET_ARCH: ${{ matrix.arch }}
+      ARCH_IMAGE: archlinux:base-devel-20261025.0.616225@sha256:624bdc7fc6615155d67bc34cf7146c0c9fd0e3c92943977da63a630e4ca49c30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-linux-${{ matrix.arch }}
+          path: dist/linux
+      - name: Build the package in an Arch container
+        run: |
+          docker run --rm -e PDFCRAFT_VERSION -v "$GITHUB_WORKSPACE:/workspace" -w /workspace "$ARCH_IMAGE" \
+            bash packaging/linux/arch-package.sh "$TARGET_ARCH" "dist/linux/pdfcraft-$VERSION-linux-$TARGET_ARCH.tar.gz"
+      # Arch publishes no arm64 image, and arch-package.sh has already checked the aarch64 package's contents.
+      - name: Install it on Arch and run it
+        if: matrix.arch == 'x86_64'
+        run: |
+          docker run --rm -e VERSION -e TARGET_ARCH -v "$GITHUB_WORKSPACE:/workspace" -w /workspace "$ARCH_IMAGE" bash -euo pipefail -c '
+            pacman -Sy --noconfirm --needed archlinux-keyring
+            pacman -Su --noconfirm
+            pacman -U --noconfirm "dist/release/pdfcraft-$VERSION-linux-$TARGET_ARCH.pkg.tar.zst"
+            pdfcraft --version
+            pdfcraft-cli --version | grep -F "$VERSION"
+          '
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-arch-${{ matrix.arch }}
+          path: dist/release/*.pkg.tar.zst
+          if-no-files-found: error
+
+  linux-riscv64:
+    name: Linux riscv64
+    needs: [version]
+    # Not 22.04 like the other Linux jobs: Ubuntu never built jammy's ncurses security update for
+    # riscv64, so the amd64 and riscv64 libtinfo6 can't match and the cross dependencies don't install.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      INPUT_VERSION: ${{ inputs.version }}
+      PDFCRAFT_VERSION: ${{ needs.version.outputs.version }}
+      PDFCRAFT_BUILD_DATE: ${{ needs.version.outputs.date }}
+      PDFCRAFT_BUILD_SHA: ${{ github.sha }}
+      CRAFT_FONTS_DIR: ${{ github.workspace }}/craft-fonts
+      CRAFT_FONTS_REQUIRED: "1"
+      # Built on 24.04, the binaries need glibc 2.39, and libc defines that symbol version.
+      GLIBC_FLOOR: "2.39"
+      RPM_GLIBC_FLOOR: libc.so.6(GLIBC_2.39)(64bit)
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: storytold/craft-fonts
+          ref: ${{ env.CRAFT_FONTS_REF }}
+          path: craft-fonts
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
+        with:
+          toolchain: stable
+          targets: riscv64gc-unknown-linux-gnu
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          key: release-linux-riscv64
+      - name: Apply version override
+        if: env.INPUT_VERSION != ''
+        run: cargo xtask version set "$VERSION"
+      - name: Install the riscv64 cross toolchain and nfpm
+        env:
+          NFPM_SHA256: 787af76e172dd5fc7cedf4d7c5a090a2f62be9001557a4db1103e270f90ddefd
+        run: |
+          . /etc/os-release
+          sudo dpkg --add-architecture riscv64
+          # Pin the existing sources to amd64; riscv64 comes from ports.
+          if [ -f /etc/apt/sources.list.d/ubuntu.sources ]; then
+            sudo sed -i '/^Types: deb/a Architectures: amd64' /etc/apt/sources.list.d/ubuntu.sources
+          fi
+          if [ -f /etc/apt/sources.list ]; then
+            sudo sed -i 's/^deb /deb [arch=amd64] /g' /etc/apt/sources.list
+            sudo sed -i 's/^deb-src /deb-src [arch=amd64] /g' /etc/apt/sources.list
+          fi
+          for suite in "$VERSION_CODENAME" "$VERSION_CODENAME-updates" "$VERSION_CODENAME-security"; do
+            echo "deb [arch=riscv64] https://ports.ubuntu.com/ubuntu-ports $suite main universe restricted multiverse"
+          done | sudo tee /etc/apt/sources.list.d/riscv64.list
+          # Multi-Arch: same packages must match across amd64 and riscv64. Ports publishes security
+          # updates at once but the runner's amd64 mirror lags, so read amd64's from the primary too.
+          echo "deb [arch=amd64] https://security.ubuntu.com/ubuntu $VERSION_CODENAME-security main universe restricted multiverse" \
+            | sudo tee /etc/apt/sources.list.d/amd64-security.list
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            gcc-riscv64-linux-gnu binutils-riscv64-linux-gnu libc6-dev-riscv64-cross libc6-dev:riscv64 qemu-user \
+            libxkbcommon-dev:riscv64 libwayland-dev:riscv64 libx11-dev:riscv64 libxrandr-dev:riscv64 \
+            libxi-dev:riscv64 libgl1-mesa-dev:riscv64 libasound2-dev:riscv64 pkg-config \
+            desktop-file-utils appstream
+          curl --proto '=https' --proto-redir =https -fsSL -o "$RUNNER_TEMP/nfpm.deb" \
+            "https://github.com/goreleaser/nfpm/releases/download/v2.48.0/nfpm_2.48.0_amd64.deb"
+          echo "$NFPM_SHA256  $RUNNER_TEMP/nfpm.deb" | sha256sum -c -
+          sudo dpkg -i "$RUNNER_TEMP/nfpm.deb"
+      - name: Build and package (deb, rpm, tar.gz), and run the CLI under QEMU
+        env:
+          CARGO_TARGET_RISCV64GC_UNKNOWN_LINUX_GNU_LINKER: riscv64-linux-gnu-gcc
+          PKG_CONFIG_SYSROOT_DIR: /
+          PKG_CONFIG_PATH: /usr/lib/riscv64-linux-gnu/pkgconfig:/usr/share/pkgconfig
+          PKG_CONFIG_ALLOW_CROSS: "1"
+          CROSS_ARCH: riscv64
+          CROSS_TARGET: riscv64gc-unknown-linux-gnu
+          CROSS_COMPILE: riscv64-linux-gnu-
+          EMULATOR: qemu-riscv64
+          QEMU_LD_PREFIX: /usr/riscv64-linux-gnu
+        run: packaging/linux/package.sh --formats "deb rpm tar"
+      - name: Check the packages
+        shell: bash
+        run: |
+          dpkg-deb --info dist/release/*-linux-riscv64.deb | tee "$RUNNER_TEMP/deb-info"
+          grep -F 'libc6 (>= 2.39)' "$RUNNER_TEMP/deb-info"
+          dpkg-deb --contents dist/release/*-linux-riscv64.deb | grep -E 'usr/bin/|metainfo|applications'
+          tar -tzf "dist/release/pdfcraft-$VERSION-linux-riscv64.tar.gz" | grep -F "/bin/pdfcraft-cli"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-linux-riscv64
+          path: dist/release/*
+          if-no-files-found: error
+
+  freebsd:
+    name: FreeBSD ${{ matrix.arch }}
+    needs: [version]
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x86_64, aarch64]
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      INPUT_VERSION: ${{ inputs.version }}
+      PDFCRAFT_VERSION: ${{ needs.version.outputs.version }}
+      PDFCRAFT_BUILD_DATE: ${{ needs.version.outputs.date }}
+      PDFCRAFT_BUILD_SHA: ${{ github.sha }}
+      CARGO_HOME: /var/tmp/craft-cargo
+      CARGO_TARGET_DIR: /var/tmp/craft-target
+      CARGO_BUILD_JOBS: 4
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: storytold/craft-fonts
+          ref: ${{ env.CRAFT_FONTS_REF }}
+          path: craft-fonts
+          persist-credentials: false
+      - name: Start the FreeBSD VM
+        uses: vmactions/freebsd-vm@c46abacb49f09938ca4e1702d15d836285d694cc # v1.5.9
+        with:
+          release: "15.1"
+          # Always an x86_64 guest, which KVM accelerates: aarch64 is cross-compiled in it, because an
+          # emulated aarch64 guest takes over 5 hours.
+          usesh: true
+          cpu: 4
+          mem: 12288
+          copyback: false
+          envs: "VERSION INPUT_VERSION PDFCRAFT_VERSION PDFCRAFT_BUILD_DATE PDFCRAFT_BUILD_SHA CARGO_HOME CARGO_TARGET_DIR CARGO_INCREMENTAL CARGO_BUILD_JOBS"
+          prepare: |
+            # Keep rustup and its proxies outside the Cargo data directory.
+            unset CARGO_HOME CARGO_TARGET_DIR
+            if [ "${{ matrix.arch }}" = aarch64 ]; then
+              # The host compiler and the aarch64 standard library come from the amd64 and aarch64
+              # lang/rust packages, which must be the same build. "latest" can build them days apart;
+              # the quarterly branch keeps them in step.
+              mkdir -p /usr/local/etc/pkg/repos
+              printf 'FreeBSD-ports: { url: "https://pkg.FreeBSD.org/${ABI}/quarterly" }\n' > /usr/local/etc/pkg/repos/FreeBSD.conf
+              pkg update -f -q
+            fi
+            pkg install -y bash git curl pkgconf cmake python3 libxkbcommon wayland libX11 libXcursor libXrandr libXi libxcb mesa-libs vulkan-loader gtk3 fontconfig freetype2 alsa-lib
+            # aarch64-unknown-freebsd is a tier-3 Rust target: rustup publishes no toolchain or standard
+            # library for it, so use FreeBSD's lang/rust package.
+            if [ "${{ matrix.arch }}" = aarch64 ]; then
+              pkg install -y rust
+            else
+              # A fixed rustup release, checked before it runs. The toolchain it installs is signed by the Rust project.
+              curl --proto '=https' --tlsv1.2 -sSf -o /tmp/rustup-init https://static.rust-lang.org/rustup/archive/1.29.2/x86_64-unknown-freebsd/rustup-init
+              [ "$(sha256 -q /tmp/rustup-init)" = 75761aeaa57195f998cb0dd641508a10c528b4d8ea6dcd91465ead110b969439 ] || exit 1
+              chmod +x /tmp/rustup-init
+              /tmp/rustup-init -y --profile minimal --default-toolchain stable
+            fi
+      - name: Set up the aarch64 cross toolchain
+        if: matrix.arch == 'aarch64'
+        shell: freebsd {0}
+        run: |
+          set -eu
+          # Stable Rust, no -Zbuild-std: the aarch64 standard library is copied from FreeBSD's aarch64
+          # lang/rust package, and C code links with base clang and lld against an arm64 sysroot
+          # (base.txz plus the libraries the prepare step installs).
+          target=aarch64-unknown-freebsd
+          X=/var/tmp/craft-cross
+          S=$X/sysroot
+          mkdir -p "$X/db" "$X/cache" "$S"
+          release=$(freebsd-version -u | sed 's/-p[0-9]*$//')
+          P="-o ABI=FreeBSD:${release%%.*}:aarch64 -o OSVERSION=$(uname -U) -o PKG_DBDIR=$X/db -o PKG_CACHEDIR=$X/cache -o IGNORE_OSVERSION=yes"
+          pkg $P update -q
+          host=$(pkg query %v rust)
+          cross=$(pkg $P rquery %v rust)
+          if [ "$host" != "$cross" ]; then
+            echo "error: lang/rust is $host for amd64 but $cross for aarch64; the standard library must match the compiler" >&2
+            exit 1
+          fi
+          pkg $P fetch -y -q rust
+          # pkg links each name-version.pkg to its hashed file.
+          tar -xf "$X/cache/rust-$cross.pkg" -C "$X" --include "*usr/local/lib/rustlib/$target/*"
+          cp -R "$X/usr/local/lib/rustlib/$target" /usr/local/lib/rustlib/
+          base=https://download.freebsd.org/releases/arm64/aarch64/$release
+          fetch -q -o "$X/MANIFEST" "$base/MANIFEST"
+          fetch -q -o "$X/base.txz" "$base/base.txz"
+          if [ "$(awk '$1 == "base.txz" { print $2 }' "$X/MANIFEST")" != "$(sha256 -q "$X/base.txz")" ]; then
+            echo "error: arm64 base.txz does not match its MANIFEST" >&2
+            exit 1
+          fi
+          tar -xf "$X/base.txz" -C "$S" ./lib ./usr/lib ./usr/include ./usr/libdata
+          # The libraries the prepare step installs; the build tools stay host-only.
+          pkg $P fetch -y -q -d libxkbcommon wayland libX11 libXcursor libXrandr libXi libxcb mesa-libs vulkan-loader gtk3 fontconfig freetype2 alsa-lib
+          for p in "$X"/cache/*.pkg; do
+            [ ! -L "$p" ] || continue
+            case "$p" in */rust-*) continue ;; esac
+            tar -xf "$p" -C "$S" --exclude '+*'
+          done
+          for tool in cc c++; do
+            printf '#!/bin/sh\nexec %s --target=%s%s --sysroot=%s -fuse-ld=lld -I%s/usr/local/include -L%s/usr/local/lib -Wl,-rpath-link,%s/usr/local/lib "$@"\n' \
+              "$tool" "$target" "${release%%-*}" "$S" "$S" "$S" "$S" > "$X/$tool"
+            chmod +x "$X/$tool"
+          done
+          cat > "$X/env" <<EOF
+          export CARGO_BUILD_TARGET=$target
+          export CARGO_TARGET_AARCH64_UNKNOWN_FREEBSD_LINKER=$X/cc
+          export CC_aarch64_unknown_freebsd=$X/cc CXX_aarch64_unknown_freebsd=$X/c++ AR_aarch64_unknown_freebsd=/usr/bin/ar
+          export PKG_CONFIG_ALLOW_CROSS=1 PKG_CONFIG_SYSROOT_DIR=$S PKG_CONFIG_LIBDIR=$S/usr/local/libdata/pkgconfig:$S/usr/libdata/pkgconfig
+          EOF
+          rustc --print target-libdir --target "$target"
+      # package.sh runs `pdfcraft --version` on x86_64 and checks each aarch64 binary's type with file(1).
+      - name: Build and package
+        shell: freebsd {0}
+        run: |
+          set -eu
+          # Only rustup writes this; the lang/rust package installs into /usr/local/bin.
+          [ ! -f "$HOME/.cargo/env" ] || . "$HOME/.cargo/env"
+          git config --global --add safe.directory "*"
+          # Before the cross environment: xtask has to run on the guest.
+          if [ -n "$INPUT_VERSION" ]; then cargo xtask version set "$VERSION"; fi
+          # Written by "Set up the aarch64 cross toolchain": cargo then builds for aarch64.
+          [ ! -f /var/tmp/craft-cross/env ] || . /var/tmp/craft-cross/env
+          export CRAFT_FONTS_DIR="$PWD/craft-fonts" CRAFT_FONTS_REQUIRED=1
+          bash packaging/freebsd/package.sh
+          archive="dist/release/pdfcraft-$VERSION-freebsd-${{ matrix.arch }}.tar.gz"
+          tar -tzf "$archive" | grep -F /bin/pdfcraft-cli
+      - name: Copy the archive from the VM
+        run: |
+          mkdir -p dist/release
+          rsync -a --timeout=1800 --rsync-path='env PATH=/usr/local/bin:/usr/bin:/bin rsync' \
+            -e 'ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=60 -o ConnectTimeout=120' \
+            "freebsd:$GITHUB_WORKSPACE/dist/release/" dist/release/
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-freebsd-${{ matrix.arch }}
+          path: dist/release/*
+          if-no-files-found: error
+
+  web:
+    name: Web (wasm)
+    needs: [version]
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      INPUT_VERSION: ${{ inputs.version }}
+      PDFCRAFT_VERSION: ${{ needs.version.outputs.version }}
+      PDFCRAFT_BUILD_DATE: ${{ needs.version.outputs.date }}
+      PDFCRAFT_BUILD_SHA: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
+        with:
+          toolchain: stable
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          key: release-web
+      - name: Install trunk
+        env:
+          TRUNK_SHA256: f2b4680cd239693a646a2795e4633c625328d7b2a044fbe749fa3a2fe9e7036b
+        run: |
+          curl --proto '=https' --proto-redir =https -fsSL -o "$RUNNER_TEMP/trunk.tar.gz" \
+            "https://github.com/trunk-rs/trunk/releases/download/v0.21.14/trunk-x86_64-unknown-linux-gnu.tar.gz"
+          echo "$TRUNK_SHA256  $RUNNER_TEMP/trunk.tar.gz" | sha256sum -c -
+          tar -xz -C "$HOME/.cargo/bin" -f "$RUNNER_TEMP/trunk.tar.gz" trunk
+          trunk --version
+      - name: Apply version override
+        if: env.INPUT_VERSION != ''
+        run: cargo xtask version set "$VERSION"
+      - name: Build and zip
+        run: packaging/web/package.sh
+      - name: Serve the zip's site and fetch the page and its wasm
+        shell: bash
+        run: |
+          unzip -q "dist/release/pdfcraft-web-$VERSION.zip" -d "$RUNNER_TEMP/web"
+          cd "$RUNNER_TEMP/web/pdfcraft-web-$VERSION"
+          wasm=(*.wasm)
+          if [ ! -f "${wasm[0]}" ] || [ "${#wasm[@]}" != 1 ]; then echo "::error::expected 1 wasm file: ${wasm[*]}"; exit 1; fi
+          python3 -m http.server 8766 --bind 127.0.0.1 &
+          server=$!
+          trap 'kill "$server"' EXIT
+          base=http://127.0.0.1:8766
+          curl -fsS --retry 5 --retry-connrefused --retry-delay 1 -o "$RUNNER_TEMP/index.html" "$base/index.html"
+          grep -F "${wasm[0]}" "$RUNNER_TEMP/index.html"
+          curl -fsS -o "$RUNNER_TEMP/app.wasm" "$base/${wasm[0]}"
+          cmp <(head -c 4 "$RUNNER_TEMP/app.wasm") <(printf '\0asm')
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-web
+          path: dist/release/*
+          if-no-files-found: error
+
+  # Runs on dry runs too, which never reach the draft job: a missing or stray file fails here first.
+  assets:
+    name: Check the package list
+    needs: [version, windows, linux, macos, flatpak, arch, linux-riscv64, freebsd, web]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: release-*
+          path: artifacts
+          merge-multiple: true
+      - name: Compare with the 30 expected packages
+        working-directory: artifacts
+        shell: bash
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          {
+            for arch in x86_64 aarch64; do
+              for ext in AppImage AppImage.zsync deb rpm tar.gz flatpak pkg.tar.zst; do
+                echo "pdfcraft-$VERSION-linux-$arch.$ext"
+              done
+              echo "pdfcraft-cli-$VERSION-linux-$arch.tar.gz"
+              echo "pdfcraft-$VERSION-freebsd-$arch.tar.gz"
+            done
+            for ext in deb rpm tar.gz; do echo "pdfcraft-$VERSION-linux-riscv64.$ext"; done
+            for arch in x64 x86 arm64; do
+              echo "pdfcraft-$VERSION-windows-$arch.msi"
+              echo "pdfcraft-$VERSION-windows-$arch-portable.zip"
+            done
+            echo "pdfcraft-$VERSION-macos-universal.dmg"
+            echo "pdfcraft-cli-$VERSION-macos-universal.zip"
+            echo "pdfcraft-web-$VERSION.zip"
+          } | LC_ALL=C sort >"$RUNNER_TEMP/expected"
+          find . -maxdepth 1 -type f -printf '%f\n' | LC_ALL=C sort >"$RUNNER_TEMP/built"
+          diff "$RUNNER_TEMP/expected" "$RUNNER_TEMP/built"
+          wc -l <"$RUNNER_TEMP/built"
+
   draft:
     name: Draft GitHub release
     if: github.event_name == 'push' && github.ref == 'refs/heads/release'
-    needs: [version, windows, linux, macos]
+    needs: [version, assets]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
