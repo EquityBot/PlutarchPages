@@ -1,0 +1,30 @@
+# Snyk (https://snyk.io) policy file.
+version: v1.25.0
+ignore:
+  SNYK-RUST-RSA-6092045:
+    - '*':
+        reason: >-
+          Marvin timing attack on RSA private-key decryption; no fixed rsa
+          release. rsa only verifies signatures and does big-number maths here
+          (crates/sign/src/rsa_pad.rs, ec512.rs); private keys use aws-lc-rs.
+          Recheck when RustCrypto/RSA#626 lands.
+        expires: 2027-05-01T00:00:00.000Z
+        created: 2026-11-01T00:00:00.000Z
+  SNYK-RUST-FLATBUFFERS-1912881:
+    - '*':
+        reason: >-
+          RUSTSEC-2021-0122 was fixed in flatbuffers 22.9.29; 24.12.23 is past
+          it and Snyk lists every version. OCR models load only from the
+          install directory or PDFCRAFT_MODELS (crates/ocr/src/lib.rs), never
+          from a PDF.
+        expires: 2027-05-01T00:00:00.000Z
+        created: 2026-11-01T00:00:00.000Z
+  SNYK-RUST-NAGA-7251687:
+    - '*':
+        reason: >-
+          Stack overflow parsing a hostile shader; no fixed naga release. The
+          web build compiles only egui-wgpu's built-in shader and accepts no
+          shader input.
+        expires: 2027-05-01T00:00:00.000Z
+        created: 2026-11-01T00:00:00.000Z
+patch: {}
