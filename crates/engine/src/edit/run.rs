@@ -182,20 +182,14 @@ pub(crate) struct EditCtx {
     pub(crate) today: (i64, u32, u32),
     pub(crate) seed: u64,
     pub(crate) count: u64,
+    /// Platform CSPRNG (`getrandom::fill`). Tests replace it so Protect can fail closed.
+    pub(crate) rng: fn(&mut [u8]) -> Result<(), getrandom::Error>,
     /// Fields the edit renamed to keep imported names separate (old → new), for the repair
     /// log and the undo label.
     pub(crate) renamed_fields: Vec<(String, String)>,
     /// The overlay streams the edit's applied redactions added, which alone the renderer's check
     /// leaves out.
     pub(crate) redaction_overlays: Vec<pdfcraft_cos::ObjRef>,
-}
-
-/// 32 bytes from the operating system's secure generator, for new encryption keys and salts.
-/// Protection fails if the generator does, rather than encrypting with weaker randomness.
-fn entropy() -> Result<[u8; 32], EditError> {
-    let mut out = [0u8; 32];
-    getrandom::fill(&mut out).map_err(|e| EditError::Protection(format!("no secure random numbers for the encryption keys: {e}")))?;
-    Ok(out)
 }
 
 impl EditCtx {
@@ -224,9 +218,21 @@ impl EditCtx {
             today: (1970, 1, 1),
             seed,
             count: 0,
+            rng: getrandom::fill,
             renamed_fields: Vec::new(),
             redaction_overlays: Vec::new(),
         }
+    }
+
+    /// 32 bytes of entropy for new encryption keys, salts and generated owner passwords from the
+    /// platform CSPRNG. Fails closed when secure randomness is unavailable.
+    fn entropy(&mut self) -> Result<[u8; 32], EditError> {
+        let mut out = [0u8; 32];
+        (self.rng)(&mut out).map_err(|e| EditError::Protection(format!("no secure randomness available: {e}")))?;
+        if out == [0u8; 32] {
+            return Err(EditError::Protection("no secure randomness available".into()));
+        }
+        Ok(out)
     }
 
     /// A fresh `/NM`: a random-looking UUID (version 4 layout) from a splitmix64 stream.
@@ -748,10 +754,13 @@ pub(crate) fn run_edit(doc: &mut pdfcraft_cos::Document, edit: &Edit, cx: &mut E
         }
         Edit::Protect(p) => {
             p.validate()?;
-            let seed = entropy()?;
+            let seed = cx.entropy()?;
             // Without a permissions password nothing is restricted, so the owner password is a
             // random one nobody needs.
-            let random_owner: String = entropy()?.iter().map(|b| format!("{b:02x}")).collect();
+            let random_owner = match p.permissions_password {
+                Some(_) => String::new(),
+                None => cx.entropy()?.iter().map(|b| format!("{b:02x}")).collect(),
+            };
             let params = pdfcraft_cos::NewEncryption {
                 algorithm: p.algorithm,
                 user_password: p.open_password.as_deref().unwrap_or(""),

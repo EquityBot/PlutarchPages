@@ -20,7 +20,7 @@ pub const UPDATE_APP: craft_update::app::App = craft_update::app::App {
     former_ids: &[],
     former_names: &[],
     icon_png: Some(include_bytes!("../../../assets/app-icon/hicolor/128x128/apps/ai.storyteller.pdfcraft.png")),
-    accent: Some([0xb7, 0x02, 0x28]),
+    accent: Some([0x99, 0x00, 0x24]),
     ..craft_update::suite::PDFCRAFT
 };
 
@@ -93,6 +93,7 @@ use canvas::fling;
 use canvas::image_pick;
 use canvas::page_cursor;
 use canvas::page_pointer;
+use canvas::page_router;
 pub use canvas::scroll_speed;
 use canvas::signature_drag;
 use canvas::wheel_boost;
@@ -321,6 +322,8 @@ pub struct PdfCraftApp {
     pub flatten_fill_sign_on_save: bool,
     /// Point size for new Fill & Sign text and dates, kept across launches.
     pub fill_text_size: f64,
+    /// Colour for new Fill & Sign text and dates, kept across launches.
+    pub fill_text_color: [f64; 3],
     pub dialog: Option<Dialog>,
     /// How to ask for the latest release (the desktop app sets it; see `updates`).
     pub(crate) updates: updates::Updates,
@@ -584,6 +587,8 @@ pub struct PdfCraftApp {
     fonts_cjk: theme::CjkPreference,
     /// The window title last sent to the platform.
     pub window_title: String,
+    /// The web page's title last set: the window title, but always with the file's name.
+    pub page_title: String,
     /// The UI control channel, when enabled (`--control`; off by default).
     control: Option<control::Control>,
     /// A bookmark being renamed in the Bookmarks panel: (path, text so far).

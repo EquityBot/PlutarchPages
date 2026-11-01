@@ -1,7 +1,7 @@
 use super::error::{Result, ToolError, failed};
 use super::json::{Args, document_attachment_keys, info, one_based, parse_style_ranges, security, summary, text_style_levels};
 use super::paths::{read_input, write_atomic};
-use super::{Arc, Automation, Edit, Value, block_overlapping, comments, json, tools};
+use super::{Arc, Automation, Edit, Value, block_overlapping, comments, content, json, tools};
 
 /// One piece of a tool's result.
 #[derive(Clone, Debug, PartialEq)]
@@ -13,6 +13,28 @@ pub enum Content {
 }
 
 impl Automation {
+    fn doc_convert_gray(&mut self, a: &Args) -> Result<Value> {
+        let pages = match a.opt_ints("pages")? {
+            Some(_) => self.pages(a, "pages")?,
+            None => Vec::new(),
+        };
+        self.apply(a, Edit::ConvertToGray { pages })?;
+        let r = self.session.last_color_report().cloned().unwrap_or_default();
+        Ok(json!({ "pages": r.pages, "colours": r.operators, "images": r.images, "forms": r.forms, "left": r.left }))
+    }
+
+    fn bookmark_replace_style(&mut self, a: &Args) -> Result<Value> {
+        let path = a.path("path")?;
+        let color = match a.opt_str("color")? {
+            None | Some("") => None,
+            Some(hex) => Some(json::hex_rgb(hex).ok_or_else(|| ToolError::InvalidArgs(format!("color must be #RRGGBB, not {hex:?}")))?),
+        };
+        let (bold, italic) = (a.opt_bool("bold")?.unwrap_or(false), a.opt_bool("italic")?.unwrap_or(false));
+        let edits =
+            vec![Edit::SetBookmarkColor { path: path.clone(), color }, Edit::SetBookmarkStyle { path, bold: Some(bold), italic: Some(italic) }];
+        self.apply(a, Edit::Batch { label: "Style".into(), edits })
+    }
+
     /// Run the tool `name` with JSON `args` (an object; `null` means no arguments).
     pub fn call(&mut self, name: &str, args: &Value) -> Result<Vec<Content>> {
         let empty = json!({});
@@ -38,7 +60,7 @@ impl Automation {
                 let edit = Edit::SetInfo { key: a.str("key")?.into(), value: a.str("value")?.into() };
                 self.apply(&a, edit)?
             }
-            "page_render" => return self.page_render(&a).map(|c| vec![c]),
+            "page_render" => return self.page_render(&a),
             "comment_image_preview" => return self.comment_image_preview(&a),
             "text_extract" => self.text_extract(&a)?,
             "text_word_count" => self.text_word_count(&a)?,
@@ -127,15 +149,7 @@ impl Automation {
             "page_extract" => self.page_extract(&a)?,
             "doc_combine" => self.doc_combine(&a)?,
             "doc_create_multiple" => self.doc_create_multiple(&a)?,
-            "doc_convert_gray" => {
-                let pages = match a.opt_ints("pages")? {
-                    Some(_) => self.pages(&a, "pages")?,
-                    None => Vec::new(),
-                };
-                self.apply(&a, Edit::ConvertToGray { pages })?;
-                let r = self.session.last_color_report().cloned().unwrap_or_default();
-                json!({ "pages": r.pages, "colours": r.operators, "images": r.images, "forms": r.forms, "left": r.left })
-            }
+            "doc_convert_gray" => self.doc_convert_gray(&a)?,
             "speech_start" => self.speech_start(&a)?,
             "speech_stop" => self.speech_stop(),
             "speech_status" => self.speech_status(),
@@ -154,7 +168,7 @@ impl Automation {
             "command_run" => return self.command_run(&a),
             "command_batch" => self.command_batch(&a)?,
             "doc_inspect" => self.doc_inspect(&a)?,
-            "render_preview" => return self.render_preview(&a).map(|c| vec![c]),
+            "render_preview" => return self.render_preview(&a),
             "page_number" => {
                 use pdfcraft_organize::LabelStyle as L;
                 let n = self.doc(&a)?.info.pages.len();
@@ -239,19 +253,7 @@ impl Automation {
                     _ => self.apply(&a, Edit::Batch { label: "Style".into(), edits })?,
                 }
             }
-            "bookmark_replace_style" => {
-                let path = a.path("path")?;
-                let color = match a.opt_str("color")? {
-                    None | Some("") => None,
-                    Some(hex) => Some(json::hex_rgb(hex).ok_or_else(|| ToolError::InvalidArgs(format!("color must be #RRGGBB, not {hex:?}")))?),
-                };
-                let (bold, italic) = (a.opt_bool("bold")?.unwrap_or(false), a.opt_bool("italic")?.unwrap_or(false));
-                let edits = vec![
-                    Edit::SetBookmarkColor { path: path.clone(), color },
-                    Edit::SetBookmarkStyle { path, bold: Some(bold), italic: Some(italic) },
-                ];
-                self.apply(&a, Edit::Batch { label: "Style".into(), edits })?
-            }
+            "bookmark_replace_style" => self.bookmark_replace_style(&a)?,
             "bookmark_from_structure" => {
                 let mut out = self.apply(&a, Edit::BookmarksFromStructure)?;
                 let listing = self.bookmark_listing(&a)?;
@@ -563,7 +565,15 @@ impl Automation {
                 };
                 let index = self.paragraph_index(id, page, k, &blocks)?;
                 let block = blocks.get(index).cloned().ok_or_else(|| ToolError::InvalidArgs(format!("paragraph {k} is out of range")))?;
-                let text = a.opt_str("text")?.map(str::to_owned).unwrap_or(block.text);
+                let width = a.opt_num("width")?;
+                // Explicit row alignments keep the editor's row boundaries; a width-only
+                // reflow rejoins soft wraps while retaining typed newlines and spaces.
+                let text = match a.opt_str("text")? {
+                    Some(text) => text.to_owned(),
+                    None if a.get("aligns").is_some() => block.editor_text,
+                    None if width.is_some() => block.reflow_text.clone(),
+                    None => block.text,
+                };
                 let mut style = pdfcraft_engine::BlockStyle {
                     ranges: parse_style_ranges(a.get("ranges"))?,
                     resource: a.opt_str("font_resource")?.map(str::to_owned),
@@ -573,7 +583,7 @@ impl Automation {
                     line_spacing: a.opt_num("line_spacing")?,
                     char_spacing: a.opt_num("char_spacing")?,
                     scale: a.opt_num("scale")?,
-                    width: a.opt_num("width")?,
+                    width,
                     ..Default::default()
                 };
                 let (dx, dy) = (a.opt_num("dx")?, a.opt_num("dy")?);
@@ -593,13 +603,10 @@ impl Automation {
                     style.color = Some(comments::parse_color(c)?);
                 }
                 if let Some(al) = a.opt_str("align")? {
-                    style.align = Some(match al {
-                        "left" => pdfcraft_engine::TextAlign::Left,
-                        "center" => pdfcraft_engine::TextAlign::Center,
-                        "right" => pdfcraft_engine::TextAlign::Right,
-                        "justify" => pdfcraft_engine::TextAlign::Justify,
-                        other => return Err(ToolError::InvalidArgs(format!("unknown align {other:?}"))),
-                    });
+                    style.align = Some(content::parse_align(al)?);
+                }
+                if let Some(aligns) = content::opt_aligns(&a)? {
+                    style.aligns = aligns;
                 }
                 // Where the paragraph is drawn after the edit: moved by dx, dy (up is +dy).
                 let [dx, dy] = style.offset.unwrap_or([0.0, 0.0]);
@@ -661,6 +668,7 @@ impl Automation {
             }
             "doc_export_images" | "doc_export_text" | "doc_export_all_images" => self.export(name, &a)?,
             "doc_header_footer" | "doc_watermark" | "doc_background" | "doc_remove_marks" => self.marks(name, &a)?,
+            "doc_backdrops" => self.backdrops(&a)?,
             "doc_unprotect" => {
                 let mut out = self.apply(&a, Edit::RemoveProtection)?;
                 out["security"] = security(self.doc(&a)?);

@@ -59,6 +59,29 @@ fn a_newer_release_is_offered_for_download() {
     assert!(h.query_by_label_contains("is available").is_none(), "Later closes the dialog");
 }
 
+/// A launcher's version choice for upstream's `pdfcraft` id must not stop this fork offering its own
+/// releases. The file is named by an environment variable, so the check runs in a child process.
+#[test]
+fn a_launcher_pin_on_the_shared_id_does_not_stop_update_offers() {
+    const CHILD: &str = "PLUTARCHPAGES_PIN_TEST_CHILD";
+    if std::env::var_os(CHILD).is_none() {
+        let file = std::env::temp_dir().join(format!("plutarchpages-pin-test-{}.json", std::process::id()));
+        std::fs::write(&file, r#"{"apps":{"pdfcraft":{"Pinned":"v0.1.0"}}}"#).unwrap();
+        let status = std::process::Command::new(std::env::current_exe().unwrap())
+            .args(["--exact", "updates::a_launcher_pin_on_the_shared_id_does_not_stop_update_offers"])
+            .env("CRAFT_VERSIONS_FILE", &file)
+            .env(CHILD, "1")
+            .status();
+        std::fs::remove_file(&file).unwrap();
+        assert!(status.unwrap().success(), "the pinned check didn't offer the release");
+        return;
+    }
+    let mut h = harness(Ok(Some("v99.0.0")));
+    h.state_mut().execute("help.check_updates");
+    settle(&mut h);
+    h.get_by_label_contains("PlutarchPages 99.0.0 is available");
+}
+
 #[test]
 fn an_up_to_date_or_failed_check_says_so() {
     let mut h = harness(Ok(None));
