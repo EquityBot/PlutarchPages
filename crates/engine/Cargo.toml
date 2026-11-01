@@ -53,9 +53,11 @@ unicode-segmentation = "1.13"
 chrono = { workspace = true, features = ["clock"] }
 # Optional external programs (Office and HTML conversion, Read Out Loud); never on the web.
 pdfcraft-external = { workspace = true }
+# Encryption keys and salts for Protect, from the operating system's secure generator.
 getrandom = "0.4"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
+# In the browser the secure generator is Web Crypto.
 getrandom = { version = "0.4", features = ["wasm_js"] }
 
 [dev-dependencies]
