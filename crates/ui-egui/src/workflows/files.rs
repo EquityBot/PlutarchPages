@@ -28,6 +28,13 @@ pub enum FilePurpose {
     RedactWords,
 }
 
+#[cfg(not(target_arch = "wasm32"))]
+fn discover_fonts_safely(
+    discover: impl FnOnce() -> Vec<pdfcraft_engine::text_fonts::FontFile> + std::panic::UnwindSafe,
+) -> Vec<pdfcraft_engine::text_fonts::FontFile> {
+    std::panic::catch_unwind(discover).unwrap_or_default()
+}
+
 /// Discover installed document fonts off the GUI thread, only when the picker is opened.
 #[cfg(not(target_arch = "wasm32"))]
 pub(crate) fn installed_font_files(ctx: &egui::Context) -> Option<Vec<pdfcraft_engine::text_fonts::FontFile>> {
@@ -41,7 +48,7 @@ pub(crate) fn installed_font_files(ctx: &egui::Context) -> Option<Vec<pdfcraft_e
         if std::thread::Builder::new()
             .name("document-font-discovery".into())
             .spawn(move || {
-                let fonts = pdfcraft_engine::text_fonts::discover(&pdfcraft_engine::text_fonts::installed_directories());
+                let fonts = discover_fonts_safely(|| pdfcraft_engine::text_fonts::discover(&pdfcraft_engine::text_fonts::installed_directories()));
                 if let Ok(mut result) = result.lock() {
                     *result = Some(fonts);
                 }
@@ -1175,5 +1182,13 @@ mod stem_tests {
             if path.is_dir() { out.extend(walk(&path)) } else { out.push(path) }
         }
         out
+    }
+}
+
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod font_scan_tests {
+    #[test]
+    fn a_panicking_font_scan_finishes_with_an_empty_list() {
+        assert!(super::discover_fonts_safely(|| panic!("synthetic font scan failure")).is_empty());
     }
 }
