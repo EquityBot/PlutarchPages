@@ -465,6 +465,11 @@ from public specifications like the rest of PdfCraft.
   [PR #3021](https://github.com/storytold/pdfcraft/pull/3021) by guillehr2): pages that draw with
   Type 3 fonts go to a Windows printer as pictures, so `d2d1.dll` can't close the app on them, and
   a printer's job is built off the UI thread.
+- **Find across script variants** (`text_find` too): Kangxi radicals find their ideographs (`⾒` and
+  `見`), Arabic presentation forms their letters, Persian yeh and kaf their Arabic letters, Arabic
+  vowel marks and kashida are ignored, and
+  Arabic-Indic digits ASCII digits. Always on; redaction word search finds these as well as every
+  literal match.
 
 Not implemented, and why: cloud storage connectors (Box, Dropbox, Google Drive, OneDrive,
 SharePoint need registered OAuth apps), FileOpen and Azure RMS DRM (proprietary vendor SDKs), the

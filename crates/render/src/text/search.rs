@@ -1,12 +1,73 @@
 //! Literal search in normalized page text, retaining the original glyph owners.
 use super::{PageText, fold_case};
 use std::ops::Range;
+use unicode_normalization::UnicodeNormalization;
 
-pub(super) fn find(page: &PageText, query: &str, sensitive: bool, whole_words: bool, limit: usize) -> Vec<Range<usize>> {
+/// Folds script variants a reader can't tell apart, in both the query and the page:
+///
+/// - Kangxi radicals and the CJK radical supplement forms with a compatibility mapping (U+2E9F,
+///   U+2EF3) become their unified ideographs, so `⾒` is found by typing `見`.
+/// - Arabic presentation forms become base letters ([`push_presentation_form`]). Ornamental forms
+///   with no compatibility mapping (U+FDFD, U+FD40) stay as they are.
+/// - Arabic vowel marks and kashida are dropped, unless the query is nothing else (`keep_marks`), so
+///   a ligature and its spelled-out letters match either way.
+/// - Persian yeh becomes Arabic yeh, and Persian kaf becomes Arabic kaf. Alef maksura stays: `على`
+///   and `علي` are different words.
+/// - Arabic-Indic and Extended Arabic-Indic digits become ASCII digits.
+///
+/// Whole-string NFKC is deliberately not used: it would compose `e` + U+0301 so that `e` stops
+/// matching, and fold `½` or `™` too. Folding one character at a time also means text
+/// that matched before folding still matches after it. One character can become several; each
+/// keeps its glyph as owner in [`find`], so a match inside an expansion reports the whole glyph.
+fn fold_script(s: &str, keep_marks: bool) -> String {
+    let mut out = String::with_capacity(s.len());
+    for c in s.chars() {
+        match c {
+            '\u{2E9F}' | '\u{2EF3}' | '\u{2F00}'..='\u{2FD5}' => out.extend(c.nfkc()),
+            '\u{FB50}'..='\u{FDFF}' | '\u{FE70}'..='\u{FEFF}' => push_presentation_form(c, keep_marks, &mut out),
+            c if is_arabic_mark(c) && !keep_marks => {}
+            _ => out.push(base_letter(c)),
+        }
+    }
+    out
+}
+
+/// An Arabic vowel mark or kashida. Madda and hamza (U+0653 to U+0655) aren't: they change the letter.
+fn is_arabic_mark(c: char) -> bool {
+    matches!(c, '\u{640}' | '\u{64B}'..='\u{652}' | '\u{656}'..='\u{65F}' | '\u{670}')
+}
+
+/// A presentation form as its letters, without a ligature's vowel marks and kashida. With
+/// `keep_marks` it keeps its marks and loses any spacing carrier (U+FE70), so they can still be found.
+fn push_presentation_form(form: char, keep_marks: bool, out: &mut String) {
+    let has_letter = form.nfkc().any(|c| !c.is_whitespace() && !is_arabic_mark(c));
+    let keep = |c: char| {
+        if keep_marks { !c.is_whitespace() && c != '\u{640}' } else { has_letter && !is_arabic_mark(c) }
+    };
+    out.extend(form.nfkc().filter(|&c| keep(c)).map(base_letter));
+}
+
+fn base_letter(c: char) -> char {
+    match c {
+        '\u{6CC}' => '\u{64A}',
+        '\u{6A9}' => '\u{643}',
+        '\u{660}'..='\u{669}' => char::from_digit(u32::from(c) - 0x660, 10).unwrap_or(c),
+        '\u{6F0}'..='\u{6F9}' => char::from_digit(u32::from(c) - 0x6F0, 10).unwrap_or(c),
+        _ => c,
+    }
+}
+
+/// `script_variants` is off only for the literal half of redaction search
+/// ([`PageText::find_for_redaction`]).
+pub(super) fn find(page: &PageText, query: &str, sensitive: bool, whole_words: bool, script_variants: bool, limit: usize) -> Vec<Range<usize>> {
     if limit == 0 {
         return Vec::new();
     }
-    let fold = |s: &str| if sensitive { s.to_owned() } else { fold_case(s) };
+    let keep_marks = fold_script(query, false).trim().is_empty();
+    let fold = |s: &str| {
+        let cased = if sensitive { s.to_owned() } else { fold_case(s) };
+        if script_variants { fold_script(&cased, keep_marks) } else { cased }
+    };
     let needle: Vec<char> = fold(query).split_whitespace().collect::<Vec<_>>().join(" ").chars().collect();
     if needle.is_empty() {
         return Vec::new();
@@ -51,8 +112,17 @@ pub(super) fn find(page: &PageText, query: &str, sensitive: bool, whole_words: b
         let bounded = !whole_words || (!word(start.checked_sub(1)) && !word(Some(end)));
         if bounded {
             if let Some((_, first)) = chars.get(start)
-                && let Some(last) = owner.checked_add(1)
+                && let Some(mut last) = owner.checked_add(1)
             {
+                // A mark drawn as its own glyph folds to nothing but belongs to the Arabic letter before it.
+                while c.is_alphabetic()
+                    && matches!(c, '\u{600}'..='\u{6FF}' | '\u{750}'..='\u{77F}' | '\u{870}'..='\u{8FF}')
+                    && page.glyphs.get(last).is_some_and(|g| !g.text.is_empty() && fold(&g.text).is_empty())
+                    && !page.space_before.get(last).copied().unwrap_or(false)
+                    && page.line_of.get(last) == page.line_of.get(owner)
+                {
+                    last += 1;
+                }
                 hits.push(*first..last);
                 if hits.len() == limit {
                     break;

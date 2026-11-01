@@ -128,19 +128,34 @@ impl PageText {
     }
 
     /// Case-insensitive search. Returns glyph ranges of every match (words may span line breaks,
-    /// which count as a single space).
+    /// which count as a single space). Script variants match too (see [`Self::find_opts`]).
     pub fn find(&self, needle: &str) -> Vec<std::ops::Range<usize>> {
         self.find_opts(needle, false, false)
     }
 
-    /// Search with Acrobat's find options: case-sensitive, whole words only.
+    /// Search with Acrobat's find options: case-sensitive, whole words only. With or without
+    /// them, script variants a reader can't tell apart match each other: Kangxi radicals and
+    /// ideographs, Arabic presentation forms and letters, Persian and Arabic yeh and kaf, and
+    /// Arabic-Indic and ASCII digits. Part of a glyph's text matching reports the whole glyph.
     pub fn find_opts(&self, needle: &str, case_sensitive: bool, whole_words: bool) -> Vec<std::ops::Range<usize>> {
         self.find_opts_limited(needle, case_sensitive, whole_words, usize::MAX)
     }
 
     /// Search with Acrobat's find options, returning at most `limit` glyph ranges.
     pub fn find_opts_limited(&self, needle: &str, case_sensitive: bool, whole_words: bool, limit: usize) -> Vec<std::ops::Range<usize>> {
-        search::find(self, needle, case_sensitive, whole_words, limit)
+        search::find(self, needle, case_sensitive, whole_words, true, limit)
+    }
+
+    /// The search behind redaction marks: every range [`Self::find_opts`] finds, plus every range
+    /// the same search finds without script folding. Folding can shift a non-overlapping match
+    /// (`11` in `۱11`) or close a word boundary (`見` beside `⾒`), and redaction must
+    /// never mark less than the literal text it was asked for.
+    pub fn find_for_redaction(&self, needle: &str, case_sensitive: bool, whole_words: bool) -> Vec<std::ops::Range<usize>> {
+        let mut hits = self.find_opts(needle, case_sensitive, whole_words);
+        let folded: HashSet<_> = hits.iter().cloned().collect();
+        let literal = search::find(self, needle, case_sensitive, whole_words, false, usize::MAX);
+        hits.extend(literal.into_iter().filter(|r| !folded.contains(r)));
+        hits
     }
 
     /// Glyph ranges of the matches a character matcher finds in the page text (words and lines

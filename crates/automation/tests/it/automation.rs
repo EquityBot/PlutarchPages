@@ -767,6 +767,47 @@ fn arabic_actual_text_stays_logical_through_editor_tools_and_save_reopen() {
     std::fs::remove_dir_all(dir).unwrap();
 }
 
+/// Find and redaction see script variants as the letters they are, report the document's own text
+/// and box each glyph alone. Glyphs are found one at a time, so right-to-left reordering is moot.
+#[test]
+fn text_find_and_redact_mark_match_script_variants() {
+    use pdfcraft_cos::{Dict, Document, ObjRef, Object, SaveOptions, Stream, write_full};
+    use std::sync::Arc;
+
+    let dir = workdir("script-variants");
+    let mut doc = Document::open(Arc::new(fixture(1))).unwrap();
+    // Synthetic glyph codes: A Persian kaf, B Persian yeh, C Persian 1, X lam-alef, Y Kangxi "see".
+    let cmap = "/CIDInit /ProcSet findresource begin 12 dict begin begincmap /CMapType 2 def \
+                1 begincodespacerange <00> <FF> endcodespacerange 5 beginbfchar \
+                <41> <06A9> <42> <06CC> <43> <06F1> <58> <FEFB> <59> <2F92> \
+                endbfchar endcmap CMapName currentdict /CMap defineresource pop end end";
+    let unicode = doc.add(Object::Stream(Stream::flate(Dict::new(), cmap.as_bytes())));
+    doc.update_dict(ObjRef::new(3, 0), |d| d.set(b"ToUnicode".to_vec(), Object::Ref(unicode))).unwrap();
+    let content = "BT /F1 24 Tf 20 150 Td (A) Tj 40 0 Td (B) Tj 40 0 Td (C) Tj 40 0 Td (X) Tj 40 0 Td (Y) Tj ET";
+    doc.set(ObjRef::new(5, 0), Object::Stream(Stream::flate(Dict::new(), content.as_bytes())));
+    std::fs::write(dir.join("variants.pdf"), write_full(&doc, &SaveOptions::default()).unwrap()).unwrap();
+
+    let mut a = auto(&dir);
+    let id = ok(&mut a, "doc_open", json!({"path":"variants.pdf"}))["doc"].as_u64().unwrap();
+    for (typed, drawn) in [
+        ("\u{643}", "\u{6A9}"),
+        ("\u{64A}", "\u{6CC}"),
+        ("1", "\u{6F1}"),
+        ("\u{644}\u{627}", "\u{FEFB}"),
+        ("\u{627}", "\u{FEFB}"),
+        ("\u{898B}", "\u{2F92}"),
+    ] {
+        let found = ok(&mut a, "text_find", json!({"doc":id,"query":typed}));
+        assert_eq!(found["count"], 1, "{typed}: {found}");
+        assert_eq!(found["matches"][0]["text"], drawn, "{typed}");
+        let rects = found["matches"][0]["rects"].as_array().unwrap();
+        assert_eq!(rects.len(), 1, "{typed}");
+        assert_eq!(found["matches"], ok(&mut a, "text_find", json!({"doc":id,"query":drawn}))["matches"], "{typed}");
+    }
+    let marked = ok(&mut a, "redact_mark", json!({"doc":id,"words":["\u{643}","1"]}));
+    assert_eq!(marked["marks_pending"].as_u64(), Some(2), "{marked}");
+}
+
 #[test]
 fn arabic_ligature_actual_text_is_one_editable_word_through_save_reopen() {
     use pdfcraft_cos::{Dict, Document, ObjRef, Object, SaveOptions, Stream, write_full};

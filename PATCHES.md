@@ -61,6 +61,10 @@ Upstream's tests for these were changed to assert the fork's behaviour. Keep the
   `ed6252a6`): those pages go as pictures. Unlike the PR, a printer's job is built on its worker
   (`Session::print_source`) and the dialog's check runs in the background, because rendering on the
   UI thread froze the app. If upstream merges its version, keep the worker.
+- Script folding in Find: `crates/render/src/text/search.rs` folds Kangxi radicals, Arabic
+  presentation forms, Persian yeh and kaf and Arabic-Indic digits. Redaction word search stays on
+  `PageText::find_for_redaction`, which adds back the literal matches: if an upstream merge moves a
+  redaction caller to `find_opts`, it can mark less.
 
 ## Merging upstream
 
