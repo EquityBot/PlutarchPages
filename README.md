@@ -9,7 +9,8 @@
 
 <div align="center">
 
-[![tests](https://github.com/EquityBot/PlutarchPages/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/EquityBot/PlutarchPages/actions/workflows/ci.yml) [![CodeQL](https://github.com/EquityBot/PlutarchPages/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/EquityBot/PlutarchPages/actions/workflows/codeql.yml)<br>
+[![tests](https://github.com/EquityBot/PlutarchPages/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/EquityBot/PlutarchPages/actions/workflows/ci.yml) [![Codecov](https://codecov.io/gh/EquityBot/PlutarchPages/graph/badge.svg)](https://codecov.io/gh/EquityBot/PlutarchPages) [![CodeQL](https://github.com/EquityBot/PlutarchPages/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/EquityBot/PlutarchPages/actions/workflows/codeql.yml) [![Snyk](https://github.com/EquityBot/PlutarchPages/actions/workflows/snyk.yml/badge.svg?branch=main)](https://github.com/EquityBot/PlutarchPages/actions/workflows/snyk.yml) [![SonarCloud](https://sonarcloud.io/api/project_badges/measure?project=EquityBot_PlutarchPages&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=EquityBot_PlutarchPages) [![Codacy code quality](https://app.codacy.com/project/badge/Grade/5ce0643c37eb4a8e9635595492f66c87)](https://app.codacy.com/gh/EquityBot/PlutarchPages/dashboard)<br>
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/16133/badge)](https://www.bestpractices.dev/projects/16133)<br>
 [![rust: 1.95+](.github/assets/badges/rust.svg)](https://www.rust-lang.org/) [![licence: MIT OR Apache-2.0](.github/assets/badges/licence.svg)](#license-and-credits) [![fork of: PdfCraft](.github/assets/badges/fork-of.svg)](https://github.com/storytold/pdfcraft)
 
 </div>
