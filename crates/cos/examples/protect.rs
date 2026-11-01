@@ -1,14 +1,8 @@
 //! Encrypt a PDF: `cargo run -p pdfcraft-cos --example protect in.pdf out.pdf rc4-40|rc4-128|aes-128|aes-256 USER OWNER`
-/// 32 fresh bytes for the file key. `RandomState` is seeded by the operating system (as the
-/// engine's `entropy` uses it), so every run encrypts with a different key.
+/// 32 fresh bytes for the file key and salts, from the operating system's secure generator.
 fn seed() -> [u8; 32] {
-    use std::hash::{BuildHasher, Hasher};
     let mut out = [0u8; 32];
-    for (i, chunk) in out.chunks_mut(8).enumerate() {
-        let mut h = std::collections::hash_map::RandomState::new().build_hasher();
-        h.write_usize(i);
-        chunk.copy_from_slice(&h.finish().to_le_bytes());
-    }
+    getrandom::fill(&mut out).expect("the operating system's secure generator failed");
     out
 }
 
