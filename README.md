@@ -410,9 +410,12 @@ Builds are on the [latest release](https://github.com/EquityBot/PlutarchPages/re
 | Windows | `pdfcraft-<ver>-windows-x64.msi`, also x86 and arm64, or a `-portable.zip` |
 | macOS | `pdfcraft-<ver>-macos-universal.dmg` |
 | Linux | `.AppImage`, `.deb`, `.rpm` or `.tar.gz`, for x86_64 and aarch64 |
+| Linux, from the next release | `.flatpak` or Arch `.pkg.tar.zst`, for x86_64 and aarch64; `.deb`, `.rpm` or `.tar.gz` for riscv64 (glibc 2.39 or newer) |
+| FreeBSD, from the next release | `pdfcraft-<ver>-freebsd-x86_64.tar.gz` or `pdfcraft-<ver>-freebsd-aarch64.tar.gz` |
+| Web, from the next release | `pdfcraft-web-<ver>.zip`, a static site to host yourself |
 | Command line only | `pdfcraft-cli-<ver>-*`, for Linux and macOS |
 
-**The packages are unsigned**, so Windows and macOS may warn about or block them. `SHA256SUMS.txt` on the release lists a checksum for every file. On Windows, don't install it alongside upstream PdfCraft: the 2 share some registry entries, so that isn't supported. Flatpak, Arch, FreeBSD, riscv64 and web packages aren't built yet. To build from source instead, see [Development](docs/development.md).
+**The packages are unsigned**, so Windows and macOS may warn about or block them. `SHA256SUMS.txt` on the release lists a checksum for every file. On Windows, don't install it alongside upstream PdfCraft: the 2 share some registry entries, so that isn't supported. To build from source instead, see [Development](docs/development.md).
 
 ---
 

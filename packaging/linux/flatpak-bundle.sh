@@ -11,12 +11,12 @@
 # `appstreamcli compose`; the freedesktop runtime and SDK named in the manifest are
 # installed per-user from Flathub. Unless --no-test, the bundle is then installed per-user and
 # `pdfcraft-cli --version` is run inside the sandbox as a smoke test.
-# Manifest: packaging/linux/flatpak/ai.storyteller.pdfcraft.bundle.yml.
+# Manifest: packaging/linux/flatpak/io.github.EquityBot.PlutarchPages.bundle.yml.
 set -euo pipefail
 # shellcheck source=../env.sh
 . "$(dirname "${BASH_SOURCE[0]}")/../env.sh"
 HERE="$ROOT/packaging/linux"
-APP_ID=ai.storyteller.pdfcraft
+APP_ID=io.github.EquityBot.PlutarchPages
 FLATHUB=https://dl.flathub.org/repo/flathub.flatpakrepo
 
 TEST=1
@@ -66,6 +66,13 @@ if [[ "$TEST" = 1 ]]; then
   flatpak install --user -y --noninteractive --reinstall "$OUT"
   flatpak info --user "$APP_ID"
   flatpak run --command=pdfcraft-cli "$APP_ID" --version
+  # The window's Wayland app id depends on this (window_app_id in apps/pdfcraft/src/main.rs).
+  # shellcheck disable=SC2016 # expanded inside the sandbox
+  flatpak run --command=sh "$APP_ID" -c 'test "$FLATPAK_ID" = '"$APP_ID"
+  # Flatpak silently leaves out anything not named after the id, and the desktop would show no app.
+  exports="${XDG_DATA_HOME:-$HOME/.local/share}/flatpak/exports/share"
+  [[ -f "$exports/applications/$APP_ID.desktop" ]]
+  [[ -f "$exports/icons/hicolor/scalable/apps/$APP_ID.svg" ]]
   flatpak run --command=sh "$APP_ID" -c 'ls /app/share/applications /app/share/metainfo /app/share/mime/packages /app/share/icons/hicolor/scalable/apps /app/share/pdfcraft/models'
   # Informational: printing runs lp/lpstat, which the freedesktop runtime doesn't ship (see the
   # manifest's finish-args). Says so if a runtime update ever adds them.

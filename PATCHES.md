@@ -40,9 +40,19 @@ Upstream's tests for these were changed to assert the fork's behaviour. Keep the
 - Shared CI: workflows from `storytold/craft-common-actions` are pinned to a commit, and SonarCloud
   receives only `SONAR_TOKEN`. Upstream merges restore `@main` and `secrets: inherit`, so reapply both.
 - Releases: `.github/workflows/release.yml` is this fork's own and uses nothing from
-  `craft-common-actions`. It builds unsigned packages, tests an installed MSI with
-  `packaging/windows/test-install.ps1` and only drafts the release. Keep it over upstream's. Flatpak,
-  Arch, FreeBSD, riscv64 and web packages aren't built yet.
+  `craft-common-actions`. It builds unsigned packages, tests an installed MSI and an upgrade from
+  v0.15.0 with `packaging/windows/test-install.ps1`, and only drafts the release. Keep it over
+  upstream's. Its FreeBSD, riscv64, web and Flatpak jobs are ported from that repository's
+  `release.yml` at `2b3fb9dc`, without the FreeBSD Cargo cache action, and
+  `packaging/linux/arch-package.sh` replaces its `arch-package` action. All are first included in the
+  release after v0.15.0, and the `assets` job fails unless all 30 packages are there.
+- Linux identity: the Flatpak's id is `io.github.EquityBot.PlutarchPages` and the Arch package is `plutarchpages`, so
+  neither updates or replaces upstream's. If a merge brings back
+  `packaging/linux/flatpak/ai.storyteller.pdfcraft*.yml`, move its changes across and delete it. The
+  other packages still use `ai.storyteller.pdfcraft` and the `pdfcraft` package name, which v0.15.0
+  shipped, so they can't be installed alongside upstream's either.
+- `packaging/linux/nfpm.yaml` takes its glibc floors from `package.sh`, because riscv64 builds on Ubuntu
+  24.04 and needs 2.39. Upstream hard-codes 2.35, which understates it there.
 - Windows registration: `PlutarchPages.*` names and its own context-menu component GUIDs, so it doesn't
   share registry state with an upstream install. `pdfcraft.exe` stays, so `App Paths\pdfcraft.exe` and
   `Applications\pdfcraft.exe` are still shared: installing it alongside upstream isn't supported.

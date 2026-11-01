@@ -663,6 +663,26 @@ fn the_desktop_entry_names_the_window_class() {
     assert_eq!(class, Some(super::APP_ID));
 }
 
+/// Inside the Flatpak the window names the exported desktop entry; everywhere else, and in
+/// another app's sandbox, it keeps the id the other packages install.
+#[test]
+fn the_window_names_the_flatpak_desktop_entry_only_in_its_own_sandbox() {
+    assert_eq!(super::window_app_id(Some(super::FLATPAK_APP_ID)), super::FLATPAK_APP_ID);
+    assert_eq!(super::window_app_id(None), super::APP_ID);
+    assert_eq!(super::window_app_id(Some("org.example.Other")), super::APP_ID);
+}
+
+/// Both manifests rewrite `StartupWMClass` to the id the window carries in the sandbox.
+#[test]
+fn the_flatpak_desktop_entries_name_the_window_class() {
+    for manifest in [
+        include_str!("../../../packaging/linux/flatpak/io.github.EquityBot.PlutarchPages.yml"),
+        include_str!("../../../packaging/linux/flatpak/io.github.EquityBot.PlutarchPages.bundle.yml"),
+    ] {
+        assert!(manifest.contains(&format!("s/^StartupWMClass=.*/StartupWMClass={}/", super::FLATPAK_APP_ID)));
+    }
+}
+
 // Regression test for #246: `eprintln!` panics when standard error is a broken pipe (a GUI
 // launch on Windows), and a panic inside the panic hook aborts the process. The start-up
 // path and the hook must write to standard error without it.
