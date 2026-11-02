@@ -1,0 +1,7 @@
+# This Cargo.lock is the one upstream packaged with vello_cpu. Cargo never reads it: the crate is a
+# path patch (Cargo.toml), and every crate resolves from the root Cargo.lock, so this finding
+# describes a version PlutarchPages does not build.
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0204"
+reason = "upstream's unused lockfile; the root Cargo.lock has crossbeam-epoch 0.9.21"
