@@ -475,9 +475,9 @@ from public specifications like the rest of PdfCraft.
 Not implemented, and why: cloud storage connectors (Box, Dropbox, Google Drive, OneDrive,
 SharePoint need registered OAuth apps), FileOpen and Azure RMS DRM (proprietary vendor SDKs), the
 virtual printer driver, legacy browser plug-ins, the Office add-in, the licence key installer, spell
-checking (no permissively licensed dictionary or checker, and Windows' own checker needs unsafe
-code), and, for now, 3D content, export to PowerPoint, enhanced OCR clean-up, an AI assistant and
-an Explorer 'Combine' menu.
+checking (no cross-platform checker chosen yet, and Windows' own checker needs unsafe code), and,
+for now, 3D content, export to PowerPoint, enhanced OCR clean-up, an AI assistant and an Explorer
+'Combine' menu.
 
 ---
 
