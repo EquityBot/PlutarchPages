@@ -49,6 +49,7 @@
   <a href="#how-its-built">How it's built</a> ·
   <a href="#get-started">Get started</a> ·
   <a href="#whats-next">What's next</a> ·
+  <a href="#when-to-choose-something-else">Alternatives</a> ·
   <a href="#downloads">Downloads</a>
 </p>
 
@@ -400,6 +401,18 @@ PdfCraft is young and moving fast. The aim is a workbench where you can view, or
 **Next, in order:** office-document-to-PDF and a .docx export that keeps layout, the reported bugs and the Chinese interface font, a fidelity harness against a reference renderer, editing existing content, then professional workflows (OCR, office formats, Preflight, signatures, accessibility tagging) and 1.0 polish.
 
 The summary is in **[ROADMAP.md](ROADMAP.md)**; the full assessment by dimension and area is in [docs/target-app-parity.md](docs/target-app-parity.md), the ranked gaps in [docs/gaps.md](docs/gaps.md), and the milestones in [docs/roadmap.md](docs/roadmap.md).
+
+---
+
+## When to choose something else
+
+PlutarchPages is alpha, like PdfCraft (see [What's next](#whats-next)). Another tool fits better when:
+
+- **You need OCR, office document conversion or content editing today:** [Stirling-PDF](https://github.com/Stirling-Tools/Stirling-PDF) does all 3, with more than 50 tools, as a desktop app, in the browser or on your own server. Its core is MIT; some of its directories are under a proprietary licence.
+- **You only merge, split, rotate or extract pages:** [PDFsam Basic](https://github.com/torakiki/pdfsam) is a mature desktop app for exactly that (AGPL-3.0).
+- **You want one viewer for PDF, EPUB, DjVu and comic books:** [Okular](https://okular.kde.org/), KDE's document viewer, reads them all and annotates PDFs (GPL).
+- **You transform PDFs in scripts:** [qpdf](https://github.com/qpdf/qpdf) is a mature command line tool that encrypts, linearises, selects pages and repairs files without changing their content (Apache-2.0). `pdfcraft-cli` covers PlutarchPages's own engine.
+- **You want the upstream app:** [PdfCraft](https://github.com/storytold/pdfcraft), without this fork's [changes](#fork-changes). Both are MIT or Apache-2.0.
 
 ---
 
