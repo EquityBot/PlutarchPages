@@ -241,6 +241,8 @@ Press <kbd>⌘K</kbd> to search every tool and command, or browse the **All tool
   <sub>The <kbd>⌘K</kbd> command palette</sub>
 </p>
 
+The Tools panel sits on the left, or on the right with Preferences ▸ Tools panel side. The rail stays at the right edge and opens one side panel beside it. Drag a panel's inner edge to resize it; widths are remembered. F4 shows or hides the side panel and Shift+F4 the Tools panel (also in the View menu); View ▸ Reset side panels restores the default arrangement.
+
 ---
 
 ## Runs everywhere, stays yours
@@ -466,17 +468,16 @@ from public specifications like the rest of PdfCraft.
   Type 3 fonts go to a Windows printer as pictures, so `d2d1.dll` can't close the app on them, and
   a printer's job is built off the UI thread.
 - **Find across script variants** (`text_find` too): Kangxi radicals find their ideographs (`⾒` and
-  `見`), Arabic presentation forms their letters, Persian yeh and kaf their Arabic letters, Arabic
-  vowel marks and kashida are ignored, and
-  Arabic-Indic digits ASCII digits. Always on; redaction word search finds these as well as every
-  literal match.
+  `見`), Arabic presentation forms their letters, Persian yeh and kaf their Arabic letters, and
+  Arabic-Indic digits ASCII digits; Arabic vowel marks and kashida are ignored. Always on; redaction
+  word search finds these as well as every literal match.
 
 Not implemented, and why: cloud storage connectors (Box, Dropbox, Google Drive, OneDrive,
 SharePoint need registered OAuth apps), FileOpen and Azure RMS DRM (proprietary vendor SDKs), the
 virtual printer driver, legacy browser plug-ins, the Office add-in, the licence key installer, spell
 checking (no permissively licensed dictionary or checker, and Windows' own checker needs unsafe
 code), and, for now, 3D content, export to PowerPoint, enhanced OCR clean-up, an AI assistant and
-an Explorer "Combine" menu.
+an Explorer 'Combine' menu.
 
 ---
 
@@ -494,9 +495,10 @@ PdfCraft is made by the ArtCraft team and community. The ArtCraft name, wordmark
 trademarks of the ArtCraft Team; this fork has removed them, as the upstream brand licence requires
 for modified versions, and is not an ArtCraft product.
 
-The banner's lettering and emblem are drawn from Cascadia Mono glyphs (SIL OFL 1.1).
+The banner's lettering and emblem are drawn from Cascadia Mono and Besley glyphs (SIL OFL 1.1).
 
 <sub>Adobe, Photoshop, Illustrator, Premiere Pro, Lightroom, Acrobat, After Effects and InDesign are trademarks or registered trademarks of Adobe Inc. in the United States and/or other countries. PdfCraft is an independent, open-source project and is not affiliated with, sponsored by or endorsed by Adobe Inc.; these names are used only to describe the workflows it is compatible with.</sub>
 
+---
 
-The Tools panel sits on the left, or on the right with Preferences ▸ Tools panel side. The rail stays at the right edge and opens one side panel beside it. Drag a panel's inner edge to resize it; widths are remembered. F4 shows or hides the side panel and Shift+F4 the Tools panel (also in the View menu); View ▸ Reset side panels restores the default arrangement.
+<p align="center"><sub>Of making many PDFs there is no end (cf. Ecclesiastes 12:12, NET).<br>Made by <a href="https://github.com/EquityBot">EquityBot</a>. <i>Ad gloriam eius, non meam.</i></sub></p>
