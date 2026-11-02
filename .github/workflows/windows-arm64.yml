@@ -20,7 +20,9 @@ on:
 
 concurrency:
   group: windows-arm64-${{ github.ref }}
-  cancel-in-progress: true
+  # Only pull request runs are cancelled: scheduled and push runs on main would
+  # otherwise cancel each other.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
