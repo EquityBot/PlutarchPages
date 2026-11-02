@@ -65,6 +65,14 @@ Upstream's tests for these were changed to assert the fork's behaviour. Keep the
   presentation forms, Persian yeh and kaf and Arabic-Indic digits. Redaction word search stays on
   `PageText::find_for_redaction`, which adds back the literal matches: if an upstream merge moves a
   redaction caller to `find_opts`, it can mark less.
+- Comments panel: cards and page headers more than a screen out of view aren't laid out
+  (`crates/ui-egui/src/panels/comments_panel.rs`). Each stands in at the height it had when last
+  drawn for the same width, document edit, interface scale and language, with its click targets,
+  accessible name and place in the focus order; screen-reader mode draws everything. Upstream lays
+  out every card each frame, which left the 500-comment frame budget in
+  `crates/ui-egui/tests/perf.rs` at the edge on CI. A stand-in skips the automatic ids its drawn
+  version takes (a card 2, a header row 1). If a merge changes how a card allocates, recount them:
+  `far_comment_cards_and_headers_skip_layout_but_stay_reachable` fails when the count is wrong.
 
 ## Merging upstream
 
