@@ -24,7 +24,9 @@ permissions:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Only pull request runs are cancelled: scheduled and push runs on main would
+  # otherwise cancel each other.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   rust:
@@ -42,11 +44,17 @@ jobs:
           persist-credentials: false
       - uses: snyk/actions/setup@9adf32b1121593767fc3c057af55b55db032dc04 # v1.0.0
       # The workspace's rust-version.
-      - name: Install the SBOM generator
+      - name: Install the toolchain
         run: |
           rustup toolchain install 1.95 --profile minimal
           rustup default 1.95
-          cargo install cargo-cyclonedx --locked --version 0.5.9
+      # A prebuilt release whose checksum the action's manifest pins, instead of
+      # compiling the generator on every run.
+      - name: Install the SBOM generator
+        uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2.87.31
+        with:
+          tool: cargo-cyclonedx@0.5.9
+          fallback: none
       # cargo-cyclonedx writes one SBOM per workspace member. Together the apps'
       # and xtask's SBOMs list every third-party crate in the others' (checked
       # 1 November 2026), so only they are tested. `--target all` includes the
