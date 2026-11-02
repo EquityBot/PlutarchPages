@@ -3022,3 +3022,73 @@ fn an_upright_comment_on_a_turned_page_is_drawn_where_it_goes_before_release() {
     h.drop_at(from + delta);
     h.run_steps(3);
 }
+
+/// The (page, index) of the comment whose text is `text`.
+fn key_of(h: &Harness<'static, PdfCraftApp>, text: &str) -> (usize, usize) {
+    let a = comments(h).into_iter().find(|a| a.contents.as_deref() == Some(text)).expect("the comment exists");
+    (a.page, a.index)
+}
+
+/// Cards and page headers more than a screen out of the Comments panel's view aren't laid out,
+/// but a screen reader still reaches them: they read, take a click and scroll into view, and the
+/// panel draws them there. Widgets drawn after them keep their ids, and so the keyboard focus,
+/// as the cards above come and go.
+#[test]
+fn far_comment_cards_and_headers_skip_layout_but_stay_reachable() {
+    let mut h = harness(|app| {
+        app.set_option("panel", "comments").unwrap();
+        for i in 0..120 {
+            let shape = pdfcraft_engine::Shape::Note { at: [20.0, 20.0], icon: pdfcraft_engine::NoteIcon::Comment };
+            assert!(app.apply_edit(pdfcraft_engine::Edit::AddAnnotation(pdfcraft_engine::NewAnnotation {
+                page: i / 60,
+                style: pdfcraft_engine::Style::default_for(&shape),
+                shape,
+                contents: format!("Note {i}"),
+                author: "Tester".into(),
+            })));
+        }
+        app.views[0].comments.selected = None;
+        app.views[0].comments.reveal = false;
+    });
+    h.run_steps(4);
+    assert!(h.query_by_label("Note 0").is_some(), "the first card is drawn");
+    assert!(h.query_by_label("Note 119").is_none(), "the last card is far out of view and not laid out");
+    // The second page's header is far down too: its chevron and title still take a click.
+    assert_eq!(h.get_all_by_label("Collapse").count(), 2, "both page headers have their chevron");
+    h.get_by_label("Page 2").click_accesskit();
+    h.run_steps(4);
+    assert_eq!(h.state().views[0].comments.collapsed_pages, [1], "the far header folded its page");
+    h.get_by_label("Expand").click_accesskit();
+    h.run_steps(4);
+    assert!(h.state().views[0].comments.collapsed_pages.is_empty(), "and opened it again");
+    // A far card takes the click and, revealed, the panel scrolls to it and draws its neighbours.
+    h.get_by_label("Tester: Note 119").click_accesskit();
+    h.run_steps(4);
+    assert_eq!(h.state().views[0].comments.selected, Some(key_of(&h, "Note 119")), "the far card took the click");
+    h.state_mut().views[0].comments.reveal = true;
+    h.run_steps(8);
+    let (card, above) = (h.get_by_label("Note 119").rect(), h.get_by_label("Note 118").rect());
+    assert!(above.bottom() <= card.top(), "Note 118 {above:?} sits above Note 119 {card:?}");
+    assert!(h.query_by_label("Note 0").is_none(), "the first card is now far out of view");
+    // Scrolled into view, the second page's header is drawn; focused, it keeps the focus while
+    // the wheel moves the cards above it out of reach.
+    h.get_by_label("Page 2").scroll_to_me();
+    h.run_steps(8);
+    h.get_by_label("Page 2").focus();
+    h.run_steps(2);
+    assert!(h.get_by_label("Page 2").is_focused(), "the header title takes the focus");
+    h.hover_at(h.get_by_label("Page 2").rect().center());
+    h.run_steps(1);
+    h.event(egui::Event::MouseWheel {
+        unit: egui::MouseWheelUnit::Point,
+        delta: egui::vec2(0.0, -250.0),
+        phase: egui::TouchPhase::Move,
+        modifiers: egui::Modifiers::NONE,
+        source: egui::MouseWheelSource::Unknown,
+    });
+    h.run_steps(20);
+    assert!(h.get_by_label("Page 2").is_focused(), "the header kept the focus while the panel scrolled");
+    h.get_by_label("Tester: Note 0").scroll_to_me();
+    h.run_steps(8);
+    assert!(h.query_by_label("Note 0").is_some(), "scrolled back into view, the first card is drawn");
+}
