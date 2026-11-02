@@ -40,8 +40,8 @@ Upstream's tests for these were changed to assert the fork's behaviour. Keep the
 - Shared CI: workflows from `storytold/craft-common-actions` are pinned to a commit, and SonarCloud
   receives only `SONAR_TOKEN`. Upstream merges restore `@main` and `secrets: inherit`, so reapply both.
 - Releases: `.github/workflows/release.yml` is this fork's own and uses nothing from
-  `craft-common-actions`. It builds unsigned packages, tests an installed MSI and an upgrade from
-  v0.15.0 with `packaging/windows/test-install.ps1`, and only drafts the release. Keep it over
+  `craft-common-actions`. It builds unsigned packages, tests an installed MSI and an upgrade from the
+  latest published release with `packaging/windows/test-install.ps1`, and only drafts the release. Keep it over
   upstream's. Its FreeBSD, riscv64, web and Flatpak jobs are ported from that repository's
   `release.yml` at `2b3fb9dc`, without the FreeBSD Cargo cache action, and
   `packaging/linux/arch-package.sh` replaces its `arch-package` action. All are first included in the
