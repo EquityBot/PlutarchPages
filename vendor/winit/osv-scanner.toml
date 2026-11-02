@@ -1,0 +1,40 @@
+# This Cargo.lock is the one upstream packaged with winit, and this copy is never built: the
+# workspace pins winit to a storytold git revision and keeps vendor/winit as provenance only
+# (Cargo.toml). Every crate resolves from the root Cargo.lock, so these findings describe
+# versions PlutarchPages does not build.
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0007"
+reason = "upstream's unused lockfile; the root Cargo.lock has bytes 1.12.1"
+
+[[IgnoredVulns]]
+id = "GHSA-434x-w66g-qw3r"
+reason = "alias of RUSTSEC-2026-0007"
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0186"
+reason = "upstream's unused lockfile; the root Cargo.lock has memmap2 0.9.11"
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0194"
+reason = "upstream's unused lockfile; the root Cargo.lock has quick-xml 0.41.0 and 0.42.0"
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0195"
+reason = "upstream's unused lockfile; the root Cargo.lock has quick-xml 0.41.0 and 0.42.0"
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2025-0055"
+reason = "upstream's unused lockfile; tracing-subscriber is not in the root Cargo.lock"
+
+[[IgnoredVulns]]
+id = "GHSA-xwfj-jgwm-7wp5"
+reason = "alias of RUSTSEC-2025-0055"
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2025-0056"
+reason = "upstream's unused lockfile; adler is not in the root Cargo.lock"
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0192"
+reason = "upstream's unused lockfile; ttf-parser is not in the root Cargo.lock"

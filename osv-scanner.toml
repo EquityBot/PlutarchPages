@@ -1,0 +1,23 @@
+# OSV-Scanner reads this file next to Cargo.lock, and OpenSSF Scorecard's Vulnerabilities check runs
+# OSV-Scanner. These are the advisories deny.toml already ignores, with the same reasons; review
+# both files together. The files under vendor/ cover lockfiles that Cargo never reads.
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2023-0071"
+reason = "rsa is used for verification only (ADR-0009)"
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2024-0370"
+reason = "compile-time proc macro of winprint's fmt-derive (craft-print Windows printing, #1107)"
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0370"
+reason = "zvariant unmaintained; Linux a11y stack via accesskit_unix"
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0371"
+reason = "zbus_names unmaintained; Linux a11y stack via accesskit_unix"
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0372"
+reason = "zvariant_derive unmaintained; Linux a11y stack via accesskit_unix"

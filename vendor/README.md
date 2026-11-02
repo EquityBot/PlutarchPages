@@ -27,6 +27,11 @@ licence files unchanged. Every patch is marked `PdfCraft patch:` in the source, 
 PdfCraft test, and should be proposed upstream. Remove the vendored copy once upstream releases
 the fix. Vendoring copyleft code is never allowed (plan/adr/0001).
 
+The `osv-scanner.toml` beside some upstream `Cargo.lock` files is ours. Cargo never reads those
+lockfiles (every crate resolves from the root `Cargo.lock`), so each file ignores, by ID and with a
+reason, the advisories OSV-Scanner and OpenSSF Scorecard report for versions PdfCraft does not
+build. Recheck them when re-vendoring a crate; the root `osv-scanner.toml` mirrors `deny.toml`.
+
 A PdfCraft patch in `hayro-syntax::Page::base_dimensions` expresses the existing one-point floor as a raw reciprocal of `/UserUnit`, rounded upward only when f32 multiplication would fall below one point. Five `pdfcraft-render` regressions with prefix `raster::tests::raw_crop_` cover the observed dimensions, origins and rotations, units 41/47, bounded vector rasters and unchanged nearly-zero A4 fallback. Accepted page-unit policy and licences are unchanged.
 
 In `hayro-interpret`, Type 3 glyph bounding boxes are transformed to device space before intersecting clip and shading bounds; `raster::tests::shaded_type3_glyph_draws_at_multiple_positions` covers translated glyphs (#3178).

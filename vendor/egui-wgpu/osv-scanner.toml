@@ -1,0 +1,12 @@
+# This Cargo.lock is the one upstream packaged with egui-wgpu, and this copy is never built: the
+# workspace pins egui-wgpu to a storytold git revision and keeps vendor/egui-wgpu as provenance
+# only (Cargo.toml). Every crate resolves from the root Cargo.lock, so these findings describe
+# versions PlutarchPages does not build.
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0194"
+reason = "upstream's unused lockfile; the root Cargo.lock has quick-xml 0.41.0 and 0.42.0"
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0195"
+reason = "upstream's unused lockfile; the root Cargo.lock has quick-xml 0.41.0 and 0.42.0"
