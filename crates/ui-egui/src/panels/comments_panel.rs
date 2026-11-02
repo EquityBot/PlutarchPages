@@ -242,6 +242,13 @@ pub(crate) fn show(
     let mut page = usize::MAX;
     let mut group: Option<String> = None;
     let near_view = ui.clip_rect().expand2(vec2(0.0, ui.clip_rect().height()));
+    // Cards and page headers more than a screen out of view stand in at their last drawn size
+    // (below), which holds only for the same width, document edit, interface scale and
+    // language. Screen-reader mode makes labels focusable, so it draws everything to keep the
+    // focus order whole.
+    let layout_key =
+        ui.scope_id().with((ui.available_width().to_bits(), doc.edit_generation(), ui.ctx().zoom_factor().to_bits(), crate::i18n::current().code()));
+    let stand_ins = !ui.memory(|m| m.options.screen_reader);
     for a in roots {
         if sort != SortBy::Page {
             let g = group_of(a);
@@ -256,16 +263,15 @@ pub(crate) fn show(
             let open = !view.comments.collapsed_pages.contains(&page);
             let tip = if open { tl!("Collapse") } else { tl!("Expand") };
             let title = || crate::i18n::fmt(tl!("Page {label}"), &[("label", &info.pages[page].label)]);
-            // A header more than a screen out of view stands in as its two click targets, with
-            // the ids, rects and names they had when last drawn, so it keeps its place in the
-            // focus order without being laid out.
+            // A header far out of view stands in as its two click targets, with the ids, rects
+            // and names they had when last drawn, so it keeps its place in the focus order.
             let place_id = ui.scope_id().with(("page-header", page));
-            let width = ui.available_width();
             let top = ui.cursor().min;
             let far = ui.data(|d| d.get_temp::<HeaderPlace>(place_id)).filter(|p| {
-                p.width == width
+                stand_ins
+                    && p.key == layout_key
                     && !ui.memory(|m| m.has_focus(p.toggle.0) || m.has_focus(p.title.0))
-                    && !egui::Rect::from_min_size(top, vec2(width, p.height)).intersects(near_view)
+                    && !egui::Rect::from_min_size(top, vec2(ui.available_width(), p.height)).intersects(near_view)
             });
             let clicked = if let Some(p) = far {
                 let toggle = ui.interact(p.toggle.1.translate(top.to_vec2()), p.toggle.0, Sense::click());
@@ -279,22 +285,28 @@ pub(crate) fn show(
             } else {
                 let n = page_counts.get(&page).copied().unwrap_or_default();
                 ui.add_space(6.0);
+                // The row has its own id, so its chevron's and title's ids don't depend on what
+                // comes before it and stay right for the stand-in.
+                let row = egui::UiBuilder::new().scope_id(ui.scope_id().with(("page-header-row", page)));
                 let (toggle, name) = ui
-                    .horizontal(|ui| {
-                        let chevron = if open { "chevron-down" } else { "chevron-right" };
-                        let toggle = icons::button(ui, chevron, 18.0, false, tip);
-                        let name = ui.add(
-                            egui::Label::new(egui::RichText::new(title()).font(theme::semibold(12.5)).color(t.text_muted)).sense(Sense::click()),
-                        );
-                        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                            ui.label(egui::RichText::new(n.to_string()).color(t.text_faint).small())
-                        });
-                        (toggle, name)
+                    .scope_builder(row, |ui| {
+                        ui.horizontal(|ui| {
+                            let chevron = if open { "chevron-down" } else { "chevron-right" };
+                            let toggle = icons::button(ui, chevron, 18.0, false, tip);
+                            let name = ui.add(
+                                egui::Label::new(egui::RichText::new(title()).font(theme::semibold(12.5)).color(t.text_muted)).sense(Sense::click()),
+                            );
+                            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                                ui.label(egui::RichText::new(n.to_string()).color(t.text_faint).small())
+                            });
+                            (toggle, name)
+                        })
+                        .inner
                     })
                     .inner;
                 ui.add_space(2.0);
                 let at = |r: &egui::Response| (r.id, r.rect.translate(-top.to_vec2()));
-                let place = HeaderPlace { width, height: ui.cursor().top() - top.y, toggle: at(&toggle), title: at(&name) };
+                let place = HeaderPlace { key: layout_key, height: ui.cursor().top() - top.y, toggle: at(&toggle), title: at(&name) };
                 ui.data_mut(|d| d.insert_temp(place_id, place));
                 toggle.clicked() || name.clicked()
             };
@@ -311,28 +323,24 @@ pub(crate) fn show(
         }
         let thread = replies_of(a);
         let rotation = info.pages.get(a.page).map_or(0, |p| p.rotation);
-        // A card more than a screen out of view keeps its last height, click target and place in
-        // the focus order, but isn't laid out: laying out every card of a 500-comment document
-        // took most of a frame. The selected card, one being edited and one with its menu open
-        // are always drawn.
+        // A card far out of view keeps the height it had when last drawn unselected, its click
+        // target, its place in the focus order and its text as one accessible name, but isn't
+        // laid out: laying out every card of a 500-comment document took most of a frame. The
+        // selected card, one being edited and one with its menu open are always drawn.
         let key = (a.page, a.index);
         let height_id = ui.scope_id().with(("card-height", key));
-        let width = ui.available_width();
         let busy = view.comments.selected == Some(key)
             || view.comments.editing.as_ref().is_some_and(|(p, i, _)| (*p, *i) == key || thread.iter().any(|r| (r.page, r.index) == (*p, *i)))
             || egui::Popup::is_id_open(ui.ctx(), ui.scope_id().with(("card-menu", key)));
         if !busy
-            && let Some((w, h)) = ui.data(|d| d.get_temp::<(f32, f32)>(height_id))
-            && w == width
+            && stand_ins
+            && let Some((k, h)) = ui.data(|d| d.get_temp::<(egui::Id, f32)>(height_id))
+            && k == layout_key
         {
-            let rect = egui::Rect::from_min_size(ui.cursor().min, vec2(width, h));
+            let rect = egui::Rect::from_min_size(ui.cursor().min, vec2(ui.available_width(), h));
             if !rect.intersects(near_view) {
                 let click = ui.interact(rect, ui.scope_id().with(("card", key)), Sense::click());
-                click.widget_info(|| {
-                    let author = a.author.as_deref().map_or_else(|| tl!("Unknown author"), |name| name);
-                    let body = a.contents.as_deref().filter(|s| !s.is_empty()).unwrap_or_else(|| tl!(kind_label(a)));
-                    egui::WidgetInfo::labeled(egui::Role::Button, true, format!("{author}: {body}"))
-                });
+                click.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, card_text(t, a, thread)));
                 if click.clicked() {
                     select(view, nav, a, rotation);
                 }
@@ -348,20 +356,38 @@ pub(crate) fn show(
         if let Some(e) = card(ui, view, CardContext { theme: t, annotation: a, rotation, thread, doc, prefs, allowed, nav }) {
             edit = Some(e);
         }
-        let h = ui.cursor().top() - top;
-        ui.data_mut(|d| d.insert_temp(height_id, (width, h)));
+        if !busy {
+            let h = ui.cursor().top() - top;
+            ui.data_mut(|d| d.insert_temp(height_id, (layout_key, h)));
+        }
     }
     edit
 }
 
-/// A page header as last drawn: the panel width, its height with spacing, and the id and rect
-/// (from its top-left) of its chevron and title.
+/// A page header as last drawn: the layout it was drawn for, its height with spacing, and the id
+/// and rect (from its top-left) of its chevron and title.
 #[derive(Clone, Copy)]
 struct HeaderPlace {
-    width: f32,
+    key: egui::Id,
     height: f32,
     toggle: (egui::Id, egui::Rect),
     title: (egui::Id, egui::Rect),
+}
+
+/// The text a drawn card shows, one item a line: author, date, comment, status, then each reply's
+/// author, date and text.
+fn card_text(t: &Tokens, a: &Annotation, thread: &[&Annotation]) -> String {
+    let mut lines = vec![a.author.as_deref().unwrap_or(tl!("Unknown author"))];
+    lines.extend(a.modified.as_deref());
+    lines.push(a.contents.as_deref().filter(|s| !s.is_empty()).unwrap_or_else(|| tl!(kind_label(a))));
+    let status = thread.iter().rev().filter(|r| !r.is_mark()).find_map(|r| r.state.as_deref());
+    lines.extend(status.and_then(|s| status_badge(t, s)).map(|(_, label, _)| tl!(label)));
+    for r in thread.iter().filter(|r| r.state.is_none()) {
+        lines.push(r.author.as_deref().unwrap_or(tl!("Reply")));
+        lines.extend(r.modified.as_deref());
+        lines.push(r.contents.as_deref().unwrap_or(""));
+    }
+    lines.join("\n")
 }
 
 /// Select comment `a` in the panel and flash it on its page.
