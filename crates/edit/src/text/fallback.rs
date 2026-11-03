@@ -268,6 +268,11 @@ fn unicode_hex(ch: char) -> String {
 /// The same outline for a face that may simply lack the glyph: `None` then, so the caller can try
 /// the next face (and report the character once none of them has it).
 pub(crate) fn type3_glyph(face: &CraftFont, ch: char) -> Result<Option<(Vec<u8>, f64)>, EditError> {
+    // A variation selector draws nothing and takes no room; its code keeps it in the text, so the
+    // line still reads back with it. Choosing the emoji or text form it asks for needs shaping.
+    if crate::bidi::is_variation_selector(ch) {
+        return Ok(Some((b"0 0 0 0 0 0 d1\n".to_vec(), 0.0)));
+    }
     match japanese_glyph_from(face, ch) {
         Err(GlyphError::Missing) => Ok(None),
         _ => type3_path(face, ch).map(Some),
@@ -321,8 +326,10 @@ pub(super) fn no_japanese_font() -> EditError {
 }
 
 /// The first of `faces` (best match first) that has a glyph for every one of `chars`, else the first.
+/// Variation selectors don't count: [`type3_glyph`] draws them in any face.
 pub(crate) fn fallback_face<'a>(faces: &[&'a CraftFont], chars: &[char], has_glyph: impl Fn(&CraftFont, char) -> bool) -> Option<&'a CraftFont> {
-    faces.iter().copied().find(|face| chars.iter().all(|ch| has_glyph(face, *ch))).or_else(|| faces.first().copied())
+    let drawn = || chars.iter().copied().filter(|ch| !crate::bidi::is_variation_selector(*ch));
+    faces.iter().copied().find(|face| drawn().all(|ch| has_glyph(face, ch))).or_else(|| faces.first().copied())
 }
 
 /// This build has no Hebrew face to draw replacement text with.
