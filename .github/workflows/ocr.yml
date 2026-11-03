@@ -1,0 +1,80 @@
+name: OCR
+
+# The OCR tests skip when the models are absent and the gate never fetches them, so an OCR break
+# went unnoticed. This job runs them with the models: twice a week, on demand and on pull requests
+# that touch OCR. The models are cached, so the ocrs author's bucket, which pays for each download,
+# is read only when a model changes: `cargo xtask models` checks every file against
+# ATTRIBUTION.toml's SHA-256 and fetches only what is missing or different. Two scheduled runs a
+# week keep the cache inside GitHub's 7-day eviction window. The OCR tests in ui-egui need the GUI
+# toolchain and stay with the gate.
+on:
+  schedule:
+    - cron: "43 4 * * 2,5"
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "crates/ocr/**"
+      - "crates/engine/**"
+      - "crates/automation/**"
+      - "ATTRIBUTION.toml"
+      - ".github/workflows/ocr.yml"
+
+# The token is only used to check out the code: no job writes to the repository.
+permissions:
+  contents: read
+
+concurrency:
+  group: ocr-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ocr:
+    name: OCR tests with the models
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          key: ocr
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - name: Restore the OCR models
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: assets/models
+          key: ocr-models-${{ hashFiles('ATTRIBUTION.toml') }}
+          # ATTRIBUTION.toml changes with most dependency updates; start from the last models.
+          restore-keys: ocr-models-
+      - name: Fetch any missing model, checked against ATTRIBUTION.toml
+        run: cargo xtask models
+      # The 9 tests that skip without the models, by full name: a renamed one fails the job
+      # instead of dropping out. --nocapture shows a test's skip notice, which fails the job too.
+      - name: Run the OCR tests, failing on any skip
+        shell: bash
+        env:
+          TESTS: >-
+            automation::copy_restricted_text_stays_in_the_document
+            automation::ocr_tools_make_a_scan_searchable
+            automation::ocr_recognize_reads_pictures_on_pages_with_text
+            automation::ocr_recognize_files_writes_searchable_copies
+            tests::recognize_text_reads_the_euro_sign
+            tests::recognize_text_makes_a_scanned_page_searchable
+            tests::recognize_text_reads_a_picture_on_a_page_that_has_text
+            tests::native_text_only_ignores_comments_but_not_page_text
+            tests::reads_rendered_text
+        run: |
+          # shellcheck disable=SC2086 # TESTS is a list of test names
+          cargo test --locked -p pdfcraft-ocr -p pdfcraft-engine -p pdfcraft-automation -- \
+            --exact $TESTS --nocapture 2>&1 | tee ocr-tests.log
+          if grep -q "OCR models not installed" ocr-tests.log; then
+            echo "::error::an OCR test ran without the models"
+            exit 1
+          fi
+          for t in $TESTS; do
+            grep -q "^test $t \.\.\. ok$" ocr-tests.log || { echo "::error::$t did not pass"; exit 1; }
+          done
