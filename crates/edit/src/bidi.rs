@@ -43,9 +43,16 @@ fn is_digit(c: char) -> bool {
     c.is_ascii_digit() || matches!(c, '\u{0660}'..='\u{0669}' | '\u{06F0}'..='\u{06F9}')
 }
 
+/// Variation selectors (U+FE0F asks for the emoji form of the character before it): never drawn
+/// alone, so they stay with that character when a line is reordered, broken or encoded.
+pub(crate) fn is_variation_selector(c: char) -> bool {
+    matches!(c, '\u{FE00}'..='\u{FE0F}' | '\u{E0100}'..='\u{E01EF}')
+}
+
 /// Combining marks that ride on the character before them.
 fn is_mark(c: char) -> bool {
     is_hebrew_mark(c)
+        || is_variation_selector(c)
         || matches!(
             u32::from(c),
             0x0300..=0x036F | 0x0610..=0x061A | 0x064B..=0x065F | 0x0670 | 0x06D6..=0x06DC | 0x06DF..=0x06E4 | 0x06E7..=0x06E8 | 0x06EA..=0x06ED | 0xFE20..=0xFE2F
@@ -281,6 +288,12 @@ mod tests {
     /// What a producer writes into the content stream for `logical`.
     fn drawn(logical: &str) -> String {
         to_visual(logical)
+    }
+
+    #[test]
+    fn a_variation_selector_stays_after_its_base_in_rtl_text() {
+        assert_eq!(drawn("א❤\u{FE0F}ב"), "ב❤\u{FE0F}א");
+        assert_eq!(to_logical("ב❤\u{FE0F}א"), "א❤\u{FE0F}ב");
     }
 
     #[test]

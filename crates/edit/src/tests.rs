@@ -1648,6 +1648,21 @@ fn uzbek_and_kazakh_cyrillic_use_the_bundled_latin_face() {
     }
 }
 
+/// Upstream #4861: a variation selector (U+FE0F after a digit or symbol, as emoji keyboards type
+/// it) has no glyph in any fallback face, so the whole edit was refused. It is written as an empty
+/// glyph and reads back with the text.
+#[test]
+fn a_variation_selector_survives_line_and_block_edits() {
+    for replacement in ["1\u{FE0F}", "a1\u{FE0F}b", "қ\u{FE0F}"] {
+        for paragraph in [false, true] {
+            let mut doc = text_page("BT /F2 12 Tf 72 700 Td (ab) Tj ET");
+            if paragraph { text::replace_block(&mut doc, 0, 0, replacement) } else { text::replace_line(&mut doc, 0, 0, replacement) }
+                .unwrap_or_else(|e| panic!("{replacement:?}: {e}"));
+            assert_eq!(text::text_lines(&reopen(&doc), 0).unwrap()[0].text, replacement, "{replacement:?}");
+        }
+    }
+}
+
 /// The Japanese faces keep first refusal for the Cyrillic they do carry, so Russian text keeps the
 /// face it was drawn with before the bundled Latin face was added.
 #[test]

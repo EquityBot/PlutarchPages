@@ -282,6 +282,9 @@ mod tests {
         assert_eq!(fallback_face(&faces, &['a', 'ф'], has).map(|f| f.family), Some("Gothic"));
         // Characters the best face has keep it.
         assert_eq!(fallback_face(&faces, &['a', 'b'], has).map(|f| f.family), Some("Mincho"));
+        // A variation selector, which no face has, doesn't count: the Gothic face has every letter.
+        let letters = |face: &CraftFont, ch: char| ch.is_ascii() || (face.family == "Gothic" && ch == 'ф');
+        assert_eq!(fallback_face(&faces, &['ф', '\u{FE0F}'], letters).map(|f| f.family), Some("Gothic"));
         // No face has them all: the best face stays, and names the missing glyph.
         assert_eq!(fallback_face(&faces, &['a', 'ф'], |_, ch| ch.is_ascii()).map(|f| f.family), Some("Mincho"));
         assert!(fallback_face(&[], &['a'], has).is_none());
