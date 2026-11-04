@@ -974,6 +974,24 @@ fn the_rail_zoom_field_sets_a_typed_zoom() {
     assert_eq!(h.get_by_role_and_label(Role::TextInput, "Zoom").value().as_deref(), Some("200%"));
 }
 
+/// `/Direction /R2L` reaches the view from the file, and holds with the default view too: it says
+/// how the book is bound, not how to show it.
+#[test]
+fn a_document_bound_on_the_right_opens_bound_on_the_right() {
+    let right_bound = String::from_utf8_lossy(PAGES)
+        .replace("/Pages 2 0 R >>", "/Pages 2 0 R /PageLayout /TwoPageLeft /ViewerPreferences << /Direction /R2L >> >>");
+    let open = |file: &[u8], always: &str| {
+        let mut app = PdfCraftApp::new();
+        app.set_option("language", "en").unwrap();
+        app.set_option("always-default-view", always).unwrap();
+        app.open_bytes("book.pdf", None, file.to_vec()).expect("opens");
+        app.views[0].right_to_left
+    };
+    assert!(open(right_bound.as_bytes(), "off"));
+    assert!(open(right_bound.as_bytes(), "on"));
+    assert!(!open(PAGES, "off"));
+}
+
 #[test]
 fn always_use_my_default_zoom_and_page_layout_ignores_what_the_pdf_asks_for() {
     use pdfcraft_ui_egui::canvas::{Fit, PageLayout};

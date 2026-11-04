@@ -1763,6 +1763,32 @@ fn fit_width_fits_the_shown_page_in_single_page_view_only() {
     assert_eq!(v.zoom, wide, "continuous fit width holds still across page sizes");
 }
 
+/// A book bound on the right reads across each spread from the right: the earlier page on the
+/// right, a lone cover on the left. Rects stay in page order, and a page alone on its row in place.
+#[test]
+fn right_bound_spreads_put_the_earlier_page_on_the_right() {
+    let page = || pdfcraft_render::PageInfo { width: 300.0, height: 400.0, label: String::new(), crop: [0.0, 0.0, 300.0, 400.0], rotation: 0 };
+    let info = DocInfo { pages: vec![page(), page(), page()], ..Default::default() };
+    let mut v = DocView::new(DocId(1), &info, ViewDefaults::default());
+    (v.layout, v.zoom) = (PageLayout::TwoUp, 1.0);
+    let w = v.content_width(&info, 1200.0);
+    let left_bound = v.layout(&info, w, 1.0);
+    assert!(left_bound[0].max.x < left_bound[1].min.x, "the earlier page on the left: {left_bound:?}");
+    v.right_to_left = true;
+    let right_bound = v.layout(&info, w, 1.0);
+    assert!(right_bound[1].max.x < right_bound[0].min.x, "the earlier page on the right: {right_bound:?}");
+    assert!(
+        (right_bound[0].min.x - left_bound[1].min.x).abs() < 1e-3 && (right_bound[1].min.x - left_bound[0].min.x).abs() < 1e-3,
+        "the same spread"
+    );
+    assert_eq!(right_bound[0].min.y, right_bound[1].min.y, "one row");
+    assert!((right_bound[2].min.x - left_bound[2].min.x).abs() < 1e-3, "the last page, alone on its row");
+    v.cover = true;
+    let covered = v.layout(&info, w, 1.0);
+    assert!(covered[0].max.x <= w / 2.0, "the cover on the left: {:?} in {w}", covered[0]);
+    assert!(covered[2].max.x < covered[1].min.x && covered[1].min.y > covered[0].max.y, "{covered:?}");
+}
+
 #[test]
 fn layouts_match_their_commands_and_names() {
     for l in PageLayout::ORDER {

@@ -327,7 +327,8 @@ impl DocView {
                 }
             }
             PageLayout::TwoUp => {
-                // With a cover page, the first page sits alone on the right.
+                // With a cover page, the first page sits alone on the right, or on the left when
+                // the document is bound on the right.
                 let rows: Vec<&[pdfcraft_render::PageInfo]> = if self.cover && !info.pages.is_empty() {
                     std::iter::once(&info.pages[..1]).chain(info.pages[1..].chunks(2)).collect()
                 } else {
@@ -338,9 +339,17 @@ impl DocView {
                     let row_w: f32 = sizes.iter().map(|v| v.x).sum::<f32>() + gap * (sizes.len() as f32 - 1.0);
                     let row_h = sizes.iter().map(|v| v.y).fold(0.0, f32::max);
                     let mut x = if self.cover && ri == 0 { (content_w / 2.0 + gap / 2.0).max(SIDE) } else { ((content_w - row_w) / 2.0).max(SIDE) };
+                    let first = rects.len();
                     for size in sizes {
                         rects.push(Rect::from_min_size(pos2(x, y + (row_h - size.y) / 2.0), size));
                         x += size.x + gap;
+                    }
+                    if self.right_to_left {
+                        // The row mirrored about the content's centre. Rects stay in page order:
+                        // hit tests and scrolling index them by page.
+                        for r in &mut rects[first..] {
+                            *r = r.translate(vec2(content_w - r.max.x - r.min.x, 0.0));
+                        }
                     }
                     y += row_h + gap;
                 }

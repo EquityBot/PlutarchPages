@@ -300,6 +300,9 @@ pub struct DocView {
     pub snapshot: Option<Snapshot>,
     /// Two-page view: show the first page alone, as a cover (View ▸ Page display).
     pub cover: bool,
+    /// Two-page view: the document is bound on the right (`/ViewerPreferences /Direction /R2L`), so
+    /// each spread reads from the right.
+    pub right_to_left: bool,
     /// Previous view / Next view: pages visited before (and after, once going back).
     pub back: Vec<usize>,
     pub forward: Vec<usize>,
@@ -627,6 +630,7 @@ impl DocView {
             close_requested: false,
             snapshot: None,
             cover: false,
+            right_to_left: false,
             back: Vec::new(),
             forward: Vec::new(),
             goto: None,
@@ -793,6 +797,7 @@ impl DocView {
         fresh.snapshot = self.snapshot.clone();
         fresh.close_requested = self.close_requested;
         fresh.cover = self.cover;
+        fresh.right_to_left = self.right_to_left;
         // Still presenting, with the display to go back to on leaving.
         fresh.presentation = self.presentation.take();
         fresh.back = std::mem::take(&mut self.back);

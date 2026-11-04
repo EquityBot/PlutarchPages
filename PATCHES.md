@@ -98,6 +98,9 @@ Upstream's tests for these were changed to assert the fork's behaviour. Keep the
   readable `U+XXXX` tokens. Character warnings are independent of paint warnings and preserve
   mixed reasons within one replacement string. Tokens stay whole within the 200-character cap;
   these flags identify text for review and do not establish that it is malicious.
+- Right-edge binding: `/Direction /R2L` sets `DocView::right_to_left`, whatever the default view, and
+  `DocView::layout` mirrors each two-page row. Upstream's open PR #4239 adds a command for the same
+  layout: if it lands, keep the file's `/Direction` deciding how a document opens.
 - `publish = false` in every crate and app: `pdfcraft`, `pdfcraft-cos`, `craft-ui` and other names
   this workspace uses belong to unrelated crates on crates.io. Give any crate upstream adds the
   same line.
