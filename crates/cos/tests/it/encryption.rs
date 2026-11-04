@@ -912,6 +912,27 @@ fn an_encrypt_entry_by_a_reference_that_cannot_be_read_refuses_the_file() {
     assert_eq!(content(&Document::open(Arc::new(v2)).unwrap()), SECRET, "below /V 4");
 }
 
+/// `/Encrypt` can refer to more than any file needs. Stopping there would leave an indirect `/O` or
+/// `/U` out of what reads as stored, and a full save would corrupt it, so the file doesn't open.
+#[test]
+fn an_encrypt_dictionary_of_too_many_references_refuses_the_file() {
+    let saved = |refer: &dyn Fn(&mut Document, u32) -> Object, count: u32| {
+        let mut doc = Document::open(Arc::new(protect(Algorithm::Aes128, "", "owner", -1))).unwrap();
+        let encrypt = doc.trailer().reference(b"Encrypt").unwrap();
+        let mut dict = doc.get(encrypt).as_dict().cloned().unwrap();
+        let extra = (0..count).map(|i| refer(&mut doc, i)).collect();
+        dict.set(b"Extra".to_vec(), Object::Array(extra));
+        doc.set(encrypt, Object::Dict(dict));
+        write_incremental(&doc, &SaveOptions::default()).unwrap()
+    };
+    let objects = |doc: &mut Document, i: u32| Object::Ref(doc.add(Object::Int(i64::from(i))));
+    let nowhere = |_: &mut Document, i: u32| Object::Ref(ObjRef::new(10_000 + i, 0));
+    let refused = |file: Vec<u8>| matches!(Document::open(Arc::new(file)), Err(CosError::Security(_)));
+    assert!(refused(saved(&objects, 4_097)), "objects");
+    assert!(refused(saved(&nowhere, 4_097)), "references to nothing, each a scan of the file");
+    assert_eq!(content(&Document::open(Arc::new(saved(&objects, 32))).unwrap()), SECRET, "within the limit");
+}
+
 /// A lone parameter dictionary belongs to the first filter, so `/Crypt` behind another filter has
 /// none of its own and is `/Identity` (ISO 32000-2 §7.4.1), whatever that dictionary says.
 #[test]

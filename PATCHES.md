@@ -20,8 +20,10 @@ Upstream's tests for these were changed to assert the fork's behaviour. Keep the
 - **Crypt filters** named by a reference that can't be read are never `/Identity`. Upstream reads
   the reference as absent, which saves the stream in the clear. Here a stream's `/DecodeParms` or
   `/Name` takes the document's filter, and a save drops its `/Crypt`; `/StmF`, `/StrF`, `/EFF`, `/CF`
-  or `/CFM` from `/V 4` on refuses the file. `crypt_name` and `encrypt_dict` in
-  `crates/cos/src/security.rs` hold this, with tests in `crates/cos/tests/it/encryption.rs`. The cos
+  or `/CFM` from `/V 4` on refuses the file, as does an `/Encrypt` and `/ID` referring to more than
+  4,096 objects. `crypt_name` and `encrypt_dict` in `crates/cos/src/security.rs` and
+  `encryption_members` in `crates/cos/src/document/open.rs` hold this, with tests in
+  `crates/cos/tests/it/encryption.rs`. The cos
   part of upstream's `9203e4a6b` (#5548) came in ahead of the next merge; its hayro-syntax patch 30
   and renderer tests didn't.
 

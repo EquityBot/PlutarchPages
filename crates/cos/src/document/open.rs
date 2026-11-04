@@ -3,9 +3,9 @@ use super::state::Credentials;
 use super::xref::XrefIndex;
 use super::{Arc, BTreeMap, CosError, Dict, Document, HashSet, ObjRef, Object};
 
-/// More objects than `/Encrypt` and `/ID` refer to in any file, so that one which refers to the page
-/// tree, say, doesn't have a whole document read to open it.
-const MAX_ENCRYPT_MEMBERS: usize = 64;
+/// More objects than `/Encrypt` and `/ID` refer to in any file. A file that goes past it doesn't
+/// open: a member left out would be decrypted as data, and each reference to nothing scans the file.
+const MAX_ENCRYPT_MEMBERS: usize = 4_096;
 
 impl Document {
     /// A new document with an empty page tree (for split / extract / combine). It has no
@@ -192,7 +192,7 @@ impl Document {
         let params = crate::security::encrypt_dict(self, &dict)?;
         let id0 = self.first_id();
         // Read here, while nothing is decrypted yet.
-        let members = self.encryption_members(enc);
+        let members = self.encryption_members(enc)?;
         let handler = match credentials {
             Credentials::Password(password) => {
                 let mut handler = pdfcraft_crypt::SecurityHandler::open(params, &id0, *password).map_err(|e| match e {
@@ -238,20 +238,24 @@ impl Document {
     }
 
     /// The objects `/Encrypt`, given as `enc`, and `/ID` refer to, the ones they refer to, and so
-    /// on, up to [`MAX_ENCRYPT_MEMBERS`]. Their strings aren't encrypted (ISO 32000-2 §7.6.2): the
-    /// key is made from them, so they have to read as stored, and stay so. A number with no object
-    /// behind it, and a stream, which those dictionaries never hold, isn't one: an object added
-    /// under that number later, or a page's content a hostile `/Encrypt` names, is encrypted.
-    fn encryption_members(&self, enc: &Object) -> HashSet<u32> {
+    /// on. Their strings aren't encrypted (ISO 32000-2 §7.6.2): the key is made from them, so they
+    /// have to read as stored, and stay so. A number with no object behind it, and a stream, which
+    /// those dictionaries never hold, isn't one: an object added under that number later, or a
+    /// page's content a hostile `/Encrypt` names, is encrypted. More than [`MAX_ENCRYPT_MEMBERS`]
+    /// references, followed or not, is an error.
+    fn encryption_members(&self, enc: &Object) -> Result<HashSet<u32>, CosError> {
         let mut pending = Vec::new();
         crate::writer::collect_refs(enc, &mut |r| pending.push(r));
         if let Some(id) = self.trailer.get(b"ID") {
             crate::writer::collect_refs(id, &mut |r| pending.push(r));
         }
-        let mut members = HashSet::new();
+        let (mut seen, mut members) = (HashSet::new(), HashSet::new());
         while let Some(r) = pending.pop() {
-            if members.len() >= MAX_ENCRYPT_MEMBERS || members.contains(&r.num) {
+            if !seen.insert(r.num) {
                 continue;
+            }
+            if seen.len() > MAX_ENCRYPT_MEMBERS {
+                return Err(CosError::Security(format!("/Encrypt and /ID refer to more than {MAX_ENCRYPT_MEMBERS} objects")));
             }
             let held = self.get(r);
             if matches!(&*held, Object::Null | Object::Stream(_)) {
@@ -260,7 +264,7 @@ impl Document {
             members.insert(r.num);
             crate::writer::collect_refs(&held, &mut |x| pending.push(x));
         }
-        members
+        Ok(members)
     }
 
     /// Whether object `num` is written as it is held, being one of [`Document::encryption_members`],
