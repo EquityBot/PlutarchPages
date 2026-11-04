@@ -1,7 +1,7 @@
 use super::error::{Result, ToolError, failed};
 use super::json::{Args, document_attachment_keys, info, one_based, parse_style_ranges, security, summary, text_style_levels};
 use super::paths::{read_input, write_atomic};
-use super::{Arc, Automation, Edit, Value, block_overlapping, comments, content, json, tools};
+use super::{Arc, Automation, Edit, Value, block_overlapping, comments, content, hidden_text, json, tools};
 
 /// One piece of a tool's result.
 #[derive(Clone, Debug, PartialEq)]
@@ -337,19 +337,22 @@ impl Automation {
                 let doc = self.doc_to_copy(&a)?;
                 let info = &doc.info.pages[page];
                 let r = |x: f32| (x as f64 * 100.0).round() / 100.0;
-                let lines: Vec<Value> = doc
-                    .text_lines(page)
+                let text_lines = doc.text_lines(page);
+                let mut hidden = hidden_text::line_entries(&text_lines, info).into_iter();
+                let lines: Vec<Value> = text_lines
                     .iter()
                     .enumerate()
                     .map(|(i, l)| {
                         let (u, v) = (info.user_to_view(l.rect[0] as f32, l.rect[1] as f32), info.user_to_view(l.rect[2] as f32, l.rect[3] as f32));
-                        json!({
+                        let mut line = json!({
                             "line": i + 1,
                             "text": l.text,
                             "rect": [r(u[0].min(v[0])), r(u[1].min(v[1])), r(u[0].max(v[0])), r(u[1].max(v[1]))],
                             "font": l.base_font,
                             "size": (l.size * 100.0).round() / 100.0,
-                        })
+                        });
+                        hidden_text::attach(&mut line, hidden.next().unwrap_or_default());
+                        line
                     })
                     .collect();
                 json!({ "page": page + 1, "count": lines.len(), "lines": lines })
@@ -459,13 +462,14 @@ impl Automation {
                 let info = &doc.info.pages[page];
                 let r = |x: f32| (x as f64 * 100.0).round() / 100.0;
                 let current = doc.text_blocks(page);
+                let hidden = hidden_text::line_entries(&doc.text_lines(page), info);
                 let id = doc.id;
                 let blocks: Vec<Value> = current
                     .iter()
                     .enumerate()
                     .map(|(i, b)| {
                         let (u, v) = (info.user_to_view(b.rect[0] as f32, b.rect[1] as f32), info.user_to_view(b.rect[2] as f32, b.rect[3] as f32));
-                        json!({
+                        let mut paragraph = json!({
                             "paragraph": i + 1,
                             "text": b.text,
                             "editor_text": b.editor_text,
@@ -474,7 +478,9 @@ impl Automation {
                             "rect": [r(u[0].min(v[0])), r(u[1].min(v[1])), r(u[0].max(v[0])), r(u[1].max(v[1]))],
                             "font": b.base_font,
                             "size": (b.size * 100.0).round() / 100.0,
-                        })
+                        });
+                        hidden_text::attach(&mut paragraph, hidden_text::block_entries(b, &hidden));
+                        paragraph
                     })
                     .collect();
                 self.record_listing(id, page, &current);

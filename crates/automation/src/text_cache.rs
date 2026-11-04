@@ -4,7 +4,12 @@ use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, Weak};
 
 use pdfcraft_engine::DocId;
-use pdfcraft_render::{PageText, TextGlyph};
+use pdfcraft_render::{HiddenReason, PageText, TextGlyph};
+
+use super::hidden_text::Hidden;
+
+/// A page's text and the class of each of its glyphs.
+pub(super) type Extracted = (Arc<PageText>, Hidden);
 
 const BYTE_BUDGET: usize = 64 * 1024 * 1024;
 // Also bound bookkeeping for documents with thousands of empty pages.
@@ -13,7 +18,7 @@ type Key = (DocId, usize);
 
 struct Cached {
     version: Weak<Vec<u8>>,
-    text: Arc<PageText>,
+    text: Extracted,
     bytes: usize,
     stamp: u64,
 }
@@ -72,7 +77,7 @@ impl TextCache {
         self.clock
     }
 
-    pub(super) fn get(&mut self, id: DocId, page: usize) -> Option<Arc<PageText>> {
+    pub(super) fn get(&mut self, id: DocId, page: usize) -> Option<Extracted> {
         let stamp = self.stamp();
         let entry = self.pages.get_mut(&(id, page))?;
         self.order.remove(&entry.stamp);
@@ -81,7 +86,7 @@ impl TextCache {
         Some(entry.text.clone())
     }
 
-    pub(super) fn insert(&mut self, id: DocId, page: usize, version: &Arc<Vec<u8>>, text: Arc<PageText>) {
+    pub(super) fn insert(&mut self, id: DocId, page: usize, version: &Arc<Vec<u8>>, text: Extracted) {
         let bytes = retained_bytes(&text);
         self.remove_page((id, page));
         // An oversized page is usable by this call, but never retained by the cache.
@@ -110,8 +115,9 @@ impl TextCache {
 }
 
 // Estimate owned allocations, including spare capacity; bookkeeping has its own page-count cap.
-fn retained_bytes(text: &PageText) -> usize {
+fn retained_bytes((text, hidden): &Extracted) -> usize {
     let arrays = std::mem::size_of::<PageText>()
+        .saturating_add(hidden.len().saturating_mul(std::mem::size_of::<Option<HiddenReason>>()))
         .saturating_add(2 * std::mem::size_of::<usize>())
         .saturating_add(text.glyphs.capacity().saturating_mul(std::mem::size_of::<TextGlyph>()))
         .saturating_add(text.line_of.capacity().saturating_mul(std::mem::size_of::<u32>()))
@@ -132,14 +138,14 @@ mod tests {
         let mut word = String::with_capacity(1000);
         word.push('a');
         text.glyphs.push(TextGlyph { text: word, rect: [0.0; 4], quad: [[0.0; 2]; 4], direction: [1.0, 0.0] });
+        let text: Extracted = (Arc::new(text), Hidden::from(vec![None; 40]));
         let cost = retained_bytes(&text);
-        assert!(cost >= 32 * std::mem::size_of::<TextGlyph>() + 48 * 4 + 64 + 1000);
-        let text = Arc::new(text);
+        assert!(cost >= 32 * std::mem::size_of::<TextGlyph>() + 48 * 4 + 64 + 1000 + 40 * std::mem::size_of::<Option<HiddenReason>>());
         let version = Arc::new(vec![1]);
         let mut cache = TextCache::new(cost * 2);
         cache.insert(DocId(1), 0, &version, text.clone());
         cache.insert(DocId(2), 0, &version, text.clone());
-        assert!(Arc::ptr_eq(&cache.get(DocId(1), 0).unwrap(), &text));
+        assert!(Arc::ptr_eq(&cache.get(DocId(1), 0).unwrap().0, &text.0));
         cache.insert(DocId(3), 0, &version, text.clone());
         assert!(cache.get(DocId(2), 0).is_none(), "least recently used page in another document is evicted");
         assert_eq!(cache.bytes, 2 * cost);
@@ -156,7 +162,7 @@ mod tests {
 
     #[test]
     fn oversized_pages_bypass_cache_and_empty_pages_have_a_bookkeeping_limit() {
-        let text = Arc::new(PageText::default());
+        let text: Extracted = (Arc::new(PageText::default()), Hidden::from([]));
         let version = Arc::new(vec![]);
         let cost = retained_bytes(&text);
         let mut tiny = TextCache::new(cost - 1);

@@ -8591,3 +8591,17 @@ fn styled_existing_justification_is_refused_instead_of_silently_left_aligning() 
     assert_eq!(page_content_bytes(&doc, 0), before);
     assert_eq!(page_content_bytes(&reopen(&doc), 0), before);
 }
+
+#[test]
+fn text_lines_keep_each_runs_rendering_mode_and_one_opacity_per_line() {
+    // A line joins runs in an invisible mode to visible ones, so the mode is kept for each run.
+    let doc = text_page("BT /F1 20 Tf 1 0 0 1 20 200 Tm (Hello ) Tj /OCR BMC 3 Tr (secret) Tj EMC 0 Tr ( world) Tj ET");
+    let lines = text_lines(&doc, 0).unwrap();
+    assert_eq!(lines.iter().map(|l| l.text.as_str()).collect::<Vec<_>>(), ["Hello secret world"]);
+    assert_eq!(lines[0].run_modes().collect::<Vec<_>>(), [(0, false), (3, true), (0, false)]);
+    assert_eq!(lines[0].opacity(), (1.0, 1.0));
+    // A run at another opacity starts a line of its own, so one opacity holds for a line's runs.
+    let doc = row_state_page("BT /F1 20 Tf 1 0 0 1 20 200 Tm (Opaque) Tj ET q /GS1 gs BT /F1 20 Tf 1 0 0 1 92 200 Tm (faint) Tj ET Q");
+    let lines = text_lines(&doc, 0).unwrap();
+    assert_eq!(lines.iter().map(|l| (l.text.as_str(), l.opacity())).collect::<Vec<_>>(), [("Opaque", (1.0, 1.0)), ("faint", (0.3, 0.3))]);
+}

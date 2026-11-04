@@ -27,7 +27,7 @@ pub use raster::{
     Retiring, Tile, device_pixels, effective_scale,
 };
 pub use reading::{ReadingColors, ReadingParams};
-pub use text::{PageText, TextGlyph};
+pub use text::{HiddenReason, PageText, TextGlyph, character_reason, is_tiny, paints_nothing};
 
 /// Errors surfaced to the user when a document cannot be opened.
 #[derive(Debug, thiserror::Error)]

@@ -17,12 +17,15 @@
 //! - `tiny`: one 16 px tile, which shows the fixed cost of a request.
 //! - `text`: the text layer of page 1.
 //! - `sweep`: whole pages and tiles at six scales, the broadest identity check.
+//! - `hidden`: the text layer of page 1 on one renderer without a pool, read plainly and then with
+//!   the class of each glyph that paints nothing (which reads every glyph's colour). Each round
+//!   prints both times, the hidden glyph count and whether the two text layers are equal.
 
 use std::error::Error;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use pdfcraft_render::{PageText, RenderConfig, RenderPool, RenderRequest, RenderedPage, RequestKind, Tile};
+use pdfcraft_render::{PageRenderer, PageText, RenderConfig, RenderPool, RenderRequest, RenderedPage, RequestKind, Tile};
 
 /// The canvas's tile side in device pixels.
 const TILE: u32 = 1024;
@@ -55,6 +58,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     };
 
     let bytes = Arc::new(std::fs::read(path)?);
+    if scenario == "hidden" {
+        return time_hidden(bytes, rounds);
+    }
     let (width, height) = {
         let pdf = hayro_syntax::Pdf::new_with_password(bytes.clone(), "").map_err(|e| format!("{e:?}"))?;
         let pages = pdf.pages();
@@ -136,6 +142,27 @@ fn scenario_requests(scenario: &str, width: f32, height: f32) -> Result<Vec<Rend
         other => return Err(format!("unknown scenario `{other}`")),
     };
     Ok(requests)
+}
+
+/// The `hidden` scenario. The two reads alternate on one renderer, so both meet the same parser
+/// state; neither keeps an interpreter cache between calls.
+fn time_hidden(bytes: Arc<Vec<u8>>, rounds: usize) -> Result<(), Box<dyn Error>> {
+    let mut renderer = PageRenderer::new(bytes, RenderConfig::default());
+    for round in 0..rounds {
+        let start = Instant::now();
+        let plain = renderer.render(RenderRequest { page: 0, kind: RequestKind::Text, tile: None, scale: 1.0, tag: TEXT_TAG, preview: false });
+        let plain_us = start.elapsed().as_micros();
+        let start = Instant::now();
+        let (text, hidden) = renderer.text_with_hidden(0)?;
+        let classed_us = start.elapsed().as_micros();
+        let same = plain.text.as_deref().map(|t| hash_text(FNV_OFFSET, t)) == Some(hash_text(FNV_OFFSET, &text));
+        println!(
+            "round={round} scenario=hidden plain_us={plain_us} classed_us={classed_us} glyphs={} hidden={} same_text={same}",
+            text.glyphs.len(),
+            hidden.iter().flatten().count()
+        );
+    }
+    Ok(())
 }
 
 /// Queues `requests` as the canvas does and waits for every answer. Returns the answers, the time

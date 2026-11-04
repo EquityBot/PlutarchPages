@@ -1,6 +1,8 @@
 use super::dispatch::Content;
 use super::error::{Result, ToolError, failed};
+use super::hidden_text::{Hidden, attach, glyph_entries};
 use super::json::{Args, one_based};
+use super::text_cache::Extracted;
 use super::{Arc, Automation, DocId, HashMap, PageRenderer, PageText, RenderConfig, RenderRequest, RequestKind, Value, commands, json, tools};
 
 /// Default and maximum resolution for `page_render`.
@@ -14,7 +16,7 @@ pub(crate) const FIND_FIRST_BATCH: usize = 8;
 
 const FIND_MAX_BATCH: usize = 128;
 
-type PageTexts = Vec<(usize, std::result::Result<Arc<PageText>, String>)>;
+type PageTexts = Vec<(usize, std::result::Result<Extracted, String>)>;
 
 pub(crate) const FIND_MAX_WARNINGS: usize = 100;
 
@@ -135,6 +137,11 @@ impl Automation {
 
     /// The text of `pages` (0-based), from the cache or extracted in parallel.
     pub(crate) fn page_texts(&mut self, id: DocId, pages: &[usize]) -> Result<Vec<Arc<PageText>>> {
+        Ok(self.classed_page_texts(id, pages)?.into_iter().map(|(text, _)| text).collect())
+    }
+
+    /// [`Automation::page_texts`] with the class of each glyph that paints nothing.
+    pub(crate) fn classed_page_texts(&mut self, id: DocId, pages: &[usize]) -> Result<Vec<Extracted>> {
         self.page_text_results(id, pages, &mut extract_parallel)?
             .into_iter()
             .map(|(p, text)| text.map_err(|e| failed(format!("page {}: {e}", p + 1))))
@@ -216,12 +223,23 @@ impl Automation {
         };
         // Column select (#740): only the text inside the rectangle, row by row.
         let rect = a.nums::<4>("rect")?.map(|r| r.map(|v| v as f32));
-        let texts = self.page_texts(id, &pages)?;
-        let text = |t: &PageText| match rect {
-            Some(r) => t.column_text(&t.glyphs_in(r)),
-            None => t.plain_text(),
-        };
-        let out: Vec<Value> = pages.iter().zip(texts).map(|(p, t)| json!({ "page": p + 1, "text": text(&t) })).collect();
+        let texts = self.classed_page_texts(id, &pages)?;
+        let out: Vec<Value> = pages
+            .iter()
+            .zip(texts)
+            .map(|(p, (t, hidden))| {
+                let (text, hidden) = match rect {
+                    Some(r) => {
+                        let ids = t.glyphs_in(r);
+                        (t.column_text(&ids), glyph_entries(&t, &hidden, ids.iter().copied()))
+                    }
+                    None => (t.plain_text(), glyph_entries(&t, &hidden, 0..t.glyphs.len())),
+                };
+                let mut page = json!({ "page": p + 1, "text": text });
+                attach(&mut page, hidden);
+                page
+            })
+            .collect();
         Ok(json!({ "pages": out }))
     }
 
@@ -258,7 +276,7 @@ impl Automation {
             let pages: Vec<usize> = (first..end).collect();
             let texts = self.page_text_results(id, &pages, extract)?;
             for (p, text) in texts {
-                let text = match text {
+                let (text, hidden) = match text {
                     Ok(text) => text,
                     Err(mut error) => {
                         warning_count += 1;
@@ -280,7 +298,9 @@ impl Automation {
                         next = Some(json!({ "start_page": p + 1, "skip": k }));
                         break 'search;
                     }
-                    matches.push(json!({ "page": p + 1, "text": text.text_of(r.clone()), "rects": text.line_rects(r) }));
+                    let mut found = json!({ "page": p + 1, "text": text.text_of(r.clone()), "rects": text.line_rects(r.clone()) });
+                    attach(&mut found, glyph_entries(&text, &hidden, r));
+                    matches.push(found);
                 }
             }
             first = end;
@@ -357,13 +377,7 @@ fn render_warning_text(warning: pdfcraft_render::RenderWarning) -> &'static str 
 
 /// Extract the text of `pages` (0-based) with one renderer per worker thread.
 pub(crate) fn extract_parallel(bytes: &Arc<Vec<u8>>, password: Option<Arc<str>>, pages: &[usize]) -> PageTexts {
-    let extract = |r: &mut PageRenderer, p: usize| {
-        let out = r.render(RenderRequest { page: p, kind: RequestKind::Text, tile: None, scale: 1.0, tag: 0, preview: false });
-        match out.error {
-            Some(e) => Err(e),
-            None => Ok(out.text.unwrap_or_default()),
-        }
-    };
+    let extract = |r: &mut PageRenderer, p: usize| r.text_with_hidden(p).map(|(text, hidden)| (Arc::new(text), Hidden::from(hidden)));
     let config = RenderConfig { password, ..Default::default() };
     let workers = if cfg!(target_arch = "wasm32") { 1 } else { std::thread::available_parallelism().map_or(1, std::num::NonZeroUsize::get).min(8) };
     // Small jobs aren't worth a second parse of the document.

@@ -511,6 +511,25 @@ impl PageRenderer {
             .map_err(|e| format!("text extraction failed: {}", panic_message(&e)))?
     }
 
+    /// The text of one page, as [`PageRenderer::render`] extracts it, with each glyph's
+    /// [`crate::HiddenReason`] when it paints nothing: one entry per glyph. Never panics.
+    pub fn text_with_hidden(&mut self, page: usize) -> Result<(crate::PageText, Vec<Option<crate::HiddenReason>>), String> {
+        let pdf = self.pdf.as_ref().ok_or("the document could not be parsed")?;
+        self.stats.render_requests = self.stats.render_requests.saturating_add(1);
+        self.stats.text_interpretations = self.stats.text_interpretations.saturating_add(1);
+        let number = page.saturating_add(1);
+        match catch_unwind(AssertUnwindSafe(|| crate::text::extract_page_hidden(pdf, page, &self.settings))) {
+            Ok(Some(text)) => Ok(text),
+            Ok(None) => Err(format!("page {number} does not exist")),
+            Err(panic) => {
+                // As after a crash in `render`: the parser may hold state from the failed page.
+                self.pdf = parse(&self.bytes, self.config.password.as_deref());
+                self.stats.parser_builds = self.stats.parser_builds.saturating_add(1);
+                Err(format!("text extraction crashed on page {number}: {}", panic_message(&panic)))
+            }
+        }
+    }
+
     /// Render one page. Never panics.
     pub fn render(&mut self, req: RenderRequest) -> RenderedPage {
         let start = Stopwatch::start();

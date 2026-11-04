@@ -1,3 +1,4 @@
+use super::hidden::{HiddenReason, Visibility, combine, cover_redrawn};
 use super::layout::{Flow, along_baseline, arrange_flow, compatible, continues, from_upright, to_upright, unrolled};
 use super::{
     Affine, BezPath, BlendMode, ClipPath, Context, Device, Glyph, GlyphDrawMode, HashMap, Image, InterpreterCache, InterpreterSettings, PageText,
@@ -14,8 +15,8 @@ pub(super) const DIRECTION_TOLERANCE: f64 = WORD_GAP as f64;
 pub(super) const WORD_GAP: f32 = 0.15;
 
 /// A glyph with its writing direction to the nearest quarter turn (right, down, left, up) and as
-/// a unit vector.
-pub(super) type Drawn = (usize, [f64; 2], TextGlyph);
+/// a unit vector, and why it paints nothing when it does not (only when classifying).
+pub(super) type Drawn = (usize, [f64; 2], TextGlyph, Option<HiddenReason>);
 
 pub(super) struct TextDevice {
     /// Every glyph in content order.
@@ -34,6 +35,7 @@ pub(super) struct TextDevice {
     actual_filtered: bool,
     actual_cropped: bool,
     partial_replacement: bool,
+    visibility: Visibility,
 }
 
 /// An `/ActualText` replacement: the glyph standing for it in `TextDevice::glyphs` (none for an
@@ -49,13 +51,13 @@ pub(super) struct Replaced {
 const CELL: f32 = 8.0;
 
 /// Most grid cells searched around one place: a glyph so tall its tolerance spans more is skipped.
-const MAX_CELLS: i64 = 4096;
+pub(super) const MAX_CELLS: i64 = 4096;
 
 /// Most work (grid cells visited plus glyphs compared) the redraw dedupe in `TextDevice::finish`
 /// may do on one page. A hostile page stacking ~10^5 glyphs and ~10^5 replacements at one spot
 /// would otherwise make ~10^10 comparisons; past the budget the remaining replacements keep
 /// their unmarked redraws (the text reads twice, as it would without `/ActualText`).
-const MAX_REDRAW_WORK: usize = 1 << 22;
+pub(super) const MAX_REDRAW_WORK: usize = 1 << 22;
 
 /// Most replacement text bytes the redraw dedupe in `TextDevice::finish` copies on one page.
 pub(super) const MAX_REDRAW_TEXT: usize = 1 << 22;
@@ -66,18 +68,19 @@ thread_local! {
     pub(super) static REDRAW_TEXT_BYTES: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
 }
 
-fn cell(v: f32) -> i64 {
+pub(super) fn cell(v: f32) -> i64 {
     // Glyph boxes are finite (`draw_glyph` and `merge` drop the rest); `as` saturates.
     (v / CELL).floor() as i64
 }
 
 /// How far a redrawn glyph may sit from the one it redraws: a fifth of its height, as in `redraws`.
-fn redraw_tolerance(rect: &[f32; 4]) -> f32 {
+pub(super) fn redraw_tolerance(rect: &[f32; 4]) -> f32 {
     0.2 * (rect[3] - rect[1]).max(0.1)
 }
 
-/// One glyph carrying `text`, boxed around `drawn` in their writing direction; `None` when they
-/// span several lines or writing directions (one box would break selection and line grouping).
+/// One glyph carrying `text`, boxed around `drawn` in their writing direction and hidden when
+/// they all are; `None` when they span several lines or writing directions (one box would break
+/// selection and line grouping).
 fn merge(drawn: &[Drawn], text: String) -> Option<Drawn> {
     let first = drawn.first()?;
     let (quarter, u) = (first.0, first.1);
@@ -102,7 +105,8 @@ fn merge(drawn: &[Drawn], text: String) -> Option<Drawn> {
     let rect = quad.iter().fold([f32::INFINITY, f32::INFINITY, f32::NEG_INFINITY, f32::NEG_INFINITY], |r, p| {
         [r[0].min(p[0]), r[1].min(p[1]), r[2].max(p[0]), r[3].max(p[1])]
     });
-    Some((quarter, u, TextGlyph { text, rect, quad, direction: first.2.direction }))
+    let hidden = drawn.iter().map(|d| d.3).reduce(combine).flatten();
+    Some((quarter, u, TextGlyph { text, rect, quad, direction: first.2.direction }, hidden))
 }
 
 impl TextDevice {
@@ -118,6 +122,7 @@ impl TextDevice {
             actual_filtered: false,
             actual_cropped: false,
             partial_replacement: false,
+            visibility: Visibility::default(),
         }
     }
 
@@ -261,8 +266,10 @@ impl<'a> Device<'a> for TextDevice {
     fn set_blend_mode(&mut self, _: BlendMode) {}
     fn draw_path(&mut self, _: &BezPath, _: Affine, _: &Paint<'a>, _: &PathDrawMode) {}
     fn push_clip_path(&mut self, _: &ClipPath) {}
-    fn push_transparency_group(&mut self, _: f32, _: Option<SoftMask<'a>>, _: BlendMode) {}
-    fn draw_glyph(&mut self, glyph: &Glyph<'a>, transform: Affine, glyph_transform: Affine, _: &Paint<'a>, mode: &GlyphDrawMode) {
+    fn push_transparency_group(&mut self, opacity: f32, _: Option<SoftMask<'a>>, _: BlendMode) {
+        self.visibility.push_group(opacity);
+    }
+    fn draw_glyph(&mut self, glyph: &Glyph<'a>, transform: Affine, glyph_transform: Affine, paint: &Paint<'a>, mode: &GlyphDrawMode) {
         if self.excluded_depth.is_some() || (self.filter.images && matches!(mode, GlyphDrawMode::Invisible)) {
             self.actual_filtered |= self.actual.is_some();
             return;
@@ -337,6 +344,8 @@ impl<'a> Device<'a> for TextDevice {
         }
         let length = dx.hypot(dy);
         let direction = if length.is_finite() && length > 0.0 { [dx / length, dy / length] } else { [1.0, 0.0] };
+        // The em square's height across the baseline: glyph space's y axis, 1000 units to the em.
+        let em_height = matches!(glyph, Glyph::Outline(_)).then(|| 1000.0 * coefficients[2].hypot(coefficients[3]));
         // A glyph whose Unicode is several characters (a ligature such as "ffi") stays one glyph
         // with its own box: the PDF gives no position for the characters inside it.
         let glyph = TextGlyph {
@@ -345,16 +354,20 @@ impl<'a> Device<'a> for TextDevice {
             quad: corners.map(|p| [p.x as f32, p.y as f32]),
             direction: direction.map(|d| d as f32),
         };
+        let hidden = self.visibility.class(paint, mode, em_height);
         match &mut self.actual {
-            Some((_, _, drawn)) => drawn.push((dir, direction, glyph)),
-            None => self.glyphs.push((dir, direction, glyph)),
+            Some((_, _, drawn)) => drawn.push((dir, direction, glyph, hidden)),
+            None => self.glyphs.push((dir, direction, glyph, hidden)),
         }
     }
     fn draw_image(&mut self, _: Image<'a, '_>, _: Affine) {}
     fn pop_clip_path(&mut self) {}
-    fn pop_transparency_group(&mut self) {}
+    fn pop_transparency_group(&mut self) {
+        self.visibility.pop_group();
+    }
     fn begin_marked_content(&mut self, tag: &[u8], mcid: Option<i32>) {
         self.depth = self.depth.saturating_add(1);
+        self.visibility.begin_marked_content(self.depth, tag);
         if self.excluded_depth.is_none() && self.filter.excludes(tag, mcid) {
             self.excluded_depth = Some(self.depth);
         }
@@ -372,6 +385,7 @@ impl<'a> Device<'a> for TextDevice {
         if self.excluded_depth == Some(self.depth) {
             self.excluded_depth = None;
         }
+        self.visibility.end_marked_content(self.depth);
         self.depth = self.depth.saturating_sub(1);
     }
 }
@@ -381,7 +395,24 @@ pub(crate) fn extract_page(pdf: &Pdf, page: usize, settings: &InterpreterSetting
     extract_page_filtered(pdf, page, settings, TextFilter::default()).ok()
 }
 
+/// [`extract_page`] with, for each returned glyph, why it paints nothing: one entry per glyph of
+/// the text, in its order. Panics inside the interpreter are the caller's to catch.
+pub(crate) fn extract_page_hidden(pdf: &Pdf, page: usize, settings: &InterpreterSettings) -> Option<(PageText, Vec<Option<HiddenReason>>)> {
+    extract(pdf, page, settings, TextFilter::default(), true).ok()
+}
+
 pub(crate) fn extract_page_filtered(pdf: &Pdf, page: usize, settings: &InterpreterSettings, filter: TextFilter) -> Result<PageText, String> {
+    extract(pdf, page, settings, filter, false).map(|(text, _)| text)
+}
+
+/// The page's text and, when `classify`, each returned glyph's class (else all `None`).
+fn extract(
+    pdf: &Pdf,
+    page: usize,
+    settings: &InterpreterSettings,
+    filter: TextFilter,
+    classify: bool,
+) -> Result<(PageText, Vec<Option<HiddenReason>>), String> {
     let pages = pdf.pages();
     let p = pages.get(page).ok_or("the page could not be read")?;
     let (w, h) = p.render_dimensions();
@@ -395,9 +426,13 @@ pub(crate) fn extract_page_filtered(pdf: &Pdf, page: usize, settings: &Interpret
     let mut dev = TextDevice::new();
     dev.page = initial.transform_rect_bbox(Rect::new(c.x0, c.y0, c.x1, c.y1));
     dev.filter = filter;
+    dev.visibility.on = classify;
     interpret_page(p, &mut ctx, &mut dev);
     // A replacement the content never closed ends with the page.
     dev.finish();
+    if classify {
+        cover_redrawn(&mut dev.glyphs);
+    }
     if dev.partial_replacement {
         return Err("a replacement text span mixes included and excluded content; disable the exclusions to count this page".into());
     }
@@ -424,7 +459,7 @@ pub(crate) fn extract_page_filtered(pdf: &Pdf, page: usize, settings: &Interpret
         start = end;
     }
     let mut quarters: [Vec<usize>; 4] = Default::default();
-    for (i, (quarter, u, _)) in glyphs.iter().enumerate() {
+    for (i, (quarter, u, _, _)) in glyphs.iter().enumerate() {
         if in_curve[i] {
             continue;
         }
@@ -485,16 +520,18 @@ pub(crate) fn extract_page_filtered(pdf: &Pdf, page: usize, settings: &Interpret
     let first = |ids: &[usize]| ids.iter().filter_map(|&i| rank.get(i).copied()).min().unwrap_or(usize::MAX);
     extra.sort_by_key(|f| first(&f.ids));
     let mut extra = extra.into_iter().peekable();
-    let mut slots: Vec<Option<TextGlyph>> = glyphs.into_iter().map(|g| Some(g.2)).collect();
+    let mut slots: Vec<Option<(TextGlyph, Option<HiddenReason>)>> = glyphs.into_iter().map(|g| Some((g.2, g.3))).collect();
     let mut text = PageText::default();
+    let mut hidden = Vec::new();
     let mut emit = |text: &mut PageText, ids: &[usize], line_of: &[u32], space_before: &[bool], quarter: Option<u8>| {
         let offset = text.line_of.last().map_or(0, |line| line.saturating_add(1));
         for ((&i, &line), &space) in ids.iter().zip(line_of).zip(space_before) {
-            let Some(mut g) = slots.get_mut(i).and_then(Option::take) else { continue };
+            let Some((mut g, class)) = slots.get_mut(i).and_then(Option::take) else { continue };
             if let Some(quarter) = quarter {
                 g.rect = from_upright(to_upright(g.rect, quarter, w, h), quarter, w, h);
             }
             text.glyphs.push(g);
+            hidden.push(class);
             text.line_of.push(line.saturating_add(offset));
             text.space_before.push(space);
         }
@@ -515,5 +552,5 @@ pub(crate) fn extract_page_filtered(pdf: &Pdf, page: usize, settings: &Interpret
     for f in extra {
         emit(&mut text, &f.ids, &f.line_of, &f.space_before, None);
     }
-    Ok(text)
+    Ok((text, hidden))
 }

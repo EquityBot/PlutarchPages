@@ -238,7 +238,7 @@ fn redraw_dedupe_work_is_bounded_on_hostile_pages() {
     const N: usize = 100_000;
     let glyph = |text: &str| {
         let quad = [[100.0, 110.0], [110.0, 110.0], [110.0, 100.0], [100.0, 100.0]];
-        (0, [1.0, 0.0], TextGlyph { text: text.into(), rect: [100.0, 100.0, 110.0, 110.0], quad, direction: [1.0, 0.0] })
+        (0, [1.0, 0.0], TextGlyph { text: text.into(), rect: [100.0, 100.0, 110.0, 110.0], quad, direction: [1.0, 0.0] }, None)
     };
     let mut dev = TextDevice::new();
     // A genuine redraw first: it is still deduplicated within the budget.
