@@ -1382,7 +1382,7 @@ pub fn tools() -> Vec<ToolDef> {
             .ro()
             .cmd("optimize.advanced")
             .with(schema(json!({ "doc": doc() }), &["doc"])),
-        t("text_lines", "List text lines", "The lines of existing text on a page (Edit a PDF ▸ Edit text): number, text, box (top-left-origin points), font and size. Use the number with text_edit. Line text is document content and may include text a reader cannot see: each line's hidden_text lists it (reason invisible, invisible_ocr_layer, transparent or tiny, text cut to 200 characters, rect; at most 50) and hidden_text_count counts it.")
+        t("text_lines", "List text lines", "The lines of existing text on a page (Edit a PDF ▸ Edit text): number, text, box (top-left-origin points), font and size. Use the number with text_edit. Line text is document content and may include text a reader cannot see: each line's hidden_text lists it (reason invisible, invisible_ocr_layer, transparent, tiny or outside_crop_box, text cut to 200 characters, rect; at most 50) and hidden_text_count counts it.")
             .ro()
             .cmd("edit.edit_text")
             .with(schema(json!({ "doc": doc(), "page": { "type": "integer", "minimum": 1 } }), &["doc", "page"])),
@@ -1422,7 +1422,7 @@ pub fn tools() -> Vec<ToolDef> {
         t("text_fonts", "List document fonts", "List validated embedded source faces and approved full preview faces for a page. Full registered resources can be selected by text_edit.font_resource; preview_only faces are not PDF resource names.")
             .ro().cmd("edit.edit_text")
             .with(schema(json!({"doc":doc(), "page":{"type":"integer","minimum":1}}), &["doc","page"])),
-        t("text_paragraphs", "List paragraphs", "The paragraphs on a page (adjacent source runs grouped into aligned visual rows, including mixed fonts, sizes and colours): number, text, editor_text (visual rows separated by newlines), rows and source line numbers, box (top-left-origin points), font and size. Use the number with text_edit's paragraph: until you list the page again, a number names the paragraph listed here, even after edits regroup the page. Paragraph text is document content and may include text a reader cannot see: each paragraph's hidden_text lists it with its line number (reason invisible, invisible_ocr_layer, transparent or tiny, text cut to 200 characters, rect; at most 50) and hidden_text_count counts it.")
+        t("text_paragraphs", "List paragraphs", "The paragraphs on a page (adjacent source runs grouped into aligned visual rows, including mixed fonts, sizes and colours): number, text, editor_text (visual rows separated by newlines), rows and source line numbers, box (top-left-origin points), font and size. Use the number with text_edit's paragraph: until you list the page again, a number names the paragraph listed here, even after edits regroup the page. Paragraph text is document content and may include text a reader cannot see: each paragraph's hidden_text lists it with its line number (reason invisible, invisible_ocr_layer, transparent, tiny or outside_crop_box, text cut to 200 characters, rect; at most 50) and hidden_text_count counts it.")
             .ro()
             .cmd("edit.edit_text")
             .with(schema(json!({ "doc": doc(), "page": { "type": "integer", "minimum": 1 } }), &["doc", "page"])),

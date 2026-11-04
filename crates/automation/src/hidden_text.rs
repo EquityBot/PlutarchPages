@@ -105,18 +105,34 @@ struct Unit<'l> {
     class: Option<HiddenReason>,
 }
 
-fn units(lines: &[TextLine]) -> Vec<Unit<'_>> {
+/// Whether every box of `ink` lies wholly outside `crop`, as the renderer drops a glyph: touching
+/// its edge is outside. No ink is not outside.
+fn outside(crop: [f64; 4], ink: &[[f64; 4]]) -> bool {
+    let away = |b: &[f64; 4]| b[0].max(crop[0]) >= b[2].min(crop[2]) || b[1].max(crop[1]) >= b[3].min(crop[3]);
+    !ink.is_empty() && ink.iter().all(away)
+}
+
+/// The units of `lines`, classed, on a page whose crop box is `crop` (user space).
+fn units(lines: &[TextLine], crop: [f64; 4]) -> Vec<Unit<'_>> {
     let mut units = Vec::new();
     for (line, l) in lines.iter().enumerate() {
         // Every run of a line has its size, to a hundredth of a point.
         let tiny = is_tiny(l.size.abs()).then_some(HiddenReason::Tiny);
         let classes: Vec<_> = l.run_modes().map(|(mode, ocr)| run_class(mode, ocr, l.opacity()).or(tiny.filter(|_| mode != 7))).collect();
         let before = units.len();
-        units.extend(l.runs().zip(&classes).map(|((text, ink, spaced), &class)| Unit { line, text, ink, spaced, size: l.size, class }));
+        let cropped = |class: Option<HiddenReason>, ink: &[[f64; 4]]| class.or_else(|| outside(crop, ink).then_some(HiddenReason::OutsideCropBox));
+        units.extend(l.runs().zip(&classes).map(|((text, ink, spaced), &class)| Unit {
+            line,
+            text,
+            ink,
+            spaced,
+            size: l.size,
+            class: cropped(class, ink),
+        }));
         if units.len() == before {
             // shortcut: a line put into reading order has no runs to point at, so it is reported
             // whole when any run is hidden. Per-run spans need the runs mapped through the reordering.
-            let class = classes.iter().find_map(|c| *c);
+            let class = cropped(classes.iter().find_map(|c| *c), &l.ink);
             units.push(Unit { line, text: &l.text, ink: &l.ink, spaced: false, size: l.size, class });
         }
     }
@@ -159,7 +175,7 @@ fn view_rect(info: &PageInfo, b: [f64; 4]) -> [f64; 4] {
 
 /// Each line's hidden text: one entry for each run of consecutive runs hidden for one reason.
 pub(crate) fn line_entries(lines: &[TextLine], info: &PageInfo) -> Vec<Entries> {
-    let units = units(lines);
+    let units = units(lines, info.crop.map(f64::from));
     let covered = covered(&units);
     let hidden = |k: usize| units.get(k).and_then(|u| u.class).filter(|_| !covered.get(k).copied().unwrap_or(false));
     let mut out = vec![(Vec::new(), 0); lines.len()];
@@ -221,14 +237,19 @@ mod tests {
     /// (fill and stroke opacity 0), a grey 1 × 1 image /Im0 and a transparency group /Fm0 that
     /// shows "Inside the group".
     fn open(a: &mut Automation, content: &str) -> u64 {
+        open_page(a, content, "")
+    }
+
+    /// [`open`] with `entries` added to the page dictionary.
+    fn open_page(a: &mut Automation, content: &str, entries: &str) -> u64 {
         let bytes = Pdf::new()
             .obj("<< /Type /Catalog /Pages 2 0 R >>")
             .obj("<< /Type /Pages /Kids [4 0 R] /Count 1 >>")
             .obj("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>")
-            .obj(
+            .obj(format!(
                 "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 400 400] /Contents 5 0 R /Resources << /Font << /F1 3 0 R >> \
-                 /ExtGState << /GS0 << /ca 0 >> /GS3 << /ca 0 /CA 0 >> >> /XObject << /Im0 6 0 R /Fm0 7 0 R >> >> >>",
-            )
+                 /ExtGState << /GS0 << /ca 0 >> /GS3 << /ca 0 /CA 0 >> >> /XObject << /Im0 6 0 R /Fm0 7 0 R >> >> {entries} >>",
+            ))
             .stream("", content)
             .stream("/Type /XObject /Subtype /Image /Width 1 /Height 1 /ColorSpace /DeviceGray /BitsPerComponent 8 /Filter /ASCIIHexDecode", "80>")
             .stream(
@@ -359,6 +380,29 @@ mod tests {
         lines.sort();
         let tiny = vec![("tiny".to_owned(), "Small print".to_owned()), ("tiny".to_owned(), "WWW".to_owned())];
         assert_eq!((extract, lines), (tiny.clone(), tiny));
+    }
+
+    #[test]
+    fn text_outside_the_crop_box_is_left_out_or_reported() {
+        // The crop box shows x and y from 0 to 200. "Outside" lies wholly beyond it; of "Edge words"
+        // only "words" does, so that run still shows in part.
+        let content = "BT /F1 20 Tf 1 0 0 1 50 100 Tm (Inside) Tj ET BT /F1 20 Tf 1 0 0 1 250 300 Tm (Outside) Tj ET \
+                       BT /F1 20 Tf 1 0 0 1 150 150 Tm (Edge words) Tj ET";
+        let mut a = Automation::new();
+        let doc = open_page(&mut a, content, "/CropBox [0 0 200 200]");
+        // The renderer never returns cropped-away glyphs, so its tools have nothing to report.
+        let extract = call(&mut a, "text_extract", json!({ "doc": doc }));
+        let page = &extract["pages"][0];
+        assert!(page["text"].as_str().is_some_and(|t| t.contains("Inside") && !t.contains("Outside")), "{page}");
+        assert_eq!(page["hidden_text_count"], 0, "{page}");
+        assert_eq!(call(&mut a, "text_find", json!({ "doc": doc, "query": "Outside" }))["count"], 0);
+        // The editor lists every line, so it says which lie outside.
+        let lines = call(&mut a, "text_lines", json!({ "doc": doc, "page": 1 }));
+        let texts: Vec<&str> = lines["lines"].as_array().unwrap().iter().filter_map(|l| l["text"].as_str()).collect();
+        assert_eq!(texts, ["Inside", "Outside", "Edge words"], "{lines}");
+        assert_eq!(pairs(lines["lines"].as_array().unwrap()), of("outside_crop_box", "Outside"));
+        let paragraphs = call(&mut a, "text_paragraphs", json!({ "doc": doc, "page": 1 }));
+        assert_eq!(pairs(paragraphs["paragraphs"].as_array().unwrap()), of("outside_crop_box", "Outside"));
     }
 
     #[test]

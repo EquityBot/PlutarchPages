@@ -22,6 +22,9 @@ pub enum HiddenReason {
     /// Under 1 point: the em square of its font, as drawn, is less than 1 point high across the
     /// baseline. Its box is not the measure: a turned glyph's box is as high as it is wide.
     Tiny,
+    /// Wholly outside the page's crop box, so never shown. Only the editor's text has it: the
+    /// renderer leaves such glyphs out of the text it returns.
+    OutsideCropBox,
 }
 
 impl HiddenReason {
@@ -32,6 +35,7 @@ impl HiddenReason {
             HiddenReason::InvisibleOcrLayer => "invisible_ocr_layer",
             HiddenReason::Transparent => "transparent",
             HiddenReason::Tiny => "tiny",
+            HiddenReason::OutsideCropBox => "outside_crop_box",
         }
     }
 }
