@@ -4,6 +4,7 @@ description = "External oracle processes PdfCraft checks its own output against,
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+publish = false
 
 [lints]
 workspace = true

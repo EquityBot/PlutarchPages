@@ -4,6 +4,7 @@ description = "Create PDFs: blank documents, from images (PNG, JPEG), plain text
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+publish = false
 
 [lints]
 workspace = true

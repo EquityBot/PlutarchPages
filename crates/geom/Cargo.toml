@@ -4,6 +4,7 @@ description = "Geometry primitives for PdfCraft (points, rects, page transforms)
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+publish = false
 
 [lints]
 workspace = true
