@@ -14,7 +14,7 @@ use std::ops::Range;
 use std::sync::Arc;
 
 use pdfcraft_engine::{TextBlock, TextLine};
-use pdfcraft_render::{HiddenReason, PageInfo, PageText, is_tiny, paints_nothing};
+use pdfcraft_render::{HiddenReason, PageInfo, PageText, character_reason, is_tiny, paints_nothing};
 use serde_json::{Value, json};
 
 /// The class of each glyph of a page's renderer text, in its order.
@@ -56,11 +56,78 @@ fn union(a: [f64; 4], b: [f64; 4]) -> [f64; 4] {
 
 const EMPTY: [f64; 4] = [f64::INFINITY, f64::INFINITY, f64::NEG_INFINITY, f64::NEG_INFINITY];
 
+fn extend_entries(out: &mut Entries, (entries, count): Entries) {
+    out.0.extend(entries.into_iter().take(MAX_ENTRIES.saturating_sub(out.0.len())));
+    out.1 = out.1.saturating_add(count);
+}
+
+/// Character warnings are independent of paint: a visible run may contain several kinds of
+/// control character. Keep only bounded, readable code-point tokens, never a partial token.
+#[derive(Default)]
+struct Characters {
+    current: Option<(HiddenReason, String, [f64; 4], bool)>,
+    entries: Entries,
+}
+
+impl Characters {
+    fn flush(&mut self) {
+        let Some((reason, text, rect, truncated)) = self.current.take() else { return };
+        self.entries.1 = self.entries.1.saturating_add(1);
+        if self.entries.0.len() < MAX_ENTRIES {
+            let mut value = entry(reason, &text, rect);
+            if let Some(object) = value.as_object_mut() {
+                object.insert("text_truncated".into(), truncated.into());
+            }
+            self.entries.0.push(value);
+        }
+    }
+
+    fn push(&mut self, text: &str, rect: [f64; 4]) {
+        for c in text.chars() {
+            let Some(reason) = character_reason(c) else {
+                self.flush();
+                continue;
+            };
+            if self.current.as_ref().is_some_and(|span| span.0 != reason) {
+                self.flush();
+            }
+            let span = self.current.get_or_insert_with(|| (reason, String::new(), rect, false));
+            span.2 = union(span.2, rect);
+            if !span.3 {
+                let token = format!("U+{:04X}", u32::from(c));
+                let space = usize::from(!span.1.is_empty());
+                if span.1.len().saturating_add(space).saturating_add(token.len()) <= MAX_CHARS {
+                    if space != 0 {
+                        span.1.push(' ');
+                    }
+                    span.1.push_str(&token);
+                } else {
+                    span.3 = true;
+                }
+            }
+        }
+    }
+
+    fn finish(mut self) -> Entries {
+        self.flush();
+        self.entries
+    }
+}
+
 /// The hidden text among the glyphs `ids` of `text` (indices in reading order): one entry for
 /// each run of consecutive glyphs on one line hidden for one reason.
 pub(crate) fn glyph_entries(text: &PageText, hidden: &[Option<HiddenReason>], ids: impl IntoIterator<Item = usize>) -> Entries {
     let mut spans: Vec<(HiddenReason, Range<usize>)> = Vec::new();
+    let mut characters = Characters::default();
+    let mut previous: Option<usize> = None;
     for i in ids {
+        if previous.is_some_and(|p| p.saturating_add(1) != i || text.line_of.get(p) != text.line_of.get(i)) {
+            characters.flush();
+        }
+        if let Some(glyph) = text.glyphs.get(i) {
+            characters.push(&glyph.text, glyph.rect.map(f64::from));
+        }
+        previous = Some(i);
         let Some(Some(reason)) = hidden.get(i).copied() else { continue };
         let next = i.saturating_add(1);
         match spans.last_mut() {
@@ -78,7 +145,9 @@ pub(crate) fn glyph_entries(text: &PageText, hidden: &[Option<HiddenReason>], id
             entry(*reason, &text.text_of(span.clone()), rect)
         })
         .collect();
-    (entries, spans.len())
+    let mut out = (entries, spans.len());
+    extend_entries(&mut out, characters.finish());
+    out
 }
 
 /// Why an editor run in rendering mode `mode` at fill and stroke opacity `opacity` paints
@@ -204,6 +273,18 @@ pub(crate) fn line_entries(lines: &[TextLine], info: &PageInfo) -> Vec<Entries> 
             let ink = span.iter().flat_map(|s| s.ink.iter().copied()).fold(EMPTY, union);
             let line = lines.get(u.line).map_or(EMPTY, |l| l.rect);
             entries.push(entry(reason, &text, view_rect(info, if ink[0].is_finite() { ink } else { line })));
+        }
+    }
+    for group in units.chunk_by(|a, b| a.line == b.line) {
+        let Some(first) = group.first() else { continue };
+        let mut characters = Characters::default();
+        for unit in group {
+            let rect = unit.ink.iter().copied().fold(EMPTY, union);
+            let rect = if rect[0].is_finite() { rect } else { lines.get(unit.line).map_or(EMPTY, |line| line.rect) };
+            characters.push(unit.text, view_rect(info, rect));
+        }
+        if let Some(entries) = out.get_mut(first.line) {
+            extend_entries(entries, characters.finish());
         }
     }
     out
@@ -403,6 +484,52 @@ mod tests {
         assert_eq!(pairs(lines["lines"].as_array().unwrap()), of("outside_crop_box", "Outside"));
         let paragraphs = call(&mut a, "text_paragraphs", json!({ "doc": doc, "page": 1 }));
         assert_eq!(pairs(paragraphs["paragraphs"].as_array().unwrap()), of("outside_crop_box", "Outside"));
+    }
+
+    #[test]
+    fn characters_that_hide_or_reorder_text_are_reported_by_both_engines() {
+        // Each `/ActualText` stands for the glyphs it spans, in UTF-16 with a byte order mark.
+        let span = |y: u32, utf16: &str| format!("/Span <</ActualText <FEFF{utf16}>>> BDC {}EMC\n", line(y, 0, "xyz"));
+        let content = [
+            line(350, 0, "Plain text"),
+            // "Hi" then 3 zero-width spaces.
+            span(300, "00480069200B200B200B"),
+            // A right-to-left override before "abc".
+            span(250, "202E006100620063"),
+            // A private-use character.
+            span(200, "E000"),
+            // Tag characters spelling "Ig", U+E0049 and U+E0067.
+            span(150, "DB40DC49DB40DC67"),
+        ]
+        .concat();
+        let expected: Vec<(String, String)> =
+            [("zero_width", "U+200B U+200B U+200B"), ("bidi_control", "U+202E"), ("private_use", "U+E000"), ("zero_width", "U+E0049 U+E0067")]
+                .map(|(r, t)| (r.to_owned(), t.to_owned()))
+                .to_vec();
+        assert_eq!(reported(&content), (expected.clone(), expected));
+    }
+
+    #[test]
+    fn code_points_are_cut_whole_at_200_characters() {
+        // 40 zero-width spaces: 28 of "U+200B" and their spaces make 195 characters, 29 would make 202.
+        let content = format!("/Span <</ActualText <FEFF{}>>> BDC {}EMC\n", "200B".repeat(40), line(300, 0, "xyz"));
+        let mut a = Automation::new();
+        let doc = open(&mut a, &content);
+        let extract = call(&mut a, "text_extract", json!({ "doc": doc }));
+        let lines = call(&mut a, "text_lines", json!({ "doc": doc, "page": 1 }));
+        let expected = vec!["U+200B"; 28].join(" ");
+        for e in [&extract["pages"][0]["hidden_text"][0], &lines["lines"][0]["hidden_text"][0]] {
+            assert_eq!((e["text"].as_str(), e["text_truncated"].as_bool()), (Some(expected.as_str()), Some(true)), "{extract} {lines}");
+        }
+    }
+
+    #[test]
+    fn mixed_character_reasons_in_one_replacement_are_reported_separately() {
+        let content = format!("/Span <</ActualText <FEFF0048200B202EE0000049>>> BDC {}EMC\n", line(300, 0, "xyz"));
+        let expected: Pairs = [("zero_width", "U+200B"), ("bidi_control", "U+202E"), ("private_use", "U+E000")]
+            .map(|(reason, text)| (reason.to_owned(), text.to_owned()))
+            .to_vec();
+        assert_eq!(reported(&content), (expected.clone(), expected));
     }
 
     #[test]

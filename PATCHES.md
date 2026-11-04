@@ -87,6 +87,10 @@ Upstream's tests for these were changed to assert the fork's behaviour. Keep the
   gives the line's opacity (`opacity`). A merge that changes `TextDevice`, `extract_parallel`,
   `TextCache`, these 4 tools or where `TextLine` pushes runs must keep them; the tests in those 2
   files fail when it doesn't.
+  Both engines also report zero-width, bidirectional-control and private-use characters as
+  readable `U+XXXX` tokens. Character warnings are independent of paint warnings and preserve
+  mixed reasons within one replacement string. Tokens stay whole within the 200-character cap;
+  these flags identify text for review and do not establish that it is malicious.
 - `publish = false` in every crate and app: `pdfcraft`, `pdfcraft-cos`, `craft-ui` and other names
   this workspace uses belong to unrelated crates on crates.io. Give any crate upstream adds the
   same line.

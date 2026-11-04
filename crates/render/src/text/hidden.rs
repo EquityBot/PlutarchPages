@@ -25,6 +25,15 @@ pub enum HiddenReason {
     /// Wholly outside the page's crop box, so never shown. Only the editor's text has it: the
     /// renderer leaves such glyphs out of the text it returns.
     OutsideCropBox,
+    /// A character with no width or ink of its own (U+200B to U+200D, U+2060 to U+2064, U+FEFF,
+    /// U+180E) or a tag character (U+E0000 to U+E007F), which can spell out text no one sees.
+    ZeroWidth,
+    /// A character that reorders the text around it as shown (U+061C, U+200E, U+200F, U+202A to
+    /// U+202E and U+2066 to U+2069), so what reads differs from what shows.
+    BidiControl,
+    /// A private-use character (U+E000 to U+F8FF, planes 15 and 16): its meaning is the font's.
+    /// Icon and symbol fonts use them for visible glyphs too.
+    PrivateUse,
 }
 
 impl HiddenReason {
@@ -36,6 +45,9 @@ impl HiddenReason {
             HiddenReason::Transparent => "transparent",
             HiddenReason::Tiny => "tiny",
             HiddenReason::OutsideCropBox => "outside_crop_box",
+            HiddenReason::ZeroWidth => "zero_width",
+            HiddenReason::BidiControl => "bidi_control",
+            HiddenReason::PrivateUse => "private_use",
         }
     }
 }
@@ -50,6 +62,17 @@ pub fn paints_nothing(opacity: f64) -> bool {
 /// under 1 point. A NaN size is not.
 pub fn is_tiny(size: f64) -> bool {
     size < 1.0
+}
+
+/// Why `c` hides text or what it does from a reader, if it does: [`HiddenReason::ZeroWidth`],
+/// [`HiddenReason::BidiControl`] or [`HiddenReason::PrivateUse`].
+pub fn character_reason(c: char) -> Option<HiddenReason> {
+    match c {
+        '\u{200B}'..='\u{200D}' | '\u{2060}'..='\u{2064}' | '\u{FEFF}' | '\u{180E}' | '\u{E0000}'..='\u{E007F}' => Some(HiddenReason::ZeroWidth),
+        '\u{061C}' | '\u{200E}' | '\u{200F}' | '\u{202A}'..='\u{202E}' | '\u{2066}'..='\u{2069}' => Some(HiddenReason::BidiControl),
+        '\u{E000}'..='\u{F8FF}' | '\u{F0000}'..='\u{FFFFD}' | '\u{100000}'..='\u{10FFFD}' => Some(HiddenReason::PrivateUse),
+        _ => None,
+    }
 }
 
 /// The class of a glyph drawn several times (a fill and a stroke, or the glyphs one
@@ -158,9 +181,15 @@ pub(super) fn cover_redrawn(glyphs: &mut [Drawn]) {
                 budget = rest;
                 let Some(other) = glyphs.get(j) else { continue };
                 let o = &other.2.rect;
-                if other.2.text == g.2.text && (o[0] - rect[0]).abs() < tol && (o[1] - rect[1]).abs() < tol {
-                    shown.push(i);
-                    continue 'glyphs;
+                if (o[0] - rect[0]).abs() < tol && (o[1] - rect[1]).abs() < tol {
+                    // ActualText can replace a glyph with a long string. Count its bytes,
+                    // not just the candidate, before comparing a possibly shared prefix.
+                    let Some(rest) = budget.checked_sub(g.2.text.len()) else { break 'glyphs };
+                    budget = rest;
+                    if other.2.text == g.2.text {
+                        shown.push(i);
+                        continue 'glyphs;
+                    }
                 }
             }
             let Some(rest) = budget.checked_sub(1) else { break 'glyphs };
@@ -269,6 +298,26 @@ mod tests {
     }
 
     #[test]
+    fn redraw_comparisons_charge_long_replacement_text_to_the_budget() {
+        let prefix = "a".repeat(32 * 1024);
+        let unmatched = format!("{prefix}a");
+        let matching = format!("{prefix}b");
+        let glyph = |text: &str, reason| {
+            let rect = [100.0, 100.0, 110.0, 110.0];
+            let quad = [[100.0, 110.0], [110.0, 110.0], [110.0, 100.0], [100.0, 100.0]];
+            (0, [1.0, 0.0], crate::text::TextGlyph { text: text.into(), rect, quad, direction: [1.0, 0.0] }, reason)
+        };
+        // All candidates share a long prefix at the same spot. The genuine match comes
+        // after more text than the work budget permits comparing, so it stays conservative.
+        let count = super::MAX_REDRAW_WORK / matching.len() + 1;
+        let mut glyphs: Vec<_> = (0..count).map(|_| glyph(&unmatched, None)).collect();
+        glyphs.push(glyph(&matching, None));
+        glyphs.push(glyph(&matching, Some(Invisible)));
+        super::cover_redrawn(&mut glyphs);
+        assert_eq!(glyphs.last().unwrap().3, Some(Invisible), "the comparison budget must include replacement bytes");
+    }
+
+    #[test]
     fn classes_stay_with_their_glyphs_through_redraws_and_actual_text() {
         let content = [
             line(350, 0, "Dup"),
@@ -326,6 +375,39 @@ mod tests {
         expected.sort_unstable();
         assert_eq!(tiny, expected, "{glyphs:?}");
         assert!(glyphs.iter().filter(|(t, _)| t == "i").all(|(_, r)| r.is_none()), "{glyphs:?}");
+    }
+
+    #[test]
+    fn characters_that_hide_or_reorder_text_are_classed() {
+        use super::{HiddenReason::*, character_reason};
+        for (c, reason) in [
+            ('\u{200B}', Some(ZeroWidth)),
+            ('\u{200D}', Some(ZeroWidth)),
+            ('\u{2064}', Some(ZeroWidth)),
+            ('\u{FEFF}', Some(ZeroWidth)),
+            ('\u{180E}', Some(ZeroWidth)),
+            ('\u{E0000}', Some(ZeroWidth)),
+            ('\u{E0049}', Some(ZeroWidth)),
+            ('\u{E007F}', Some(ZeroWidth)),
+            ('\u{061C}', Some(BidiControl)),
+            ('\u{200E}', Some(BidiControl)),
+            ('\u{202E}', Some(BidiControl)),
+            ('\u{2066}', Some(BidiControl)),
+            ('\u{2069}', Some(BidiControl)),
+            ('\u{E000}', Some(PrivateUse)),
+            ('\u{F8FF}', Some(PrivateUse)),
+            ('\u{F0000}', Some(PrivateUse)),
+            ('\u{10FFFD}', Some(PrivateUse)),
+            ('a', None),
+            ('é', None),
+            ('\u{00AD}', None),
+            ('\u{2065}', None),
+            ('\u{E0080}', None),
+            ('\u{F900}', None),
+            ('\u{202F}', None),
+        ] {
+            assert_eq!(character_reason(c), reason, "U+{:04X}", u32::from(c));
+        }
     }
 
     #[test]
