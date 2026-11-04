@@ -1,3 +1,6 @@
+// Copyright 2026 Ryan Duguid
+// SPDX-License-Identifier: MIT OR Apache-2.0
+
 //! Read Out Loud through the system's speech command. The text goes to the program's standard
 //! input, never into its command line, and is spoken as plain text (no markup):
 //!

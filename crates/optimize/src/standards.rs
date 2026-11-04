@@ -1,3 +1,6 @@
+// Copyright 2026 Ryan Duguid
+// SPDX-License-Identifier: MIT OR Apache-2.0
+
 //! Remove PDF/A and PDF/X identification: the `pdfaid:` and PDF/X version properties in the XMP
 //! metadata (ISO 19005, ISO 15930) and the PDF/X keys in the document information dictionary.
 //! The document content is unchanged; it simply stops claiming the standard.

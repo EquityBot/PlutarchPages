@@ -1,3 +1,6 @@
+// Copyright 2026 Ryan Duguid
+// SPDX-License-Identifier: MIT OR Apache-2.0
+
 //! A document's snapshot for printing, owned so a print can be built off the UI thread: pages
 //! going as pictures can take minutes to render.
 

@@ -1,3 +1,6 @@
+// Copyright 2026 Ryan Duguid
+// SPDX-License-Identifier: MIT OR Apache-2.0
+
 //! Email messages (`.eml`, RFC 5322 with MIME) to PDF: the subject, sender, recipients and date,
 //! then the text of the message. An HTML-only message is converted to plain text here; nothing it
 //! refers to (remote images, style sheets, tracking pixels) is ever fetched. Attachments are

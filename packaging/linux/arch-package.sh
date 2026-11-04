@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Copyright 2026 Ryan Duguid
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
 # Repackage a PlutarchPages Linux tarball as an Arch Linux package:
 #
 #   $DIST/pdfcraft-<version>-linux-<arch>.pkg.tar.zst

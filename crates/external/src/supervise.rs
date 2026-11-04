@@ -1,3 +1,6 @@
+// Copyright 2026 Ryan Duguid
+// SPDX-License-Identifier: MIT OR Apache-2.0
+
 //! Running an external program under supervision: its own process group, no inherited output, a
 //! deadline and a cancel flag. When the run ends, its process group (Unix) or process tree
 //! (Windows, while the program runs) is ended too. This is best effort, not operating-system

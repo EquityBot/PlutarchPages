@@ -1,3 +1,6 @@
+// Copyright 2026 Ryan Duguid
+// SPDX-License-Identifier: MIT OR Apache-2.0
+
 //! Markdown (CommonMark with tables, strikethrough and task lists) to PDF. Headings, emphasis,
 //! inline code, code blocks, block quotes, nested lists, rules, tables and links (as link
 //! annotations) are laid out; images are never fetched: their alternative text is shown instead.

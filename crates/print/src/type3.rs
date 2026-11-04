@@ -1,3 +1,6 @@
+// Copyright 2026 Ryan Duguid
+// SPDX-License-Identifier: MIT OR Apache-2.0
+
 //! Which pages draw with Type 3 fonts, so they can be printed as pictures (#2684).
 //!
 //! On Windows a job is drawn by `Windows.Data.Pdf` into Direct2D's print control (craft-print),

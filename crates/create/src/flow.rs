@@ -1,3 +1,6 @@
+// Copyright 2026 Ryan Duguid
+// SPDX-License-Identifier: MIT OR Apache-2.0
+
 //! Flow layout for documents created from structured text (Markdown, CSV tables, email
 //! messages): blocks of styled text in the standard 14 fonts (WinAnsiEncoding, so characters
 //! outside it print as `?`, as in [`crate::from_text`]), wrapped and paginated, with simple

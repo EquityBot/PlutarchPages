@@ -1,3 +1,6 @@
+// Copyright 2026 Ryan Duguid
+// SPDX-License-Identifier: MIT OR Apache-2.0
+
 //! CSV and tab-separated files to a PDF table (RFC 4180 quoting; the delimiter is a tab for
 //! `.tsv`, otherwise sniffed from the first line among `,` `;` tab and `|`).
 

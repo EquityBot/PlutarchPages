@@ -1,3 +1,6 @@
+// Copyright 2026 Ryan Duguid
+// SPDX-License-Identifier: MIT OR Apache-2.0
+
 //! PlutarchPages' external converters and Read Out Loud in the desktop app: Office and HTML files
 //! and web pages convert on their own thread (the window stays responsive and Stop works), the
 //! Create ▸ From web page dialog, and reading the current page or the rest of the document aloud.

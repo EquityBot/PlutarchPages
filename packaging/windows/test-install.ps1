@@ -1,3 +1,6 @@
+# Copyright 2026 Ryan Duguid
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
 <#
 .SYNOPSIS
   Install an MSI for the current account, run it, uninstall it and check nothing is left. With

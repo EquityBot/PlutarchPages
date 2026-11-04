@@ -1,3 +1,6 @@
+// Copyright 2026 Ryan Duguid
+// SPDX-License-Identifier: MIT OR Apache-2.0
+
 //! Discard Objects ▸ form submit, import and reset actions, and external cross-references (links
 //! that open another file or launch a program): ISO 32000-2 §12.6.4.
 
