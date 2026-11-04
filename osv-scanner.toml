@@ -4,7 +4,8 @@
 
 [[IgnoredVulns]]
 id = "RUSTSEC-2023-0071"
-reason = "rsa is used for verification only (ADR-0009)"
+ignoreUntil = 2027-05-01
+reason = "rsa is used for verification only (ADR-0009); recheck by 1 May 2027, the expiry the Snyk policy carried"
 
 [[IgnoredVulns]]
 id = "RUSTSEC-2024-0370"
