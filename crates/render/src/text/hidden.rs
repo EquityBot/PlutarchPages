@@ -19,6 +19,9 @@ pub enum HiddenReason {
     /// Every fill and stroke of it has an effective opacity (its colour's, times that of every
     /// enclosing transparency group) that rounds to 0 in an 8-bit raster.
     Transparent,
+    /// Under 1 point: the em square of its font, as drawn, is less than 1 point high across the
+    /// baseline. Its box is not the measure: a turned glyph's box is as high as it is wide.
+    Tiny,
 }
 
 impl HiddenReason {
@@ -28,6 +31,7 @@ impl HiddenReason {
             HiddenReason::Invisible => "invisible",
             HiddenReason::InvisibleOcrLayer => "invisible_ocr_layer",
             HiddenReason::Transparent => "transparent",
+            HiddenReason::Tiny => "tiny",
         }
     }
 }
@@ -36,6 +40,12 @@ impl HiddenReason {
 /// A NaN opacity paints, as an unreadable one is not evidence of hiding.
 pub fn paints_nothing(opacity: f64) -> bool {
     opacity < 0.5 / 255.0
+}
+
+/// Whether text whose em square is `size` points high across the baseline is too small to read:
+/// under 1 point. A NaN size is not.
+pub fn is_tiny(size: f64) -> bool {
+    size < 1.0
 }
 
 /// The class of a glyph drawn several times (a fill and a stroke, or the glyphs one
@@ -83,9 +93,11 @@ impl Visibility {
         self.groups.pop();
     }
 
-    /// Why one drawing of a glyph in `mode` with `paint` paints nothing, if it does not paint.
-    /// Clipping text (`7 Tr`) is not classed: what it shows is what is painted through it.
-    pub(super) fn class(&self, paint: &Paint<'_>, mode: &GlyphDrawMode) -> Option<HiddenReason> {
+    /// Why one drawing of a glyph in `mode` with `paint` shows nothing a reader can see, if it
+    /// does not: `em` is the height of its em square in points, `None` when unknown (a Type 3
+    /// glyph, whose glyph space its font sets). Clipping text (`7 Tr`) is not classed: what it
+    /// shows is what is painted through it.
+    pub(super) fn class(&self, paint: &Paint<'_>, mode: &GlyphDrawMode, em: Option<f64>) -> Option<HiddenReason> {
         if !self.on {
             return None;
         }
@@ -94,13 +106,16 @@ impl Visibility {
             GlyphDrawMode::Invisible => Some(HiddenReason::Invisible),
             GlyphDrawMode::Clip => None,
             GlyphDrawMode::Fill | GlyphDrawMode::Stroke(_) => {
-                // shortcut: a pattern's opacity has no getter in hayro, so pattern paint counts as
-                // painting; reading it needs an accessor patched into the vendored `Pattern`.
-                let Paint::Color(colour) = paint else { return None };
-                // The renderer's own alpha: 0 for a Separation /None, opaque for a colour it
-                // cannot convert (drawn in a fallback colour).
-                let alpha = self.groups.iter().fold(colour.to_rgba().components()[3], |alpha, group| alpha * group);
-                paints_nothing(f64::from(alpha)).then_some(HiddenReason::Transparent)
+                let alpha = match paint {
+                    // The renderer's own alpha: 0 for a Separation /None, opaque for a colour it
+                    // cannot convert (drawn in a fallback colour).
+                    Paint::Color(colour) => colour.to_rgba().components()[3],
+                    // shortcut: a pattern's own opacity has no getter in hayro, so it counts as
+                    // opaque; reading it needs an accessor patched into the vendored `Pattern`.
+                    Paint::Pattern(_) => 1.0,
+                };
+                let alpha = self.groups.iter().fold(alpha, |alpha, group| alpha * group);
+                if paints_nothing(f64::from(alpha)) { Some(HiddenReason::Transparent) } else { em.is_some_and(is_tiny).then_some(HiddenReason::Tiny) }
             }
         }
     }
@@ -157,7 +172,7 @@ pub(super) fn cover_redrawn(glyphs: &mut [Drawn]) {
 
 #[cfg(test)]
 mod tests {
-    use super::HiddenReason::{self, Invisible, InvisibleOcrLayer, Transparent};
+    use super::HiddenReason::{self, Invisible, InvisibleOcrLayer, Tiny, Transparent};
     use crate::text::{InterpreterSettings, Pdf, extract_page, extract_page_hidden};
 
     /// A 400 × 400 page drawing `content`, with Helvetica as /F1, /GS0 (fill opacity 0), /GS3
@@ -285,6 +300,28 @@ mod tests {
     fn invisible_text_over_a_picture_is_not_exempt() {
         let glyphs = classified(&format!("q 400 0 0 400 0 0 cm /Im0 Do Q {}", line(200, 3, "Over")));
         assert_eq!(flagged(&glyphs, Invisible), "Over");
+    }
+
+    #[test]
+    fn text_under_1_point_is_tiny_whatever_its_box() {
+        let content = [
+            line(350, 0, "Readable"),
+            "BT /F1 0.8 Tf 1 0 0 1 50 300 Tm (Small) Tj ET\n".to_owned(),
+            // 20 pt, drawn at 0.8 pt by the text matrix.
+            "BT /F1 20 Tf 0.04 0 0 0.04 50 250 Tm (Shrunk) Tj ET\n".to_owned(),
+            // Turned a quarter: each narrow 3 pt glyph's box is under 1 pt high, but the text is 3 pt.
+            "BT /F1 3 Tf 0 1 -1 0 300 50 Tm (iiii) Tj ET\n".to_owned(),
+            // Turned a quarter and widened 5 times: 0.8 pt text whose glyph boxes are over 3 pt high.
+            "BT /F1 0.8 Tf 500 Tz 0 1 -1 0 350 50 Tm (WWW) Tj ET\n".to_owned(),
+        ]
+        .concat();
+        let glyphs = classified(&content);
+        let mut tiny: Vec<char> = flagged(&glyphs, Tiny).chars().collect();
+        tiny.sort_unstable();
+        let mut expected: Vec<char> = "SmallShrunkWWW".chars().collect();
+        expected.sort_unstable();
+        assert_eq!(tiny, expected, "{glyphs:?}");
+        assert!(glyphs.iter().filter(|(t, _)| t == "i").all(|(_, r)| r.is_none()), "{glyphs:?}");
     }
 
     #[test]

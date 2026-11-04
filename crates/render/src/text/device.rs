@@ -344,6 +344,8 @@ impl<'a> Device<'a> for TextDevice {
         }
         let length = dx.hypot(dy);
         let direction = if length.is_finite() && length > 0.0 { [dx / length, dy / length] } else { [1.0, 0.0] };
+        // The em square's height across the baseline: glyph space's y axis, 1000 units to the em.
+        let em_height = matches!(glyph, Glyph::Outline(_)).then(|| 1000.0 * coefficients[2].hypot(coefficients[3]));
         // A glyph whose Unicode is several characters (a ligature such as "ffi") stays one glyph
         // with its own box: the PDF gives no position for the characters inside it.
         let glyph = TextGlyph {
@@ -352,7 +354,7 @@ impl<'a> Device<'a> for TextDevice {
             quad: corners.map(|p| [p.x as f32, p.y as f32]),
             direction: direction.map(|d| d as f32),
         };
-        let hidden = self.visibility.class(paint, mode);
+        let hidden = self.visibility.class(paint, mode, em_height);
         match &mut self.actual {
             Some((_, _, drawn)) => drawn.push((dir, direction, glyph, hidden)),
             None => self.glyphs.push((dir, direction, glyph, hidden)),

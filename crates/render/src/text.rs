@@ -396,7 +396,7 @@ use device::WORD_GAP;
 #[cfg(test)]
 use device::{MAX_REDRAW_TEXT, REDRAW_TEXT_BYTES, Replaced, TextDevice};
 pub(crate) use device::{extract_page, extract_page_filtered, extract_page_hidden};
-pub use hidden::{HiddenReason, paints_nothing};
+pub use hidden::{HiddenReason, is_tiny, paints_nothing};
 pub use layout::layout;
 #[cfg(test)]
 use layout::{from_upright, to_upright};

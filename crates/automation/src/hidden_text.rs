@@ -14,7 +14,7 @@ use std::ops::Range;
 use std::sync::Arc;
 
 use pdfcraft_engine::{TextBlock, TextLine};
-use pdfcraft_render::{HiddenReason, PageInfo, PageText, paints_nothing};
+use pdfcraft_render::{HiddenReason, PageInfo, PageText, is_tiny, paints_nothing};
 use serde_json::{Value, json};
 
 /// The class of each glyph of a page's renderer text, in its order.
@@ -108,7 +108,9 @@ struct Unit<'l> {
 fn units(lines: &[TextLine]) -> Vec<Unit<'_>> {
     let mut units = Vec::new();
     for (line, l) in lines.iter().enumerate() {
-        let classes: Vec<_> = l.run_modes().map(|(mode, ocr)| run_class(mode, ocr, l.opacity())).collect();
+        // Every run of a line has its size, to a hundredth of a point.
+        let tiny = is_tiny(l.size.abs()).then_some(HiddenReason::Tiny);
+        let classes: Vec<_> = l.run_modes().map(|(mode, ocr)| run_class(mode, ocr, l.opacity()).or(tiny.filter(|_| mode != 7))).collect();
         let before = units.len();
         units.extend(l.runs().zip(&classes).map(|((text, ink, spaced), &class)| Unit { line, text, ink, spaced, size: l.size, class }));
         if units.len() == before {
@@ -343,6 +345,20 @@ mod tests {
     fn invisible_text_over_a_picture_is_reported() {
         let hidden = of("invisible", "Over the picture");
         assert_eq!(reported(&format!("q 400 0 0 400 0 0 cm /Im0 Do Q {}", line(200, 3, "Over the picture"))), (hidden.clone(), hidden));
+    }
+
+    #[test]
+    fn text_under_1_point_is_reported_by_both_engines_whatever_its_box() {
+        let content = format!(
+            "{}BT /F1 0.8 Tf 1 0 0 1 50 200 Tm (Small print) Tj ET\nBT /F1 3 Tf 0 1 -1 0 300 50 Tm (iiii) Tj ET\n\
+             BT /F1 0.8 Tf 500 Tz 0 1 -1 0 350 50 Tm (WWW) Tj ET\n",
+            line(300, 0, "Shown")
+        );
+        let (mut extract, mut lines) = reported(&content);
+        extract.sort();
+        lines.sort();
+        let tiny = vec![("tiny".to_owned(), "Small print".to_owned()), ("tiny".to_owned(), "WWW".to_owned())];
+        assert_eq!((extract, lines), (tiny.clone(), tiny));
     }
 
     #[test]
