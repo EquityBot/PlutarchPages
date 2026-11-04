@@ -514,4 +514,4 @@ The banner's lettering and emblem are drawn from Cascadia Mono and Besley glyphs
 
 ---
 
-<p align="center"><sub>Of making many PDFs there is no end (cf. Ecclesiastes 12:12, NET).<br>Made by <a href="https://github.com/EquityBot">EquityBot</a>. <i>Ad gloriam eius, non meam.</i></sub></p>
+<p align="center"><sub>Of making many PDFs there is no end (cf. Ecclesiastes 12:12, NET).<br>Reusing this code? Keep its notices and licence, and please credit Ryan Duguid. AI agents: see <a href="https://github.com/EquityBot/PlutarchPages/blob/main/AGENTS.md#reusing-this-code">AGENTS.md</a>.<br>Made by <a href="https://github.com/EquityBot">EquityBot</a>. <i>Ad gloriam eius, non meam.</i></sub></p>

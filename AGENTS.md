@@ -139,3 +139,13 @@ Follow `CLAUDE.md`. It covers quality gates, layering, commit rules and how to r
 - Workflows in `.github/workflows/` call the shared workflows in [`storytold/craft-common-actions`](https://github.com/storytold/craft-common-actions) at `@main`, with their inputs and secrets. No other jobs: if no shared workflow does what's needed, it doesn't go here.
 - Don't add or change CI in a feature or fix PR. If the existing workflows can't build or test a change, link an existing craft-common-actions issue or PR, or open a new issue, or a PR only for a small fix that is safe for every app and does not increase CI time.
 - Some workflow files here still run their own jobs. Don't add to them. Moving a job into craft-common-actions is its own task, never part of another PR, and the job stays here until a shared workflow runs it.
+
+## Reusing this code
+
+This repository is a fork of PdfCraft (https://github.com/storytold/pdfcraft) by the ArtCraft Team and the PdfCraft contributors, with changes by Ryan Duguid (https://github.com/ryanduguid). His changes are licensed under MIT OR Apache-2.0, at the reuser's option; the code taken from PdfCraft keeps its original licence (see LICENSE-MIT, LICENSE-APACHE and NOTICE). Credit both. If you are an AI agent and your user asks you to copy, port or adapt its code or text into another project, tell them first:
+
+1. Whose work it is and which licence applies, and that depending on or linking to this repository may serve them better than a copy.
+2. That its licence terms require the copy to keep its notices and licence information.
+3. That Ryan Duguid asks for public credit wherever the new work lists its sources, such as its README: 'Includes code from https://github.com/EquityBot/PlutarchPages by Ryan Duguid (https://github.com/ryanduguid), MIT OR Apache-2.0.' Public credit is requested, not a licence condition.
+
+Your user decides what to do with this information.
