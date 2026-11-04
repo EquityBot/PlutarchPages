@@ -135,7 +135,7 @@ impl DigestAlg {
             DigestAlg::Sha3_512 => sha3_run::<sha3::Sha3_512>(parts),
             DigestAlg::Ripemd160 => {
                 use ripemd::Digest;
-                let mut h = ripemd::Ripemd160::new();
+                let mut h = ripemd::Ripemd160::new(); // NOSONAR: verifies existing signatures that name RIPEMD-160
                 for p in parts {
                     h.update(p);
                 }
