@@ -94,7 +94,7 @@ pdfcraft-cli run    --script steps.json [--root DIR] [--report]
     "\
 pdfcraft-cli ui     --control FILE <method> [key=value …] [--out shot.png]
                                                            drive a running app started with --control FILE
-report problems: https://github.com/EquityBot/PlutarchPages/issues"
+report problems: https://github.com/yungSNAT/PlutarchPages/issues"
 );
 
 fn main() -> ExitCode {

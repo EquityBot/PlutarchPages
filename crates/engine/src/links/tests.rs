@@ -112,7 +112,7 @@ fn remote_document_paths_to_other_computers_and_devices_are_refused() {
 
 #[test]
 fn urls_point_at_this_fork_and_upstream() {
-    assert_eq!(super::GITHUB, format!("https://github.com/EquityBot/{}", super::APP_NAME));
+    assert_eq!(super::GITHUB, format!("https://github.com/yungSNAT/{}", super::APP_NAME));
     assert_eq!(super::ISSUES, format!("{}/issues", super::GITHUB));
     assert_eq!(super::UPSTREAM, "https://github.com/storytold/pdfcraft");
     for l in super::LINKS {

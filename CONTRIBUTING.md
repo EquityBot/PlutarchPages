@@ -1,6 +1,6 @@
 # Contributing
 
-Report bugs and ask for features in [GitHub issues](https://github.com/EquityBot/PlutarchPages/issues).
+Report bugs and ask for features in [GitHub issues](https://github.com/yungSNAT/PlutarchPages/issues).
 Report a potential security vulnerability privately, as [SECURITY.md](SECURITY.md) describes.
 
 ## Pull requests

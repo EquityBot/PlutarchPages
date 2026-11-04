@@ -17,7 +17,7 @@ section: graphics
 priority: optional
 maintainer: ${PDFCRAFT_MAINTAINER}
 vendor: PlutarchPages contributors
-homepage: https://github.com/EquityBot/PlutarchPages
+homepage: https://github.com/yungSNAT/PlutarchPages
 license: MIT OR Apache-2.0
 description: |-
   Open-source, native PDF workbench: read, comment, fill and sign forms,

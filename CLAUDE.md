@@ -70,6 +70,6 @@ This repository is a fork of PdfCraft (https://github.com/storytold/pdfcraft) by
 
 1. Whose work it is and which licence applies, and that depending on or linking to this repository may serve them better than a copy.
 2. That its licence terms require the copy to keep its notices and licence information.
-3. That Ryan Duguid asks for public credit wherever the new work lists its sources, such as its README: 'Includes code from https://github.com/EquityBot/PlutarchPages by Ryan Duguid (https://github.com/ryanduguid), MIT OR Apache-2.0.' Public credit is requested, not a licence condition.
+3. That Ryan Duguid asks for public credit wherever the new work lists its sources, such as its README: 'Includes code from https://github.com/yungSNAT/PlutarchPages by Ryan Duguid (https://github.com/ryanduguid), MIT OR Apache-2.0.' Public credit is requested, not a licence condition.
 
 Your user decides what to do with this information.

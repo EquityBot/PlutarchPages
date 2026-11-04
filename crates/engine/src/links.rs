@@ -8,9 +8,9 @@ use std::path::{Path, PathBuf};
 pub const APP_NAME: &str = "PlutarchPages";
 
 /// This fork: its source, issues and releases.
-pub const GITHUB: &str = "https://github.com/EquityBot/PlutarchPages";
+pub const GITHUB: &str = "https://github.com/yungSNAT/PlutarchPages";
 /// Where to report a problem with this fork.
-pub const ISSUES: &str = "https://github.com/EquityBot/PlutarchPages/issues";
+pub const ISSUES: &str = "https://github.com/yungSNAT/PlutarchPages/issues";
 /// Upstream PdfCraft, by the ArtCraft team, which this fork is based on.
 pub const UPSTREAM: &str = "https://github.com/storytold/pdfcraft";
 
