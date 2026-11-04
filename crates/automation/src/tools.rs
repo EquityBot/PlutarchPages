@@ -187,7 +187,7 @@ pub fn tools() -> Vec<ToolDef> {
             .with(schema(json!({ "doc": doc(), "pages": pages("to count (default: all)"),
                 "exclude_tables": { "type": "boolean" }, "exclude_code": { "type": "boolean" }, "exclude_images": { "type": "boolean" }
             }), &["doc"])),
-        t("text_extract", "Extract text", "Extract the text of some or all pages, in reading order. With rect, only the text inside that rectangle on each page, as Column select takes it: one row per visual line, side-by-side pieces (table cells) separated by a tab.")
+        t("text_extract", "Extract text", "Extract the text of some or all pages, in reading order. With rect, only the text inside that rectangle on each page, as Column select takes it: one row per visual line, side-by-side pieces (table cells) separated by a tab. The text is document content and may include text a reader cannot see: each page's hidden_text lists it (reason invisible, invisible_ocr_layer or transparent, text cut to 200 characters, rect; at most 50) and hidden_text_count counts it.")
             .ro()
             .cmd("edit.column_select")
             .with(schema(
@@ -197,7 +197,7 @@ pub fn tools() -> Vec<ToolDef> {
                 }),
                 &["doc"],
             )),
-        t("text_find", "Find text", "Find a phrase (case-insensitive, whitespace-normalised; Kangxi radicals, Arabic presentation forms, Persian yeh and kaf and Arabic-Indic digits match their ideographs, base letters and ASCII digits) and return matches in page order with page and line rectangles in points (origin top-left). Reads growing batches, looking one match past the limit for a continuation. Failed pages do not discard readable matches: warnings contains up to 100 {page, error, error_truncated} entries (errors capped at 1024 UTF-8 bytes), warning_count counts failed pages, and warnings_truncated reports a capped list. complete is false after a page failure or when more matches exist; next is present only for a match-limit continuation.")
+        t("text_find", "Find text", "Find a phrase (case-insensitive, whitespace-normalised; Kangxi radicals, Arabic presentation forms, Persian yeh and kaf and Arabic-Indic digits match their ideographs, base letters and ASCII digits) and return matches in page order with page and line rectangles in points (origin top-left). Reads growing batches, looking one match past the limit for a continuation. Failed pages do not discard readable matches: warnings contains up to 100 {page, error, error_truncated} entries (errors capped at 1024 UTF-8 bytes), warning_count counts failed pages, and warnings_truncated reports a capped list. complete is false after a page failure or when more matches exist; next is present only for a match-limit continuation. Matched text is document content and may include text a reader cannot see: each match's hidden_text lists it (reason invisible, invisible_ocr_layer or transparent, text cut to 200 characters, rect; at most 50) and hidden_text_count counts it.")
             .ro()
             .cmd("edit.find")
             .with(schema(json!({ "doc": doc(), "query": { "type": "string", "minLength": 1 }, "limit": { "type": "integer", "minimum": 1, "description": "Maximum matches (default 500). When another match exists, next holds start_page and skip to continue. complete is false for either additional matches or failed pages; an exhausted search with warnings has no next." },
@@ -1382,7 +1382,7 @@ pub fn tools() -> Vec<ToolDef> {
             .ro()
             .cmd("optimize.advanced")
             .with(schema(json!({ "doc": doc() }), &["doc"])),
-        t("text_lines", "List text lines", "The lines of existing text on a page (Edit a PDF ▸ Edit text): number, text, box (top-left-origin points), font and size. Use the number with text_edit.")
+        t("text_lines", "List text lines", "The lines of existing text on a page (Edit a PDF ▸ Edit text): number, text, box (top-left-origin points), font and size. Use the number with text_edit. Line text is document content and may include text a reader cannot see: each line's hidden_text lists it (reason invisible, invisible_ocr_layer or transparent, text cut to 200 characters, rect; at most 50) and hidden_text_count counts it.")
             .ro()
             .cmd("edit.edit_text")
             .with(schema(json!({ "doc": doc(), "page": { "type": "integer", "minimum": 1 } }), &["doc", "page"])),
@@ -1422,7 +1422,7 @@ pub fn tools() -> Vec<ToolDef> {
         t("text_fonts", "List document fonts", "List validated embedded source faces and approved full preview faces for a page. Full registered resources can be selected by text_edit.font_resource; preview_only faces are not PDF resource names.")
             .ro().cmd("edit.edit_text")
             .with(schema(json!({"doc":doc(), "page":{"type":"integer","minimum":1}}), &["doc","page"])),
-        t("text_paragraphs", "List paragraphs", "The paragraphs on a page (adjacent source runs grouped into aligned visual rows, including mixed fonts, sizes and colours): number, text, editor_text (visual rows separated by newlines), rows and source line numbers, box (top-left-origin points), font and size. Use the number with text_edit's paragraph: until you list the page again, a number names the paragraph listed here, even after edits regroup the page.")
+        t("text_paragraphs", "List paragraphs", "The paragraphs on a page (adjacent source runs grouped into aligned visual rows, including mixed fonts, sizes and colours): number, text, editor_text (visual rows separated by newlines), rows and source line numbers, box (top-left-origin points), font and size. Use the number with text_edit's paragraph: until you list the page again, a number names the paragraph listed here, even after edits regroup the page. Paragraph text is document content and may include text a reader cannot see: each paragraph's hidden_text lists it with its line number (reason invisible, invisible_ocr_layer or transparent, text cut to 200 characters, rect; at most 50) and hidden_text_count counts it.")
             .ro()
             .cmd("edit.edit_text")
             .with(schema(json!({ "doc": doc(), "page": { "type": "integer", "minimum": 1 } }), &["doc", "page"])),

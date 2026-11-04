@@ -76,6 +76,17 @@ Upstream's tests for these were changed to assert the fork's behaviour. Keep the
   `crates/ui-egui/tests/perf.rs` at the edge on CI. A stand-in skips the automatic ids its drawn
   version takes (a card 2, a header row 1). If a merge changes how a card allocates, recount them:
   `far_comment_cards_and_headers_skip_layout_but_stay_reachable` fails when the count is wrong.
+- Hidden text in the text tools: `text_extract`, `text_find`, `text_lines` and `text_paragraphs`
+  add `hidden_text` (`{reason, text, text_truncated, rect}`, at most 50, text cut to 200
+  characters) and `hidden_text_count` to each page, match, line or paragraph, and each description
+  says its text is document content that may include text a reader cannot see
+  (`crates/automation/src/hidden_text.rs`). The renderer classes the glyphs it returns when asked
+  (`PageRenderer::text_with_hidden`, `crates/render/src/text/hidden.rs`): `extract_parallel` calls
+  it instead of `render` with `RequestKind::Text`, and `TextCache` keeps the classes beside the
+  text. The editor's `TextLine` keeps each run's rendering mode and `/OCR` marker (`run_modes`) and
+  gives the line's opacity (`opacity`). A merge that changes `TextDevice`, `extract_parallel`,
+  `TextCache`, these 4 tools or where `TextLine` pushes runs must keep them; the tests in those 2
+  files fail when it doesn't.
 - `publish = false` in every crate and app: `pdfcraft`, `pdfcraft-cos`, `craft-ui` and other names
   this workspace uses belong to unrelated crates on crates.io. Give any crate upstream adds the
   same line.
