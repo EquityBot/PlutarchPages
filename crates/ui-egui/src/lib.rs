@@ -15,8 +15,8 @@
 #[cfg(not(target_arch = "wasm32"))]
 pub const UPDATE_APP: craft_update::app::App = craft_update::app::App {
     name: "PlutarchPages",
-    repo: "EquityBot/PlutarchPages",
-    developer: "EquityBot",
+    repo: "yungSNAT/PlutarchPages",
+    developer: "yungSNAT",
     former_ids: &[],
     former_names: &[],
     icon_png: Some(include_bytes!("../../../assets/app-icon/hicolor/128x128/apps/ai.storyteller.pdfcraft.png")),

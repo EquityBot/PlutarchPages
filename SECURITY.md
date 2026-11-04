@@ -6,7 +6,7 @@ behind counts as a security problem.
 ## Reporting
 
 Report a vulnerability privately through
-[GitHub's private reporting](https://github.com/EquityBot/PlutarchPages/security/advisories/new).
+[GitHub's private reporting](https://github.com/yungSNAT/PlutarchPages/security/advisories/new).
 Please don't open a public issue for it. Include the version or commit, your platform and a
 synthetic file that reproduces the problem. Don't attach a document with personal data.
 

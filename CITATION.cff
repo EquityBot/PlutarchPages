@@ -3,10 +3,10 @@ message: "If you use this work, cite it with this metadata and the release tag o
 title: "PlutarchPages"
 type: software
 authors:
-  - name: "EquityBot"
+  - name: "yungSNAT"
 abstract: "A clean-room PDF application in pure Rust, aiming at Adobe Acrobat Pro parity. A fork of PdfCraft."
-repository-code: "https://github.com/EquityBot/PlutarchPages"
-license-url: "https://github.com/EquityBot/PlutarchPages/blob/main/README.md#license-and-credits"
+repository-code: "https://github.com/yungSNAT/PlutarchPages"
+license-url: "https://github.com/yungSNAT/PlutarchPages/blob/main/README.md#license-and-credits"
 keywords:
   - desktop-app
   - pdf

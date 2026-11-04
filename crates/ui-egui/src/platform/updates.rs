@@ -9,7 +9,7 @@ use crate::{PdfCraftApp, theme, widgets};
 
 /// Where every PlutarchPages release is listed. Upstream PdfCraft builds lack this fork's
 /// changes, so the check never offers them.
-pub const RELEASES_PAGE: &str = "https://github.com/EquityBot/PlutarchPages/releases";
+pub const RELEASES_PAGE: &str = "https://github.com/yungSNAT/PlutarchPages/releases";
 
 /// Stands in for the network in tests.
 #[cfg(not(target_arch = "wasm32"))]

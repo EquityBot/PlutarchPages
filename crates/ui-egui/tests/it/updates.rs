@@ -11,7 +11,7 @@ fn release(tag: &str) -> craft_update::Release {
     craft_update::Release {
         tag: tag.to_string(),
         version: craft_update::parse_version(tag),
-        html_url: format!("https://github.com/EquityBot/PlutarchPages/releases/tag/{tag}"),
+        html_url: format!("https://github.com/yungSNAT/PlutarchPages/releases/tag/{tag}"),
         ..Default::default()
     }
 }
@@ -149,20 +149,20 @@ fn answers_are_read_and_only_our_release_pages_are_offered() {
     use craft_update::release::safe_release_html_url;
     let repo = pdfcraft_ui_egui::UPDATE_APP.repo;
     assert_eq!(pdfcraft_ui_egui::UPDATE_APP.releases_url(), pdfcraft_ui_egui::updates::RELEASES_PAGE);
-    let ours = "https://github.com/EquityBot/PlutarchPages/releases/tag/v0.2.0";
+    let ours = "https://github.com/yungSNAT/PlutarchPages/releases/tag/v0.2.0";
     assert_eq!(safe_release_html_url(repo, ours).as_deref(), Some(ours));
     for elsewhere in [
         "https://example.com/pdfcraft.exe",
-        "https://github.com/EquityBot/PlutarchPages/releases.evil/x",
+        "https://github.com/yungSNAT/PlutarchPages/releases.evil/x",
         "https://github.com/storytold/pdfcraft/releases/tag/v0.15.0",
         // Browsers resolve dot segments, so these would land on upstream's page.
-        "https://github.com/EquityBot/PlutarchPages/releases/../../../storytold/pdfcraft/releases/tag/v0.15.0",
-        "https://github.com/EquityBot/PlutarchPages/releases/tag/%2e%2e/%2e%2e/%2e%2e/%2e%2e/storytold/pdfcraft",
-        "https://github.com/EquityBot/PlutarchPages/releases/./tag/v1",
+        "https://github.com/yungSNAT/PlutarchPages/releases/../../../storytold/pdfcraft/releases/tag/v0.15.0",
+        "https://github.com/yungSNAT/PlutarchPages/releases/tag/%2e%2e/%2e%2e/%2e%2e/%2e%2e/storytold/pdfcraft",
+        "https://github.com/yungSNAT/PlutarchPages/releases/./tag/v1",
         // A tab or a newline is removed by URL parsing: `.\t.` is `..`.
-        "https://github.com/EquityBot/PlutarchPages/releases/.\t./.\t./.\t./storytold/pdfcraft/releases/tag/v1",
-        "https://github.com/EquityBot/PlutarchPages/releases/.\n./.\n./.\n./storytold/pdfcraft/releases/tag/v1",
-        "https://github.com/EquityBot/PlutarchPages/releases/tag/v1 x",
+        "https://github.com/yungSNAT/PlutarchPages/releases/.\t./.\t./.\t./storytold/pdfcraft/releases/tag/v1",
+        "https://github.com/yungSNAT/PlutarchPages/releases/.\n./.\n./.\n./storytold/pdfcraft/releases/tag/v1",
+        "https://github.com/yungSNAT/PlutarchPages/releases/tag/v1 x",
         "javascript:alert(1)",
     ] {
         assert_eq!(safe_release_html_url(repo, elsewhere), None, "{elsewhere}");

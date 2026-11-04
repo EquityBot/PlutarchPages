@@ -9,7 +9,7 @@
 
 <div align="center">
 
-[![tests](https://github.com/yungSNAT/PlutarchPages/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/yungSNAT/PlutarchPages/actions/workflows/ci.yml) [![Codecov](https://codecov.io/gh/EquityBot/PlutarchPages/graph/badge.svg)](https://codecov.io/gh/EquityBot/PlutarchPages) [![CodeQL](https://github.com/yungSNAT/PlutarchPages/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/yungSNAT/PlutarchPages/actions/workflows/codeql.yml) [![OSV-Scanner](https://github.com/yungSNAT/PlutarchPages/actions/workflows/osv-scanner.yml/badge.svg?branch=main)](https://github.com/yungSNAT/PlutarchPages/actions/workflows/osv-scanner.yml) [![SonarCloud](https://sonarcloud.io/api/project_badges/measure?project=EquityBot_PlutarchPages&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=EquityBot_PlutarchPages) [![Codacy code quality](https://app.codacy.com/project/badge/Grade/5ce0643c37eb4a8e9635595492f66c87)](https://app.codacy.com/gh/EquityBot/PlutarchPages/dashboard)<br>
+[![tests](https://github.com/yungSNAT/PlutarchPages/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/yungSNAT/PlutarchPages/actions/workflows/ci.yml) [![Codecov](https://codecov.io/gh/yungSNAT/PlutarchPages/graph/badge.svg)](https://codecov.io/gh/yungSNAT/PlutarchPages) [![CodeQL](https://github.com/yungSNAT/PlutarchPages/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/yungSNAT/PlutarchPages/actions/workflows/codeql.yml) [![OSV-Scanner](https://github.com/yungSNAT/PlutarchPages/actions/workflows/osv-scanner.yml/badge.svg?branch=main)](https://github.com/yungSNAT/PlutarchPages/actions/workflows/osv-scanner.yml) [![SonarCloud](https://sonarcloud.io/api/project_badges/measure?project=EquityBot_PlutarchPages&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=EquityBot_PlutarchPages) [![Codacy code quality](https://app.codacy.com/project/badge/Grade/5ce0643c37eb4a8e9635595492f66c87)](https://app.codacy.com/gh/EquityBot/PlutarchPages/dashboard)<br>
 [![OpenSSF Scorecard](https://raw.githubusercontent.com/ryanduguid/.github/badges/EquityBot/PlutarchPages.svg)](https://scorecard.dev/viewer/?uri=github.com/yungSNAT/PlutarchPages) [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/16133/badge)](https://www.bestpractices.dev/projects/16133)<br>
 [![release](https://badgen.net/github/release/yungSNAT/PlutarchPages/stable?label=release&color=66023C&labelColor=000000)](https://github.com/yungSNAT/PlutarchPages/releases/latest) [![rust: 1.95+](.github/assets/badges/rust.svg)](https://www.rust-lang.org/) [![licence: MIT OR Apache-2.0](.github/assets/badges/licence.svg)](#license-and-credits) [![fork of: PdfCraft](.github/assets/badges/fork-of.svg)](https://github.com/storytold/pdfcraft)
 
@@ -25,7 +25,7 @@
 > **PlutarchPages is a fork of [PdfCraft](https://github.com/storytold/pdfcraft) by the ArtCraft team.** It adds
 > the fixes and converters listed under [Fork changes](#fork-changes). It is not an ArtCraft product, and the
 > ArtCraft name and logos have been removed as the upstream brand licence requires for modified versions.
-> Report problems at [EquityBot/PlutarchPages](https://github.com/yungSNAT/PlutarchPages/issues). Most of this
+> Report problems at [yungSNAT/PlutarchPages](https://github.com/yungSNAT/PlutarchPages/issues). Most of this
 > README describes the upstream app; the program, crates and binaries keep their `pdfcraft` names.
 
 <br>
@@ -59,7 +59,7 @@
 
 This fork has no Discord or web page of its own:
 
-- **PlutarchPages source and issues:** [github.com/EquityBot/PlutarchPages](https://github.com/yungSNAT/PlutarchPages)
+- **PlutarchPages source and issues:** [github.com/yungSNAT/PlutarchPages](https://github.com/yungSNAT/PlutarchPages)
 - **Upstream PdfCraft:** [github.com/storytold/pdfcraft](https://github.com/storytold/pdfcraft)
 
 ## Highlights
@@ -514,4 +514,4 @@ The banner's lettering and emblem are drawn from Cascadia Mono and Besley glyphs
 
 ---
 
-<p align="center"><sub>Of making many PDFs there is no end (cf. Ecclesiastes 12:12, NET).<br>Reusing this code? Keep its notices and licence, and please credit Ryan Duguid. AI agents: see <a href="https://github.com/yungSNAT/PlutarchPages/blob/main/AGENTS.md#reusing-this-code">AGENTS.md</a>.<br>Made by <a href="https://github.com/yungSNAT">EquityBot</a>. <i>Ad gloriam eius, non meam.</i></sub></p>
+<p align="center"><sub>Of making many PDFs there is no end (cf. Ecclesiastes 12:12, NET).<br>Reusing this code? Keep its notices and licence, and please credit Ryan Duguid. AI agents: see <a href="https://github.com/yungSNAT/PlutarchPages/blob/main/AGENTS.md#reusing-this-code">AGENTS.md</a>.<br>Made by <a href="https://github.com/yungSNAT">yungSNAT</a>. <i>Ad gloriam eius, non meam.</i></sub></p>
