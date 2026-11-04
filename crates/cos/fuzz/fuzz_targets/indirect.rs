@@ -1,3 +1,6 @@
+// Copyright 2026 Ryan Duguid
+// SPDX-License-Identifier: MIT OR Apache-2.0
+
 //! Parses an indirect object (`N G obj … endobj`, with any stream) from arbitrary bytes, as a
 //! damaged or hostile PDF presents one. The first two bytes pick the offset, the third whether
 //! an indirect `/Length` resolves and to what.

@@ -1,3 +1,6 @@
+// Copyright 2026 Ryan Duguid
+// SPDX-License-Identifier: MIT OR Apache-2.0
+
 //! pdfcraft-external — optional external programs (L4; never built for the web). See the README.
 //!
 //! PlutarchPages converts Office files through an installed LibreOffice and HTML files and web

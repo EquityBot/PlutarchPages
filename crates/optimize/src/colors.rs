@@ -1,3 +1,6 @@
+// Copyright 2026 Ryan Duguid
+// SPDX-License-Identifier: MIT OR Apache-2.0
+
 //! Convert Colors to grayscale (PDF-XChange's Color Converter; Acrobat Print Production ▸ Convert
 //! Colors). Fill and stroke colours set in DeviceRGB, DeviceCMYK, CalRGB, CalGray or ICC-based
 //! spaces become DeviceGray by luminance (RGB: 0.30 R, 0.59 G and 0.11 B summed; CMYK: one minus

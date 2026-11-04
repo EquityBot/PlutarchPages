@@ -1,3 +1,6 @@
+// Copyright 2026 Ryan Duguid
+// SPDX-License-Identifier: MIT OR Apache-2.0
+
 //! External converters and Read Out Loud (PlutarchPages): Office files through an installed
 //! LibreOffice, HTML files and web pages through an installed Chrome, Edge or Chromium, and page
 //! text for the system's speech command. See `pdfcraft-external`.

@@ -1,3 +1,6 @@
+// Copyright 2026 Ryan Duguid
+// SPDX-License-Identifier: MIT OR Apache-2.0
+
 //! Export to Excel (.xlsx; ECMA-376 SpreadsheetML): one worksheet per page. Detected tables keep
 //! their rows and columns (a spanning header cell is merged); other paragraphs take one row each
 //! in column A, in reading order, with a blank row around each table. Cells that read as plain

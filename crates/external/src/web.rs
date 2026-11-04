@@ -1,3 +1,6 @@
+// Copyright 2026 Ryan Duguid
+// SPDX-License-Identifier: MIT OR Apache-2.0
+
 //! Web addresses the browser may be sent to for Create ▸ From web page.
 
 use std::net::{Ipv4Addr, Ipv6Addr};

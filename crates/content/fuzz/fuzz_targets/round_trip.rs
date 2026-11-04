@@ -1,3 +1,6 @@
+// Copyright 2026 Ryan Duguid
+// SPDX-License-Identifier: MIT OR Apache-2.0
+
 //! Parses an arbitrary content stream, writes its operators back and parses them again. Parsing
 //! must not panic, and once written the operators must survive every further round trip
 //! unchanged (the first round may normalise numbers and spacing). Streams with an inline image
