@@ -57,6 +57,9 @@ Upstream's tests for these were changed to assert the fork's behaviour. Keep the
   share registry state with an upstream install. `pdfcraft.exe` stays, so `App Paths\pdfcraft.exe` and
   `Applications\pdfcraft.exe` are still shared: installing it alongside upstream isn't supported.
 - CodeQL: `.github/codeql/codeql-config.yml` excludes tests and `vendor/`.
+- SonarCloud: `.sonarcloud.properties` excludes `vendor/` for the automatic analysis, and 7 hash lines
+  carry `NOSONAR` for rust:S4790: 6 MD5 lines in `crates/crypt/src/lib.rs` and the RIPEMD-160 line in
+  `crates/sign/src/keys.rs`. A merge that changes those lines drops the marker, so add it back.
 - Windows printing with Type 3 fonts (upstream #2684, from upstream PR #3021 as it stood at
   `ed6252a6`): those pages go as pictures. Unlike the PR, a printer's job is built on its worker
   (`Session::print_source`) and the dialog's check runs in the background, because rendering on the

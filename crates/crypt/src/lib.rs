@@ -319,7 +319,7 @@ impl SecurityHandler {
         if method == Method::Aes256 {
             return self.key.clone();
         }
-        let mut h = Md5::new();
+        let mut h = Md5::new(); // NOSONAR: ISO 32000 mandates MD5 for this security handler
         h.update(&self.key);
         h.update(&num.to_le_bytes()[..3]);
         h.update(generation.to_le_bytes());
@@ -455,7 +455,7 @@ fn key_len(d: &EncryptDict) -> usize {
 /// Algorithm 2: file key from a (user) password.
 fn file_key_r4(d: &EncryptDict, id0: &[u8], pw: &[u8]) -> Vec<u8> {
     let n = key_len(d);
-    let mut h = Md5::new();
+    let mut h = Md5::new(); // NOSONAR: ISO 32000 mandates MD5 for this security handler
     h.update(pad(pw));
     h.update(&d.o[..d.o.len().min(32)]);
     h.update(d.p.to_le_bytes());
@@ -466,7 +466,7 @@ fn file_key_r4(d: &EncryptDict, id0: &[u8], pw: &[u8]) -> Vec<u8> {
     let mut digest = h.finalize().to_vec();
     if d.r >= 3 {
         for _ in 0..50 {
-            digest = Md5::digest(&digest[..n]).to_vec();
+            digest = Md5::digest(&digest[..n]).to_vec(); // NOSONAR: ISO 32000 mandates MD5 for this security handler
         }
     }
     digest.truncate(n);
@@ -478,7 +478,7 @@ fn u_value_r4(d: &EncryptDict, id0: &[u8], key: &[u8]) -> Vec<u8> {
     if d.r == 2 {
         return rc4(key, &PADDING);
     }
-    let mut h = Md5::new();
+    let mut h = Md5::new(); // NOSONAR: ISO 32000 mandates MD5 for this security handler
     h.update(PADDING);
     h.update(id0);
     let mut x = rc4(key, &h.finalize());
@@ -508,10 +508,10 @@ fn user_key_r4(d: &EncryptDict, id0: &[u8], pw: &[u8]) -> Option<Vec<u8>> {
 /// The RC4 key derived from an owner password (Algorithm 3, steps a–d).
 fn owner_rc4_key(d: &EncryptDict, owner_pw: &[u8]) -> Vec<u8> {
     let n = key_len(d);
-    let mut digest = Md5::digest(pad(owner_pw)).to_vec();
+    let mut digest = Md5::digest(pad(owner_pw)).to_vec(); // NOSONAR: ISO 32000 mandates MD5 for this security handler
     if d.r >= 3 {
         for _ in 0..50 {
-            digest = Md5::digest(&digest).to_vec();
+            digest = Md5::digest(&digest).to_vec(); // NOSONAR: ISO 32000 mandates MD5 for this security handler
         }
     }
     digest.truncate(n);
