@@ -118,6 +118,9 @@ pub struct TextLine {
     /// `ink`, and whether joining put a space before it. Empty when the line's text was put
     /// into another order (see [`TextLine::runs`]).
     runs: Vec<(String, usize, bool)>,
+    /// Each run's text rendering mode (`Tr`) and whether it is in an `/OCR` marked-content
+    /// sequence, in content order. Kept when `runs` is emptied.
+    modes: Vec<(i64, bool)>,
     /// This line continues the previous one because a rewrite wrapped it (`/PCSoft`).
     soft_break: bool,
     /// This line starts after a break a rewrite kept on purpose (`/PCHard`).

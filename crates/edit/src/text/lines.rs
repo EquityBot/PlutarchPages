@@ -31,6 +31,19 @@ impl TextLine {
         })
     }
 
+    /// Each run's text rendering mode (`Tr`) and whether it is drawn in an `/OCR` marked-content
+    /// sequence, in content order: one per run of [`TextLine::runs`], also when the line was
+    /// reordered and that lists none.
+    pub fn run_modes(&self) -> impl Iterator<Item = (i64, bool)> + '_ {
+        self.modes.iter().copied()
+    }
+
+    /// The fill and stroke opacity (`ca` and `CA`) the line is drawn at: one for all its runs,
+    /// which join only when they agree.
+    pub fn opacity(&self) -> (f64, f64) {
+        self.paint.opacity()
+    }
+
     pub(crate) fn rotation(&self) -> f64 {
         let m = Matrix(self.origin.tm).then(&Matrix(self.origin.ctm)).0;
         m[1].atan2(m[0]).to_degrees()
@@ -247,6 +260,7 @@ fn text_lines_in(doc: &Document, p: &pdfcraft_model::Page, actual_text: bool) ->
             l.frame = union(l.frame, s.frame);
             l.ink.extend(s.ink.iter().copied());
             l.runs.push((s.text.clone(), l.ink.len(), spaced));
+            l.modes.push((s.state.render_mode, s.ocr_layer));
             l.ops.push(s.op);
             l.ops.extend(s.extra_ops.iter().copied());
             l.decodable &= s.decodable;
@@ -280,6 +294,7 @@ fn text_lines_in(doc: &Document, p: &pdfcraft_model::Page, actual_text: bool) ->
                 clips: s.state.render_mode >= 4,
                 unreadable_mode: s.state.unreadable.as_deref().map(str::to_owned),
                 runs: vec![(s.text.clone(), s.ink.len(), false)],
+                modes: vec![(s.state.render_mode, s.ocr_layer)],
                 soft_break: s.soft_break,
                 hard_break: s.hard_break,
                 soft_gap: s.soft_gap,
@@ -365,6 +380,7 @@ fn add_shown(lines: &mut Vec<TextLine>, last: &mut Option<Pen>, s: Shown, stream
         l.frame = union(l.frame, s.frame);
         l.ink.extend(s.ink.iter().copied());
         l.runs.push((s.text.clone(), l.ink.len(), spaced));
+        l.modes.push((s.state.render_mode, s.ocr_layer));
         l.ops.push(s.op);
         l.ops.extend(s.extra_ops.iter().copied());
         l.decodable &= s.decodable;
@@ -397,6 +413,7 @@ fn add_shown(lines: &mut Vec<TextLine>, last: &mut Option<Pen>, s: Shown, stream
             clips: s.state.render_mode >= 4,
             unreadable_mode: s.state.unreadable.as_deref().map(str::to_owned),
             runs: vec![(s.text.clone(), s.ink.len(), false)],
+            modes: vec![(s.state.render_mode, s.ocr_layer)],
             soft_break: s.soft_break,
             hard_break: s.hard_break,
             soft_gap: s.soft_gap,
@@ -550,7 +567,14 @@ pub(super) fn reading_lines(doc: &Document, page: usize) -> Result<(Vec<TextLine
         let Some(form) = form_call(w.doc, resources, name, ts.ctm, &w.path, &mut w.budget) else { return Ok(()) };
         let ops = parse(&form.data).ops;
         // The form starts with the graphics state at its `Do`, its own matrix applied.
-        let mut carry = Carry { ts: Ts { ctm: form.ctm, ..ts }, stack: Vec::new(), marked: Vec::new(), layers: Vec::new(), text_left: *text_left };
+        let mut carry = Carry {
+            ts: Ts { ctm: form.ctm, ..ts },
+            stack: Vec::new(),
+            marked: Vec::new(),
+            layers: Vec::new(),
+            ocr: Vec::new(),
+            text_left: *text_left,
+        };
         let stream = w.next_stream;
         w.next_stream = w.next_stream.saturating_add(1);
         if let Some(r) = form.obj {

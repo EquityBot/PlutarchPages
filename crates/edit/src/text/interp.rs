@@ -109,6 +109,13 @@ pub(super) struct Paint {
     gs: Gs,
 }
 
+impl Paint {
+    /// The fill and stroke opacity (`ca` and `CA`) in force.
+    pub(super) fn opacity(&self) -> (f64, f64) {
+        (self.gs.fill_alpha, self.gs.stroke_alpha)
+    }
+}
+
 /// The transparency parameters of the graphics state: what the `gs` operators have set, resolved,
 /// so a repeated `gs` or two names with the same settings leave it as it was.
 #[derive(Clone, Debug, PartialEq)]
@@ -299,6 +306,8 @@ pub(super) struct Shown {
     pub(super) decodable: bool,
     pub(super) scope: Option<usize>,
     pub(super) paint: Paint,
+    /// Whether it is drawn inside an `/OCR` marked-content sequence, the layer Scan & OCR writes.
+    pub(super) ocr_layer: bool,
     pub(super) logical_order: bool,
     pub(super) actual_text: bool,
     /// Set when a `/PCSoft` or `/PCHard` marker was seen since the previous text line.
@@ -440,6 +449,8 @@ pub(super) struct Carry {
     pub(super) marked: Vec<Option<usize>>,
     /// For each open marked-content sequence, its optional content group when it is `/OC`.
     pub(super) layers: Vec<Option<Vec<u8>>>,
+    /// For each open marked-content sequence, whether it is or is inside an `/OCR` sequence.
+    pub(super) ocr: Vec<bool>,
     /// Bytes of glyph text the rest of the page may still produce (see [`MAX_PAGE_TEXT`]).
     pub(super) text_left: usize,
 }
@@ -472,7 +483,7 @@ impl Carry {
             dash: (Vec::new(), 0.0),
             line_cap: 0,
         };
-        Carry { ts, stack: Vec::new(), marked: Vec::new(), layers: Vec::new(), text_left: MAX_PAGE_TEXT }
+        Carry { ts, stack: Vec::new(), marked: Vec::new(), layers: Vec::new(), ocr: Vec::new(), text_left: MAX_PAGE_TEXT }
     }
 }
 
@@ -487,6 +498,7 @@ type Invocation = (usize, Vec<u8>, Ts);
 struct MarkedContent {
     regions: Vec<Option<usize>>,
     layers: Vec<Option<Vec<u8>>>,
+    ocr: Vec<bool>,
     actual_text: Vec<Option<(usize, usize, String)>>,
 }
 
@@ -500,6 +512,7 @@ impl MarkedContent {
         let layer = op.is("BDC") && op.name(0) == Some(b"OC".as_slice());
         self.layers
             .push(layer.then(|| op.operands.get(1).and_then(Object::as_name).map_or_else(|| format!("@{index}").into_bytes(), <[u8]>::to_vec)));
+        self.ocr.push(op.name(0) == Some(b"OCR".as_slice()) || self.ocr.last().copied().unwrap_or(false));
         // The property list is inline or named in the resources' /Properties (§14.6.2).
         let list = logical_text.and_then(|properties| match op.operands.get(1) {
             Some(Object::Name(name)) => properties.get(name).and_then(|object| doc.dict(object)),
@@ -515,6 +528,7 @@ impl MarkedContent {
     fn end(&mut self, index: usize, shown: &mut Vec<Shown>) {
         self.regions.pop();
         self.layers.pop();
+        self.ocr.pop();
         if let Some(Some((start, open, logical))) = self.actual_text.pop() {
             let tail = shown.split_off(start.min(shown.len()));
             let mut items = tail.into_iter();
@@ -754,6 +768,7 @@ fn show_text(op: &Op, i: usize, state: &mut TextRunState<'_>) -> Result<(), Edit
         decodable,
         scope: marked.regions.last().copied().flatten(),
         paint: Paint { layers: marked.layers.iter().flatten().cloned().collect(), gs: ts.gs.clone() },
+        ocr_layer: marked.ocr.last().copied().unwrap_or(false),
         logical_order: false,
         actual_text: false,
         soft_break: state.soft_break,
@@ -781,8 +796,12 @@ pub(super) fn interpret(
     let mut stack: Vec<(Ts, Matrix, Matrix)> = std::mem::take(&mut carry.stack);
     let (mut tm, mut tlm) = (Matrix::IDENTITY, Matrix::IDENTITY);
     let mut bt = 0usize;
-    let mut marked =
-        MarkedContent { regions: std::mem::take(&mut carry.marked), layers: std::mem::take(&mut carry.layers), ..MarkedContent::default() };
+    let mut marked = MarkedContent {
+        regions: std::mem::take(&mut carry.marked),
+        layers: std::mem::take(&mut carry.layers),
+        ocr: std::mem::take(&mut carry.ocr),
+        ..MarkedContent::default()
+    };
     // A rewrite names a wrap (`/PCSoft`) or a break it kept (`/PCHard`) in an empty marker
     // before the next line. Neither name is a paragraph region, so it does not change scope.
     let mut soft_break = false;
@@ -950,6 +969,7 @@ pub(super) fn interpret(
     carry.stack = stack;
     carry.marked = marked.regions;
     carry.layers = marked.layers;
+    carry.ocr = marked.ocr;
     positioned_tracking(&mut out);
     Ok(out)
 }
