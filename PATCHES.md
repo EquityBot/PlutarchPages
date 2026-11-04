@@ -73,6 +73,9 @@ Upstream's tests for these were changed to assert the fork's behaviour. Keep the
   `crates/ui-egui/tests/perf.rs` at the edge on CI. A stand-in skips the automatic ids its drawn
   version takes (a card 2, a header row 1). If a merge changes how a card allocates, recount them:
   `far_comment_cards_and_headers_skip_layout_but_stay_reachable` fails when the count is wrong.
+- `publish = false` in every crate and app: `pdfcraft`, `pdfcraft-cos`, `craft-ui` and other names
+  this workspace uses belong to unrelated crates on crates.io. Give any crate upstream adds the
+  same line.
 
 ## Merging upstream
 

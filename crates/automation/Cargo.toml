@@ -4,6 +4,7 @@ description = "Agent control for PdfCraft: a headless tool set over the engine a
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+publish = false
 
 [lints]
 workspace = true
