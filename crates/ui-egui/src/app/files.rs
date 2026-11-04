@@ -29,6 +29,8 @@ impl PdfCraftApp {
             }
         }
         let view = &mut self.views[index];
+        // The binding belongs to the document, not to the display a user's defaults can replace.
+        view.right_to_left = v.right_to_left;
         if !self.always_default_view {
             match v.layout {
                 // The view opened in Default page display already.

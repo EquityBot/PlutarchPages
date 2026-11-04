@@ -17,6 +17,15 @@ Upstream's tests for these were changed to assert the fork's behaviour. Keep the
   check-one` checks before it renders.
 - **CSV exports** write formula-like cells as text, and import doesn't strip the apostrophe, so a
   neutralised cell doesn't round-trip back into a formula.
+- **Crypt filters** named by a reference that can't be read are never `/Identity`. Upstream reads
+  the reference as absent, which saves the stream in the clear. Here a stream's `/DecodeParms` or
+  `/Name` takes the document's filter, and a save drops its `/Crypt`; `/StmF`, `/StrF`, `/EFF`, `/CF`
+  or `/CFM` from `/V 4` on refuses the file, as does an `/Encrypt` and `/ID` referring to more than
+  4,096 objects. `crypt_name` and `encrypt_dict` in `crates/cos/src/security.rs` and
+  `encryption_members` in `crates/cos/src/document/open.rs` hold this, with tests in
+  `crates/cos/tests/it/encryption.rs`. The cos
+  part of upstream's `9203e4a6b` (#5548) came in ahead of the next merge; its hayro-syntax patch 30
+  and renderer tests didn't.
 
 ## Only here
 
@@ -91,6 +100,9 @@ Upstream's tests for these were changed to assert the fork's behaviour. Keep the
   readable `U+XXXX` tokens. Character warnings are independent of paint warnings and preserve
   mixed reasons within one replacement string. Tokens stay whole within the 200-character cap;
   these flags identify text for review and do not establish that it is malicious.
+- Right-edge binding: `/Direction /R2L` sets `DocView::right_to_left`, whatever the default view, and
+  `DocView::layout` mirrors each two-page row. Upstream's open PR #4239 adds a command for the same
+  layout: if it lands, keep the file's `/Direction` deciding how a document opens.
 - `publish = false` in every crate and app: `pdfcraft`, `pdfcraft-cos`, `craft-ui` and other names
   this workspace uses belong to unrelated crates on crates.io. Give any crate upstream adds the
   same line.
