@@ -269,13 +269,13 @@ Every engine feature is reachable without the GUI, through one table of JSON-Sch
 
   ```sh
   pdfcraft-cli tools                                        # every tool and its JSON Schema
-  pdfcraft-cli run text_find doc=1 query=invoice            # key=value; values parse as JSON
+  pdfcraft-cli run doc_open path=invoice.pdf                # key=value; values parse as JSON
   pdfcraft-cli run --script review.json                     # e.g. comment_add {"type": "highlight", "find": "total due"}
   pdfcraft-cli run --script steps.json --root ./work        # several steps in one session
   pdfcraft-cli run --script steps.json --report             # one JSON document: per step its number, tool, status, result or error
   ```
 
-  With `--root`, every file the script's steps read or write stays in that directory, including the PNG a step saves with `"out"` (the script itself is read from wherever you name it).
+  Each `run` is its own session, so a document opened by one call is gone before the next: a tool that takes `doc` needs a script whose earlier step opens it. With `--root`, every file the script's steps read or write stays in that directory, including the PNG a step saves with `"out"` (the script itself is read from wherever you name it).
 
 - **An MCP server**, for AI agents such as Claude. **It is opt-in:** PdfCraft never starts it on its own, and it opens no network port. It runs only while an agent launches `pdfcraft-cli mcp`, talks over stdin/stdout, and stops when the agent disconnects. To enable it, add it to your agent's MCP configuration:
 
@@ -283,7 +283,7 @@ Every engine feature is reachable without the GUI, through one table of JSON-Sch
   { "mcpServers": { "pdfcraft": { "command": "pdfcraft-cli", "args": ["mcp", "--root", "/path/to/your/pdfs"] } } }
   ```
 
-  `--compact` shrinks the tool list the agent has to read: `tools/list` returns about ten core tools plus `tool_search` and `tool_call`, which find and run every other tool, so the list costs far fewer tokens. Every tool still works.
+  `--compact` shrinks the tool list the agent has to read: `tools/list` returns 15 core tools plus `tool_search` and `tool_call`, which find and run every other tool, so the list costs far fewer tokens. Every tool still works.
 
   `--root` confines every file the agent can read or write to one directory. Builds that should not include the server at all can use `cargo build -p pdfcraft-cli --no-default-features`.
 
