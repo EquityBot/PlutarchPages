@@ -11,7 +11,7 @@
 
 [![tests](https://github.com/yungSNAT/PlutarchPages/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/yungSNAT/PlutarchPages/actions/workflows/ci.yml) [![Codecov](https://codecov.io/gh/yungSNAT/PlutarchPages/graph/badge.svg)](https://codecov.io/gh/yungSNAT/PlutarchPages) [![CodeQL](https://github.com/yungSNAT/PlutarchPages/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/yungSNAT/PlutarchPages/actions/workflows/codeql.yml) [![OSV-Scanner](https://github.com/yungSNAT/PlutarchPages/actions/workflows/osv-scanner.yml/badge.svg?branch=main)](https://github.com/yungSNAT/PlutarchPages/actions/workflows/osv-scanner.yml) [![SonarCloud](https://sonarcloud.io/api/project_badges/measure?project=EquityBot_PlutarchPages&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=EquityBot_PlutarchPages) [![Codacy code quality](https://app.codacy.com/project/badge/Grade/5ce0643c37eb4a8e9635595492f66c87)](https://app.codacy.com/gh/EquityBot/PlutarchPages/dashboard)<br>
 [![OpenSSF Scorecard](https://raw.githubusercontent.com/ryanduguid/.github/badges/EquityBot/PlutarchPages.svg)](https://scorecard.dev/viewer/?uri=github.com/yungSNAT/PlutarchPages) [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/16133/badge)](https://www.bestpractices.dev/projects/16133)<br>
-[![release](https://badgen.net/github/release/yungSNAT/PlutarchPages/stable?label=release&color=66023C&labelColor=000000)](https://github.com/yungSNAT/PlutarchPages/releases/latest) [![rust: 1.95+](.github/assets/badges/rust.svg)](https://www.rust-lang.org/) [![licence: MIT OR Apache-2.0](.github/assets/badges/licence.svg)](#license-and-credits) [![fork of: PdfCraft](.github/assets/badges/fork-of.svg)](https://github.com/storytold/pdfcraft)
+[![release](https://badgen.net/github/release/yungSNAT/PlutarchPages/stable?label=release&color=66023C&labelColor=000000)](https://github.com/yungSNAT/PlutarchPages/releases/latest) [![rust: 1.95+](.github/assets/badges/rust.svg)](https://www.rust-lang.org/) [![licence: MIT OR Apache-2.0](.github/assets/badges/licence.svg)](#licence) [![fork of: PdfCraft](.github/assets/badges/fork-of.svg)](https://github.com/storytold/pdfcraft)
 
 </div>
 
@@ -47,10 +47,12 @@
   <a href="#runs-everywhere-stays-yours">Everywhere</a> ·
   <a href="#built-for-agents-too">Agents</a> ·
   <a href="#how-its-built">How it's built</a> ·
-  <a href="#get-started">Get started</a> ·
+  <a href="#install-and-use">Install and use</a> ·
   <a href="#whats-next">What's next</a> ·
   <a href="#when-to-choose-something-else">Alternatives</a> ·
-  <a href="#downloads">Downloads</a>
+  <a href="#downloads">Downloads</a> ·
+  <a href="#development">Development</a> ·
+  <a href="#credits">Credits</a>
 </p>
 
 ---
@@ -356,7 +358,7 @@ poppler over the corpus on demand (`cargo xtask text-oracle`).
 
 PdfCraft is a clean-room implementation. Its behaviour comes from the ISO 32000 specification and black-box observation, never from anyone else's code. Every icon, font and image is openly licensed and listed in [ATTRIBUTION.md](ATTRIBUTION.md).
 
-## Get started
+## Install and use
 
 Building needs Rust 1.95 or later.
 
@@ -385,7 +387,6 @@ git clone https://github.com/storytold/craft-fonts ../craft-fonts
 CRAFT_FONTS_DIR=../craft-fonts cargo run --release -p pdfcraft -- some.pdf
 ```
 
-Logs, environment variables and other development notes are in [docs/development.md](docs/development.md).
 
 ## What's next
 
@@ -498,10 +499,11 @@ for now, 3D content, export to PowerPoint, enhanced OCR clean-up, an AI assistan
 
 ---
 
-## License and credits
+## Development
 
-PdfCraft is dual-licensed under [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at your option.
-Copyright (c) 2026 ArtCraft Team and the PdfCraft contributors. Required notices are in [NOTICE](NOTICE).
+Logs, environment variables and other development notes are in [docs/development.md](docs/development.md). [PATCHES.md](PATCHES.md) records what this fork changes and how to merge upstream.
+
+## Credits
 
 Bundled fonts, icons, images and other assets keep their own open licenses; each one is listed
 with its author, source and license in [ATTRIBUTION.md](ATTRIBUTION.md). Release builds also embed
@@ -513,6 +515,11 @@ trademarks of the ArtCraft Team; this fork has removed them, as the upstream bra
 for modified versions, and is not an ArtCraft product.
 
 The banner's lettering and emblem are drawn from Cascadia Mono and Besley glyphs (SIL OFL 1.1).
+
+## Licence
+
+PdfCraft is dual-licensed under [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at your option.
+Copyright (c) 2026 ArtCraft Team and the PdfCraft contributors. Required notices are in [NOTICE](NOTICE).
 
 <sub>Adobe, Photoshop, Illustrator, Premiere Pro, Lightroom, Acrobat, After Effects and InDesign are trademarks or registered trademarks of Adobe Inc. in the United States and/or other countries. PdfCraft is an independent, open-source project and is not affiliated with, sponsored by or endorsed by Adobe Inc.; these names are used only to describe the workflows it is compatible with.</sub>
 
