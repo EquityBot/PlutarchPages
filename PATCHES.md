@@ -109,6 +109,34 @@ Upstream's tests for these were changed to assert the fork's behaviour. Keep the
   this workspace uses belong to unrelated crates on crates.io. Give any crate upstream adds the
   same line.
 
+## Ported ahead of the next merge
+
+Security and robustness commits cherry-picked from upstream's `main` after `f137a289`. Each commit
+names its source in a `cherry picked from` line. The next merge brings them in again: take
+upstream's side except where this section says otherwise, then delete the entry.
+`vendor/README.md` keeps upstream's patch numbers so that merge lines up, which leaves gaps:
+hayro-jbig2 11, hayro-syntax 30 to 32 and hayro-interpret 71 to 73 aren't here.
+
+- As upstream: `21a48ac735` (font discovery worker panic), `2289b5755d` (negative trailer `/Size`),
+  `fdaa502f27` (`try_oid` arcs), `8faebd0d96` (`Matrix::invert`), `036811368b` (both `/Decode` ends
+  must be finite numbers to invert an export) and, apart from their rows in `vendor/README.md`,
+  `85c1005148` (hayro-jbig2 patches 5 to 9, hayro-syntax 29),
+  `10107d943a` (hayro-jbig2 12) and `8243952569` (hayro-jbig2 10).
+- **Crop drags** (`aef42635d0`): `clamp_crop` in `crates/ui-egui/src/tools/edit_text_ui/image.rs`
+  holds the fork's older clamps, which this crop code had before upstream's `apply_crop`: the far
+  edge stays at least 6 px past the clamped near edge, where upstream clamps each edge against the
+  image alone. Keep or drop that difference when `apply_crop` arrives, but keep the guards.
+- **Image export `/Decode`** (`ae94b54505`): `crates/create` only. Its renderer test and its row
+  changes need upstream's `fa7acd31d` (hayro-syntax patch 32). Until that comes, export reads
+  `/Decode [7 0 R 0]` through the reference and the renderer doesn't.
+- **Reference cycles** (`33d7a51301`): the `crates/create` test only. Its renderer and
+  `hayro-interpret` hunks extend tests that arrive with `fa7acd31d` and `84a2005f`.
+- Left out: `4696dd2f42` (the budget is already spent before the read here, and the rest needs
+  `b3b555ff` and `d3a40f2a`), `0ed339901e` (needs `ea6c3297`, `5480dbe1` and `39eb03a0`) and
+  `801fd3aa67` (signature preview images: it calls `ImageBudget` and `image_file_within`, which
+  `0ed339901e` introduces, so it doesn't build without it).
+  `72e763ad` and `b7ec3669` correct what `8243952569` charges and aren't here yet.
+
 ## Merging upstream
 
 1. `git merge --no-ff` upstream's `main` on a `ryan/` branch. Never rewrite history.
