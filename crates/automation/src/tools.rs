@@ -1444,7 +1444,6 @@ pub fn tools() -> Vec<ToolDef> {
                     "size": { "type": "number", "exclusiveMinimum": 0 },
                     "color": { "type": "string", "description": "#rrggbb" },
                     "align": { "type": "string", "enum": ["left", "center", "right", "justify"] },
-                    "aligns": { "type": "array", "maxItems": 4096, "items": { "enum": ["left", "center", "right", "justify", null] }, "description": "Each paragraph's (line's) own alignment, by index; null follows align." },
                     "underline": { "type": "boolean" },
                     "line_spacing": { "type": "number", "description": "Multiple of the font size (1.2 is ordinary)." },
                     "dx": { "type": "number", "description": "Paragraph only: move right by this many points (negative: left)." },

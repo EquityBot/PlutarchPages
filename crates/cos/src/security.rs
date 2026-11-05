@@ -88,7 +88,7 @@ pub(crate) fn encrypt_dict(doc: &Document, d: &Dict) -> Result<EncryptDict, CosE
         None if by_reference(Some(o)) => Err(unreadable(k)),
         f => Ok(f),
     };
-    let mut crypt_filters = Vec::new();
+    let mut crypt_filters: Vec<(Vec<u8>, Method)> = Vec::new();
     if let Some(cf) = d.get(b"CF").map(|c| filters(c, b"CF")).transpose()?.flatten() {
         for (k, f) in cf.iter() {
             let Some(f) = filters(f, k)? else { continue };
@@ -111,6 +111,17 @@ pub(crate) fn encrypt_dict(doc: &Document, d: &Dict) -> Result<EncryptDict, CosE
         .and_then(|f| f.as_dict().and_then(|f| f.get(b"Length").map(|n| doc.resolve(n))))
         .and_then(|n| n.as_int())
         .filter(|n| *n > 0);
+    // From /V 4 on a selector names /Identity or an entry of /CF (ISO 32000-2 §7.6.6). Any other
+    // name would be /Identity by default, with the same result as a reference that can't be read.
+    let (stm_f, str_f, ef_f) = (selector(d, b"StmF")?, selector(d, b"StrF")?, selector(d, b"EFF")?);
+    if v >= 4 {
+        for (key, chosen) in [("StmF", &stm_f), ("StrF", &str_f), ("EFF", &ef_f)] {
+            let held = |n: &Vec<u8>| n == b"Identity" || crypt_filters.iter().any(|(f, _)| f == n);
+            if !chosen.as_ref().is_none_or(held) {
+                return Err(CosError::Security(format!("/Encrypt's /{key} names a crypt filter /CF doesn't hold")));
+            }
+        }
+    }
     let length_bits = match (v, cf_len) {
         (5.., _) => 256,
         (4, Some(n)) if n <= 32 => n * 8,
@@ -131,9 +142,9 @@ pub(crate) fn encrypt_dict(doc: &Document, d: &Dict) -> Result<EncryptDict, CosE
         p: int(b"P", -1) as i32,
         encrypt_metadata: !matches!(d.get(b"EncryptMetadata").map(|v| doc.resolve(v)).as_deref(), Some(Object::Bool(false))),
         crypt_filters,
-        stm_f: selector(d, b"StmF")?.unwrap_or_else(|| b"Identity".to_vec()),
-        str_f: selector(d, b"StrF")?.unwrap_or_else(|| b"Identity".to_vec()),
-        ef_f: selector(d, b"EFF")?.unwrap_or_default(),
+        stm_f: stm_f.unwrap_or_else(|| b"Identity".to_vec()),
+        str_f: str_f.unwrap_or_else(|| b"Identity".to_vec()),
+        ef_f: ef_f.unwrap_or_default(),
     })
 }
 
@@ -337,7 +348,9 @@ fn stream(
         return Object::Stream(Stream { dict: walked(&s.dict), raw: s.raw.clone() });
     }
     let place = crypt_place(doc, &s.dict);
-    let mut named = place.and_then(|i| crypt_name(doc, &s.dict, i));
+    // A name `/CF` doesn't hold says no more about the stream than a reference to nothing.
+    let held = |n: &Vec<u8>| n == b"Identity" || h.dict().crypt_filters.iter().any(|(f, _)| f == n);
+    let mut named = place.and_then(|i| crypt_name(doc, &s.dict, i)).filter(held);
     // `/Crypt` that names nothing readable follows the document's filter: `/Identity` would read
     // ciphertext as data, and write the stream in the clear. A save takes it out, or the null that
     // a full save writes for a reference to nothing would make it `/Identity` from then on.
