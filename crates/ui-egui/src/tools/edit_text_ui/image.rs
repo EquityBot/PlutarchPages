@@ -66,6 +66,55 @@ fn crop_handles(k: Rect) -> [Pos2; 8] {
     [k.left_top(), k.right_top(), k.left_bottom(), k.right_bottom(), k.center_top(), k.right_center(), k.center_bottom(), k.left_center()]
 }
 
+// Keep a dragged crop inside the image and at least 6 px, including images smaller than that.
+fn clamp_crop(b: Rect, new_screen: Rect) -> Rect {
+    if !b.is_finite() || !b.is_positive() || !b.size().is_finite() || !new_screen.is_finite() {
+        return new_screen;
+    }
+    let (min_w, min_h) = (6.0_f32.min(b.width()), 6.0_f32.min(b.height()));
+    // Not `clamp`: rounding can leave `b.max - min_w` below `b.min`, and `clamp` panics on that.
+    let min = Pos2::new(new_screen.min.x.min(b.max.x - min_w).max(b.min.x), new_screen.min.y.min(b.max.y - min_h).max(b.min.y));
+    let max = Pos2::new(new_screen.max.x.max(min.x + min_w).min(b.max.x), new_screen.max.y.max(min.y + min_h).min(b.max.y));
+    Rect::from_min_max(min, max)
+}
+
+#[cfg(test)]
+mod crop_bounds_tests {
+    use super::*;
+
+    #[test]
+    fn crop_drag_rejects_nonfinite_bounds() {
+        for value in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+            let bounds = Rect { min: Pos2::new(value, 0.0), max: Pos2::new(100.0, 100.0) };
+            let keep = Rect::from_min_max(Pos2::new(10.0, 10.0), Pos2::new(50.0, 50.0));
+            assert_eq!(clamp_crop(bounds, keep), keep);
+        }
+    }
+
+    #[test]
+    fn crop_drag_survives_bounds_that_round() {
+        // 6.1 - 0.1 rounds to 6.0, and 6.1 - 6.0 is then just below 0.1.
+        let (low, high) = (0.1_f32, 6.1_f32);
+        assert!(high - (high - low) < low);
+        for bounds in [
+            Rect::from_min_max(Pos2::new(low, 0.0), Pos2::new(high, 100.0)),
+            Rect::from_min_max(Pos2::new(0.0, low), Pos2::new(100.0, high)),
+            Rect::from_min_max(Pos2::new(low, low), Pos2::new(high, high)),
+        ] {
+            for drag in [
+                Rect::from_min_max(Pos2::new(-5.0, -5.0), Pos2::new(50.0, 50.0)),
+                Rect::from_min_max(Pos2::new(3.0, 3.0), Pos2::new(3.0, 3.0)),
+                Rect::from_min_max(Pos2::new(50.0, 50.0), Pos2::new(60.0, 60.0)),
+            ] {
+                let kept = clamp_crop(bounds, drag);
+                assert!(kept.min.x >= bounds.min.x && kept.min.y >= bounds.min.y, "{kept:?}");
+                assert!(kept.max.x <= bounds.max.x && kept.max.y <= bounds.max.y, "{kept:?}");
+                assert!(kept.min.x <= kept.max.x && kept.min.y <= kept.max.y, "{kept:?}");
+            }
+        }
+    }
+}
+
 /// Crop mode for the selected image `i` whose visible frame is `b` (screen). Returns `true`
 /// (the pointer and keys are the crop's while it lasts).
 fn crop_input(cx: &ImageCx<'_>, view: &mut DocView, i: usize, b: Rect) -> bool {
@@ -74,12 +123,17 @@ fn crop_input(cx: &ImageCx<'_>, view: &mut DocView, i: usize, b: Rect) -> bool {
     let Some(mode) = view.image_selection.as_mut().and_then(|s| s.crop.as_mut()) else { return false };
     let hover_pos = ptr.pos;
     let keep_screen = |keep: [f64; 4]| xf.user_rect(info, page, keep.map(|v| v as f32)).intersect(b);
+    let k = keep_screen(mode.keep);
+    if !b.is_finite() || !b.is_positive() || !b.size().is_finite() || !k.is_finite() || !k.is_positive() {
+        mode.drag = None;
+        return true;
+    }
+
     // A drag in progress moves a grip; the box stays inside the picture and at least 6 px.
     if allow_interaction
         && resp.drag_started()
         && let Some(o) = ptr.origin
     {
-        let k = keep_screen(mode.keep);
         let grip = crop_handles(k).iter().position(|h| h.distance(o) < 8.0).or_else(|| k.contains(o).then_some(8));
         if let Some(g) = grip {
             mode.drag = Some((g, o, mode.keep));
@@ -90,6 +144,10 @@ fn crop_input(cx: &ImageCx<'_>, view: &mut DocView, i: usize, b: Rect) -> bool {
     {
         let d = p - start;
         let k0 = keep_screen(at_start);
+        if !d.is_finite() || !k0.is_finite() || !k0.is_positive() {
+            mode.drag = None;
+            return true;
+        }
         let (mut min, mut max) = (k0.min, k0.max);
         match grip {
             0 => {
@@ -118,12 +176,7 @@ fn crop_input(cx: &ImageCx<'_>, view: &mut DocView, i: usize, b: Rect) -> bool {
                 max += shift;
             }
         }
-        let (min_w, min_h) = (6.0_f32.min(b.width()), 6.0_f32.min(b.height()));
-        min.x = min.x.clamp(b.min.x, b.max.x - min_w);
-        min.y = min.y.clamp(b.min.y, b.max.y - min_h);
-        max.x = max.x.clamp(min.x + min_w, b.max.x);
-        max.y = max.y.clamp(min.y + min_h, b.max.y);
-        mode.keep = user_box(xf, info, page, Rect::from_min_max(min, max));
+        mode.keep = user_box(xf, info, page, clamp_crop(b, Rect::from_min_max(min, max)));
         if resp.drag_stopped() || !ptr.primary_down {
             mode.drag = None;
         }
