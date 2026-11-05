@@ -242,6 +242,13 @@ impl PdfCraftApp {
         self.print_tasks.printers = Some(rx);
     }
 
+    /// `true` while the Type 3 note is being read, whose thread asks for a frame as it ends (used
+    /// by tests).
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn type3_read_pending(&self) -> bool {
+        self.print_tasks.type3_pages.is_some()
+    }
+
     /// Where the pages that draw with Type 3 fonts print as images, the dialog says so (#2684): read
     /// them off the GUI thread, whatever the document holds. Every printed choice is covered: the
     /// page content and every annotation that prints.
