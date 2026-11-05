@@ -10117,7 +10117,7 @@ fn bookmark_list_reports_colour_and_style() {
 }
 
 /// `aligns` gives each line of added text an alignment of its own; `align` alone is the whole box
-/// again. Text edits take `aligns` for a paragraph's rows the same way.
+/// again. A text edit has none: see `text_edit_row_alignment_is_refused_without_changing_existing_text`.
 #[test]
 fn added_text_lines_take_their_own_alignments() {
     let dir = workdir("paragraph-aligns");

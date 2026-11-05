@@ -816,6 +816,7 @@ fn a_crypt_filter_reference_that_cannot_be_read_is_the_documents_own_filter() {
         "/Name to itself",
         "/Name nowhere",
         "/Name to a number",
+        "/Name that /CF does not hold",
     ] {
         let mut doc = Document::open(Arc::new(protect(Algorithm::Aes128, "", "owner", -1))).unwrap();
         let me = Object::Ref(contents_of(&doc));
@@ -833,6 +834,7 @@ fn a_crypt_filter_reference_that_cannot_be_read_is_the_documents_own_filter() {
                 "a /DecodeParms entry nowhere" => (Object::Array(vec![crypt]), Object::Array(vec![nowhere])),
                 "/Name to itself" => (crypt, named(me)),
                 "/Name nowhere" => (crypt, named(nowhere)),
+                "/Name that /CF does not hold" => (crypt, named(Object::name("Missing"))),
                 _ => (crypt, named(number)),
             },
         );
@@ -845,6 +847,21 @@ fn a_crypt_filter_reference_that_cannot_be_read_is_the_documents_own_filter() {
         let full = write_full(&back, &SaveOptions::default()).unwrap();
         assert!(!holds(&full, "Secret page"), "{what}: renumbered, encrypted");
         assert_eq!(raw_content(&Document::open(Arc::new(full)).unwrap()), SECRET, "{what}: renumbered");
+    }
+}
+
+/// `/StmF`, `/StrF` and `/EFF` name `/Identity` or an entry of `/CF`. A name that isn't there would
+/// be `/Identity`, so the file doesn't open: its streams or strings would be saved in the clear.
+#[test]
+fn a_selector_naming_a_filter_cf_does_not_hold_refuses_the_file() {
+    for key in ["StmF", "StrF", "EFF"] {
+        let mut doc = Document::open(Arc::new(protect(Algorithm::Aes128, "", "owner", -1))).unwrap();
+        let encrypt = doc.trailer().reference(b"Encrypt").unwrap();
+        let mut dict = doc.get(encrypt).as_dict().cloned().unwrap();
+        dict.set(key.as_bytes().to_vec(), Object::name("Missing"));
+        doc.set(encrypt, Object::Dict(dict));
+        let saved = write_incremental(&doc, &SaveOptions::default()).unwrap();
+        assert!(matches!(Document::open(Arc::new(saved)), Err(CosError::Security(_))), "{key}");
     }
 }
 
