@@ -696,8 +696,10 @@ fn a_dead_options_read_wakes_an_idle_dialog() {
     d.show_driver_options = true;
     // The preview's page rasters render on the pool and ask for frames until they arrive; on a
     // loaded machine that outlasts `run`'s step budget, so the dialog is idle only after them.
+    // Windows' Type 3 note wakes the dialog as its read ends; it has to end first, or its frame
+    // passes for the dead read's whilst that thread is still unwinding.
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
-    while h.state().render_pending() && std::time::Instant::now() < deadline {
+    while (h.state().render_pending() || h.state().type3_read_pending()) && std::time::Instant::now() < deadline {
         h.run_steps(1);
         std::thread::sleep(std::time::Duration::from_millis(5));
     }
