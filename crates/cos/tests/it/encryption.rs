@@ -865,6 +865,28 @@ fn a_selector_naming_a_filter_cf_does_not_hold_refuses_the_file() {
     }
 }
 
+/// Where `/StmF` is `/Identity` the document's filter is no filter, so a `/Name` that `/CF` doesn't
+/// hold leaves the stream's bytes as the file holds them. Nothing was decrypted, so a save shows
+/// nothing the file didn't.
+#[test]
+fn an_unknown_name_under_an_identity_stmf_keeps_the_bytes_the_file_holds() {
+    // Object streams would be encrypted, and unreadable once `/StmF` changes.
+    let doc = Document::open(Arc::new(protect(Algorithm::Aes128, "", "owner", -1))).unwrap();
+    let unpacked = write_full(&doc, &SaveOptions { object_streams: false, ..SaveOptions::default() }).unwrap();
+    let mut doc = Document::open(Arc::new(unpacked)).unwrap();
+    let encrypt = doc.trailer().reference(b"Encrypt").unwrap();
+    doc.update_dict(encrypt, |e| e.set(b"StmF".to_vec(), Object::name("Identity"))).unwrap();
+    let mut doc = Document::open(Arc::new(write_incremental(&doc, &SaveOptions::default()).unwrap())).unwrap();
+    let held = raw_content(&doc);
+    let mut parms = pdfcraft_cos::Dict::new();
+    parms.set(b"Name".to_vec(), Object::name("Missing"));
+    select(&mut doc, (Object::name("Crypt"), Object::Dict(parms)));
+    for saved in [write_incremental(&doc, &SaveOptions::default()).unwrap(), write_full(&doc, &SaveOptions::default()).unwrap()] {
+        assert!(!holds(&saved, "Secret page"), "no plaintext appears");
+        assert_eq!(raw_content(&Document::open(Arc::new(saved)).unwrap()), held, "the bytes stay");
+    }
+}
+
 /// The same in a file from elsewhere, whose stream keeps such a `/Crypt`: its ciphertext isn't read
 /// as data, and a full save neither writes it in the clear nor leaves it to read as `/Identity`.
 #[test]
