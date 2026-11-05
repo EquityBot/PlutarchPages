@@ -10149,7 +10149,7 @@ fn text_edit_row_alignment_is_refused_without_changing_existing_text() {
     let doc = ok(&mut a, "doc_open", json!({ "path": "rows.pdf" }))["doc"].as_u64().unwrap();
     let before = ok(&mut a, "text_lines", json!({ "doc": doc, "page": 1 }));
     let refused = err(&mut a, "text_edit", json!({ "doc": doc, "page": 1, "paragraph": 1, "aligns": [null, "right"] }));
-    assert!(matches!(&refused, ToolError::Failed(m) | ToolError::InvalidArgs(m) if m.contains("selected-row alignment")), "{refused:?}");
+    assert!(matches!(&refused, ToolError::Failed(m) | ToolError::InvalidArgs(m) if m.contains("unknown argument")), "{refused:?}");
     assert_eq!(ok(&mut a, "text_lines", json!({ "doc": doc, "page": 1 })), before);
     ok(&mut a, "doc_save", json!({ "doc": doc, "path": "unchanged.pdf" }));
     let reopened = ok(&mut a, "doc_open", json!({ "path": "unchanged.pdf" }))["doc"].as_u64().unwrap();
