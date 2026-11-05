@@ -121,7 +121,8 @@ hayro-jbig2 11, hayro-syntax 30 to 32 and hayro-interpret 71 to 73 aren't here.
   `fdaa502f27` (`try_oid` arcs), `8faebd0d96` (`Matrix::invert`), `036811368b` (both `/Decode` ends
   must be finite numbers to invert an export) and, apart from their rows in `vendor/README.md`,
   `85c1005148` (hayro-jbig2 patches 5 to 9, hayro-syntax 29),
-  `10107d943a` (hayro-jbig2 12) and `8243952569` (hayro-jbig2 10).
+  `10107d943a` (hayro-jbig2 12), `8243952569` (hayro-jbig2 10), `72e763ad` and `b7ec3669` (what
+  patch 10 charges).
 - **Crop drags** (`aef42635d0`): `clamp_crop` in `crates/ui-egui/src/tools/edit_text_ui/image.rs`
   holds the fork's older clamps, which this crop code had before upstream's `apply_crop`: the far
   edge stays at least 6 px past the clamped near edge, where upstream clamps each edge against the
@@ -135,7 +136,6 @@ hayro-jbig2 11, hayro-syntax 30 to 32 and hayro-interpret 71 to 73 aren't here.
   `b3b555ff` and `d3a40f2a`), `0ed339901e` (needs `ea6c3297`, `5480dbe1` and `39eb03a0`) and
   `801fd3aa67` (signature preview images: it calls `ImageBudget` and `image_file_within`, which
   `0ed339901e` introduces, so it doesn't build without it).
-  `72e763ad` and `b7ec3669` correct what `8243952569` charges and aren't here yet.
 
 ## Merging upstream
 
