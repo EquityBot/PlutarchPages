@@ -115,11 +115,12 @@ Security and robustness commits cherry-picked from upstream's `main` after `f137
 names its source in a `cherry picked from` line. The next merge brings them in again: take
 upstream's side except where this section says otherwise, then delete the entry.
 `vendor/README.md` keeps upstream's patch numbers so that merge lines up, which leaves gaps:
-hayro-jbig2 11, hayro-syntax 30 and 31, and hayro-interpret 71 and 73 aren't here.
+hayro-jbig2 11, hayro-syntax 30 and 31, and hayro-interpret 73 aren't here.
 
 - As upstream: `21a48ac735` (font discovery worker panic), `2289b5755d` (negative trailer `/Size`),
-  `fdaa502f27` (`try_oid` arcs), `8faebd0d96` (`Matrix::invert`), `fa7acd3156` (a tuple keeps its
-  references: hayro-syntax 32, hayro-interpret 72), `ae94b54505` (export reads `/Decode` through
+  `fdaa502f27` (`try_oid` arcs), `8faebd0d96` (`Matrix::invert`), `84a2005f` (an Indexed lookup
+  table in an indirect string: hayro-interpret 71), `fa7acd3156` (a tuple keeps its references:
+  hayro-syntax 32, hayro-interpret 72), `ae94b54505` (export reads `/Decode` through
   references, so it agrees with the renderer), `33d7a51301` (reference cycles), `036811368b` (both
   `/Decode` ends must be finite numbers to invert an export) and, apart from their rows in
   `vendor/README.md`, `85c1005148` (hayro-jbig2 patches 5 to 9, hayro-syntax 29), `10107d943a`
